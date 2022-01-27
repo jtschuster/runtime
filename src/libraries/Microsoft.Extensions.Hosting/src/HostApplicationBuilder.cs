@@ -19,14 +19,16 @@ namespace Microsoft.Extensions.Hosting
 
         public HostApplicationBuilder(HostApplicationOptions options)
         {
-            var (hostingEnvironment, physicalFileProvider) = Hosting.HostBuilder.CreateHostingEnvironment(
-                applicationName: options.ApplicationName,
-                environmentName: options.EnvironmentName,
-                contentRootPath: options.ContentRootPath);
+            foreach (var configurationSource in options.InitialialConfigurationSources)
+            {
+                ((IConfigurationBuilder)Configuration).Add(configurationSource);
+            }
+
+            var (hostingEnvironment, physicalFileProvider) = Hosting.HostBuilder.CreateHostingEnvironment(Configuration);
 
             Configuration.SetFileProvider(physicalFileProvider);
 
-            var hostBuilderContext = new HostBuilderContext(Properties)
+            var hostBuilderContext = new HostBuilderContext(HostBuilder.Properties)
             {
                 HostingEnvironment = hostingEnvironment,
                 Configuration = Configuration,
@@ -41,18 +43,13 @@ namespace Microsoft.Extensions.Hosting
                 Configuration);
         }
 
-        /// <summary>
-        /// A central location for sharing state between components during the host building process.
-        /// </summary>
-        public IDictionary<object, object> Properties { get; } = new Dictionary<object, object>();
-
         public IHostEnvironment Environement { get; }
 
         public IServiceCollection Services { get; }
 
         public ConfigurationManager Configuration { get; } = new();
 
-        public IHostBuilder HostBuilder { get; }
+        public IHostBuilder HostBuilder = new HostBuilderAdapter();
 
         public IHost Build()
         {
@@ -99,7 +96,10 @@ namespace Microsoft.Extensions.Hosting
 
         private class HostBuilderAdapter : IHostBuilder
         {
-            public IDictionary<object, object> Properties => throw new NotImplementedException();
+            /// <summary>
+            /// A central location for sharing state between components during the host building process.
+            /// </summary>
+            public IDictionary<object, object> Properties { get; } = new Dictionary<object, object>();
 
             public IHost Build() => throw new NotImplementedException();
             public IHostBuilder ConfigureAppConfiguration(Action<HostBuilderContext, IConfigurationBuilder> configureDelegate) => throw new NotImplementedException();

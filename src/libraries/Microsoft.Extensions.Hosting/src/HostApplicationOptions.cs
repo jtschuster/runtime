@@ -15,23 +15,8 @@ namespace Microsoft.Extensions.Hosting
     public class HostApplicationOptions
     {
         /// <summary>
-        /// The environment name.
-        /// </summary>
-        public string EnvironmentName { get; set; }
-
-        /// <summary>
-        /// The application name.
-        /// </summary>
-        public string ApplicationName { get; set; }
-
-        /// <summary>
-        /// The content root path.
-        /// </summary>
-        public string ContentRootPath { get; set; }
-
-        /// <summary>
-        /// If <see langword="true"/>, configures the <see cref="HostApplicationBuilder"/> instance with pre-configured defaults. This will overwrite
-        /// previously configured values and is intended to be called before additional configuration calls.
+        /// If <see langword="true"/>, configures the <see cref="HostApplicationBuilder"/> instance with pre-configured defaults.
+        /// This has a similar effect to calling <see cref="HostingHostBuilderExtensions.ConfigureDefaults(IHostBuilder, string[])"/>.
         /// </summary>
         /// <remarks>
         ///   The following defaults are applied to the <see cref="IHostBuilder"/>:
@@ -45,5 +30,17 @@ namespace Microsoft.Extensions.Hosting
         ///     * enables scope validation on the dependency injection container when <see cref="IHostEnvironment.EnvironmentName"/> is 'Development'
         /// </remarks>
         public bool ConfigureDefaults { get; set; }
+
+        /// <summary>
+        /// The command line arguments.
+        /// </summary>
+        public string[] Args { get; init; }
+
+        /// <summary>
+        /// Initial configuration sources to be added to the <see cref="HostApplicationBuilder.Configuration"/>. These sources can influence
+        /// the <see cref="HostApplicationBuilder.Environement"/> through the use of <see cref="HostDefaults"/> keys. If <see cref="ConfigureDefaults"/>
+        /// is <see langword="true"/>, these sources will be added after the default sources.
+        /// </summary>
+        public IList<IConfigurationSource> InitialialConfigurationSources { get; } = new List<IConfigurationSource>();
     }
 }

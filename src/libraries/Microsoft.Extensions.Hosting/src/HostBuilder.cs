@@ -180,22 +180,16 @@ namespace Microsoft.Extensions.Hosting
 
         private void InitializeHostingEnvironment()
         {
-            (_hostingEnvironment, _defaultProvider) = CreateHostingEnvironment(
-                applicationName: _hostConfiguration[HostDefaults.ApplicationKey],
-                environmentName: _hostConfiguration[HostDefaults.EnvironmentKey],
-                contentRootPath: _hostConfiguration[HostDefaults.ContentRootKey]);
+            (_hostingEnvironment, _defaultProvider) = CreateHostingEnvironment(_hostConfiguration);
         }
 
-        internal static (HostingEnvironment, PhysicalFileProvider) CreateHostingEnvironment(
-            string applicationName,
-            string environmentName,
-            string contentRootPath)
+        internal static (HostingEnvironment, PhysicalFileProvider) CreateHostingEnvironment(IConfiguration hostConfiguration)
         {
             var hostingEnvironment = new HostingEnvironment()
             {
-                ApplicationName = applicationName,
-                EnvironmentName = environmentName ?? Environments.Production,
-                ContentRootPath = ResolveContentRootPath(contentRootPath, AppContext.BaseDirectory),
+                ApplicationName = hostConfiguration[HostDefaults.ApplicationKey],
+                EnvironmentName = hostConfiguration[HostDefaults.EnvironmentKey] ?? Environments.Production,
+                ContentRootPath = ResolveContentRootPath(hostConfiguration[HostDefaults.ContentRootKey], AppContext.BaseDirectory),
             };
 
             if (string.IsNullOrEmpty(hostingEnvironment.ApplicationName))
