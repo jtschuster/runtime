@@ -3,6 +3,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting.Internal;
@@ -12,6 +14,8 @@ namespace Microsoft.Extensions.Hosting
     public class HostApplicationBuilder
     {
         private IServiceFactoryAdapter _serviceProviderFactory = new ServiceFactoryAdapter<IServiceCollection>(new DefaultServiceProviderFactory());
+        private List<IConfigureContainerAdapter> _configureContainerActions = new List<IConfigureContainerAdapter>();
+        private bool _hostBuilt;
 
         public HostApplicationBuilder(HostApplicationOptions options)
         {
@@ -52,7 +56,45 @@ namespace Microsoft.Extensions.Hosting
 
         public IHost Build()
         {
-            throw new NotImplementedException();
+            if (_hostBuilt)
+            {
+                throw new InvalidOperationException(SR.BuildCalled);
+            }
+            _hostBuilt = true;
+
+            // REVIEW: If we want to raise more events outside of these calls then we will need to
+            // stash this in a field.
+            using var diagnosticListener = new DiagnosticListener("Microsoft.Extensions.Hosting");
+            const string hostBuildingEventName = "HostBuilding";
+            const string hostBuiltEventName = "HostBuilt";
+
+            if (diagnosticListener.IsEnabled() && diagnosticListener.IsEnabled(hostBuildingEventName))
+            {
+                Write(diagnosticListener, hostBuildingEventName, HostBuilder);
+            }
+
+            object containerBuilder = _serviceProviderFactory.CreateBuilder(Services);
+            var serviceProvider = _serviceProviderFactory.CreateServiceProvider(containerBuilder);
+
+            var appServices = Hosting.HostBuilder.CreateServiceProvider();
+
+            var host = appServices.GetRequiredService<IHost>();
+            if (diagnosticListener.IsEnabled() && diagnosticListener.IsEnabled(hostBuiltEventName))
+            {
+                Write(diagnosticListener, hostBuiltEventName, host);
+            }
+
+            return host;
+        }
+
+        [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:UnrecognizedReflectionPattern",
+            Justification = "The values being passed into Write are being consumed by the application already.")]
+        private static void Write<T>(
+            DiagnosticSource diagnosticSource,
+            string name,
+            T value)
+        {
+            diagnosticSource.Write(name, value);
         }
 
         private class HostBuilderAdapter : IHostBuilder

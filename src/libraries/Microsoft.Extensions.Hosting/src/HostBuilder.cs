@@ -283,32 +283,37 @@ namespace Microsoft.Extensions.Hosting
             return services;
         }
 
-        private void CreateServiceProvider()
+        internal static IServiceProvider CreateServiceProvider(
+            IServiceCollection services,
+            IServiceFactoryAdapter factory,
+            List<IConfigureContainerAdapter> adapters,
+            HostBuilderContext context)
         {
-            var services = CreateServiceCollection(_hostBuilderContext, _hostingEnvironment, _defaultProvider, _appConfiguration);
+            object containerBuilder = factory.CreateBuilder(services);
 
-            foreach (Action<HostBuilderContext, IServiceCollection> configureServicesAction in _configureServicesActions)
+            foreach (IConfigureContainerAdapter containerAction in adapters)
             {
-                configureServicesAction(_hostBuilderContext, services);
+                containerAction.ConfigureContainer(context, containerBuilder);
             }
 
-            object containerBuilder = _serviceProviderFactory.CreateBuilder(services);
+            var serviceProvider = factory.CreateServiceProvider(containerBuilder);
 
-            foreach (IConfigureContainerAdapter containerAction in _configureContainerActions)
-            {
-                containerAction.ConfigureContainer(_hostBuilderContext, containerBuilder);
-            }
-
-            _appServices = _serviceProviderFactory.CreateServiceProvider(containerBuilder);
-
-            if (_appServices == null)
+            if (serviceProvider is null)
             {
                 throw new InvalidOperationException(SR.NullIServiceProvider);
             }
 
             // resolve configuration explicitly once to mark it as resolved within the
             // service provider, ensuring it will be properly disposed with the provider
-            _ = _appServices.GetService<IConfiguration>();
+            _ = serviceProvider.GetService<IConfiguration>();
+
+            return serviceProvider;
+        }
+
+        private void InitializeServiceProvider()
+        {
+            var services = CreateServiceCollection(_hostBuilderContext, _hostingEnvironment, _defaultProvider, _appConfiguration);
+            _appServices = CreateServiceProvider(services, _serviceProviderFactory, _configureContainerActions, _hostBuilderContext);
         }
     }
 }
