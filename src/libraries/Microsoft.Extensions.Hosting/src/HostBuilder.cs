@@ -142,7 +142,7 @@ namespace Microsoft.Extensions.Hosting
             }
 
             BuildHostConfiguration();
-            CreateHostingEnvironment();
+            InitializeHostingEnvironment();
             CreateHostBuilderContext();
             BuildAppConfiguration();
             CreateServiceProvider();
@@ -178,25 +178,39 @@ namespace Microsoft.Extensions.Hosting
             _hostConfiguration = configBuilder.Build();
         }
 
-        private void CreateHostingEnvironment()
+        private void InitializeHostingEnvironment()
         {
-            _hostingEnvironment = new HostingEnvironment()
-            {
-                ApplicationName = _hostConfiguration[HostDefaults.ApplicationKey],
-                EnvironmentName = _hostConfiguration[HostDefaults.EnvironmentKey] ?? Environments.Production,
-                ContentRootPath = ResolveContentRootPath(_hostConfiguration[HostDefaults.ContentRootKey], AppContext.BaseDirectory),
-            };
-
-            if (string.IsNullOrEmpty(_hostingEnvironment.ApplicationName))
-            {
-                // Note GetEntryAssembly returns null for the net4x console test runner.
-                _hostingEnvironment.ApplicationName = Assembly.GetEntryAssembly()?.GetName().Name;
-            }
-
-            _hostingEnvironment.ContentRootFileProvider = _defaultProvider = new PhysicalFileProvider(_hostingEnvironment.ContentRootPath);
+            (_hostingEnvironment, _defaultProvider) = CreateHostingEnvironment(
+                applicationName: _hostConfiguration[HostDefaults.ApplicationKey],
+                environmentName: _hostConfiguration[HostDefaults.EnvironmentKey],
+                contentRootPath: _hostConfiguration[HostDefaults.ContentRootKey]);
         }
 
-        private string ResolveContentRootPath(string contentRootPath, string basePath)
+        internal static (HostingEnvironment, PhysicalFileProvider) CreateHostingEnvironment(
+            string applicationName,
+            string environmentName,
+            string contentRootPath)
+        {
+            var hostingEnvironment = new HostingEnvironment()
+            {
+                ApplicationName = applicationName,
+                EnvironmentName = environmentName ?? Environments.Production,
+                ContentRootPath = ResolveContentRootPath(contentRootPath, AppContext.BaseDirectory),
+            };
+
+            if (string.IsNullOrEmpty(hostingEnvironment.ApplicationName))
+            {
+                // Note GetEntryAssembly returns null for the net4x console test runner.
+                hostingEnvironment.ApplicationName = Assembly.GetEntryAssembly()?.GetName().Name;
+            }
+
+            var physicalFileProvider = new PhysicalFileProvider(hostingEnvironment.ContentRootPath);
+            hostingEnvironment.ContentRootFileProvider = physicalFileProvider;
+
+            return (hostingEnvironment, physicalFileProvider);
+        }
+
+        private static string ResolveContentRootPath(string contentRootPath, string basePath)
         {
             if (string.IsNullOrEmpty(contentRootPath))
             {
@@ -232,35 +246,46 @@ namespace Microsoft.Extensions.Hosting
             _hostBuilderContext.Configuration = _appConfiguration;
         }
 
-        private void CreateServiceProvider()
+        internal static IServiceCollection CreateServiceCollection(
+            HostBuilderContext hostBuilderContext,
+            HostingEnvironment hostingEnvironment,
+            PhysicalFileProvider defaultFileProvider,
+            IConfiguration appConfiguration)
         {
             var services = new ServiceCollection();
 #pragma warning disable CS0618 // Type or member is obsolete
-            services.AddSingleton<IHostingEnvironment>(_hostingEnvironment);
+            services.AddSingleton<IHostingEnvironment>(hostingEnvironment);
 #pragma warning restore CS0618 // Type or member is obsolete
-            services.AddSingleton<IHostEnvironment>(_hostingEnvironment);
-            services.AddSingleton(_hostBuilderContext);
+            services.AddSingleton<IHostEnvironment>(hostingEnvironment);
+            services.AddSingleton(hostBuilderContext);
             // register configuration as factory to make it dispose with the service provider
-            services.AddSingleton(_ => _appConfiguration);
+            services.AddSingleton(_ => appConfiguration);
 #pragma warning disable CS0618 // Type or member is obsolete
-            services.AddSingleton<IApplicationLifetime>(s => (IApplicationLifetime)s.GetService<IHostApplicationLifetime>());
+            services.AddSingleton(s => (IApplicationLifetime)s.GetService<IHostApplicationLifetime>());
 #pragma warning restore CS0618 // Type or member is obsolete
             services.AddSingleton<IHostApplicationLifetime, ApplicationLifetime>();
 
             AddLifetime(services);
 
-            services.AddSingleton<IHost>(_ =>
+            services.AddSingleton<IHost>(appServices =>
             {
-                return new Internal.Host(_appServices,
-                    _hostingEnvironment,
-                    _defaultProvider,
-                    _appServices.GetRequiredService<IHostApplicationLifetime>(),
-                    _appServices.GetRequiredService<ILogger<Internal.Host>>(),
-                    _appServices.GetRequiredService<IHostLifetime>(),
-                    _appServices.GetRequiredService<IOptions<HostOptions>>());
+                return new Internal.Host(appServices,
+                    hostingEnvironment,
+                    defaultFileProvider,
+                    appServices.GetRequiredService<IHostApplicationLifetime>(),
+                    appServices.GetRequiredService<ILogger<Internal.Host>>(),
+                    appServices.GetRequiredService<IHostLifetime>(),
+                    appServices.GetRequiredService<IOptions<HostOptions>>());
             });
-            services.AddOptions().Configure<HostOptions>(options => { options.Initialize(_hostConfiguration); });
+            services.AddOptions().Configure<HostOptions>(options => { options.Initialize(hostBuilderContext.Configuration); });
             services.AddLogging();
+
+            return services;
+        }
+
+        private void CreateServiceProvider()
+        {
+            var services = CreateServiceCollection(_hostBuilderContext, _hostingEnvironment, _defaultProvider, _appConfiguration);
 
             foreach (Action<HostBuilderContext, IServiceCollection> configureServicesAction in _configureServicesActions)
             {
