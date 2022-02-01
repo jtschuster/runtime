@@ -60,16 +60,7 @@ namespace Microsoft.Extensions.Hosting
             }
             _hostBuilt = true;
 
-            // REVIEW: If we want to raise more events outside of these calls then we will need to
-            // stash this in a field.
-            using var diagnosticListener = new DiagnosticListener("Microsoft.Extensions.Hosting");
-            const string hostBuildingEventName = "HostBuilding";
-            const string hostBuiltEventName = "HostBuilt";
-
-            if (diagnosticListener.IsEnabled() && diagnosticListener.IsEnabled(hostBuildingEventName))
-            {
-                Write(diagnosticListener, hostBuildingEventName, HostBuilder);
-            }
+            using DiagnosticListener diagnosticListener = Hosting.HostBuilder.LogHostBuilding(HostBuilder);
 
             _appServices = Hosting.HostBuilder.CreateServiceProvider(
                 Services,
@@ -78,22 +69,9 @@ namespace Microsoft.Extensions.Hosting
                 _hostBuilderContext);
 
             var host = _appServices.GetRequiredService<IHost>();
-            if (diagnosticListener.IsEnabled() && diagnosticListener.IsEnabled(hostBuiltEventName))
-            {
-                Write(diagnosticListener, hostBuiltEventName, host);
-            }
+            Hosting.HostBuilder.LogHostBuilt(diagnosticListener, host);
 
             return host;
-        }
-
-        [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:UnrecognizedReflectionPattern",
-            Justification = "The values being passed into Write are being consumed by the application already.")]
-        private static void Write<T>(
-            DiagnosticSource diagnosticSource,
-            string name,
-            T value)
-        {
-            diagnosticSource.Write(name, value);
         }
 
         private class HostBuilderAdapter : IHostBuilder

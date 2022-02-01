@@ -132,28 +132,41 @@ namespace Microsoft.Extensions.Hosting
 
             // REVIEW: If we want to raise more events outside of these calls then we will need to
             // stash this in a field.
-            using var diagnosticListener = new DiagnosticListener("Microsoft.Extensions.Hosting");
-            const string hostBuildingEventName = "HostBuilding";
-            const string hostBuiltEventName = "HostBuilt";
-
-            if (diagnosticListener.IsEnabled() && diagnosticListener.IsEnabled(hostBuildingEventName))
-            {
-                Write(diagnosticListener, hostBuildingEventName, this);
-            }
+            using DiagnosticListener diagnosticListener = LogHostBuilding(this);
 
             BuildHostConfiguration();
             InitializeHostingEnvironment();
-            CreateHostBuilderContext();
+            InitializeHostBuilderContext();
             BuildAppConfiguration();
             InitializeServiceProvider();
 
             var host = _appServices.GetRequiredService<IHost>();
+            LogHostBuilt(diagnosticListener, host);
+
+            return host;
+        }
+
+        internal static DiagnosticListener LogHostBuilding(IHostBuilder builder)
+        {
+            var diagnosticListener = new DiagnosticListener("Microsoft.Extensions.Hosting");
+            const string hostBuildingEventName = "HostBuilding";
+
+            if (diagnosticListener.IsEnabled() && diagnosticListener.IsEnabled(hostBuildingEventName))
+            {
+                Write(diagnosticListener, hostBuildingEventName, builder);
+            }
+
+            return diagnosticListener;
+        }
+
+        internal static void LogHostBuilt(DiagnosticListener diagnosticListener, IHost host)
+        {
+            const string hostBuiltEventName = "HostBuilt";
+
             if (diagnosticListener.IsEnabled() && diagnosticListener.IsEnabled(hostBuiltEventName))
             {
                 Write(diagnosticListener, hostBuiltEventName, host);
             }
-
-            return host;
         }
 
         [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:UnrecognizedReflectionPattern",
@@ -217,7 +230,7 @@ namespace Microsoft.Extensions.Hosting
             return Path.Combine(Path.GetFullPath(basePath), contentRootPath);
         }
 
-        private void CreateHostBuilderContext()
+        private void InitializeHostBuilderContext()
         {
             _hostBuilderContext = new HostBuilderContext(Properties)
             {
