@@ -17,6 +17,7 @@ namespace Microsoft.Extensions.Hosting
         private readonly HostBuilderContext _hostBuilderContext;
 
         private IServiceFactoryAdapter _serviceProviderFactory = new ServiceFactoryAdapter<IServiceCollection>(new DefaultServiceProviderFactory());
+        private IServiceProvider _appServices;
         private bool _hostBuilt;
 
         public HostApplicationBuilder(HostApplicationOptions options)
@@ -39,7 +40,8 @@ namespace Microsoft.Extensions.Hosting
                 _hostBuilderContext,
                 hostingEnvironment,
                 physicalFileProvider,
-                Configuration);
+                Configuration,
+                () => _appServices);
         }
 
         public IHostEnvironment Environement { get; }
@@ -69,16 +71,13 @@ namespace Microsoft.Extensions.Hosting
                 Write(diagnosticListener, hostBuildingEventName, HostBuilder);
             }
 
-            object containerBuilder = _serviceProviderFactory.CreateBuilder(Services);
-            var serviceProvider = _serviceProviderFactory.CreateServiceProvider(containerBuilder);
-
-            var appServices = Hosting.HostBuilder.CreateServiceProvider(
+            _appServices = Hosting.HostBuilder.CreateServiceProvider(
                 Services,
                 _serviceProviderFactory,
                 _configureContainerActions,
                 _hostBuilderContext);
 
-            var host = appServices.GetRequiredService<IHost>();
+            var host = _appServices.GetRequiredService<IHost>();
             if (diagnosticListener.IsEnabled() && diagnosticListener.IsEnabled(hostBuiltEventName))
             {
                 Write(diagnosticListener, hostBuiltEventName, host);

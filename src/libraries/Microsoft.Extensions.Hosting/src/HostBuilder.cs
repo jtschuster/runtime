@@ -244,7 +244,8 @@ namespace Microsoft.Extensions.Hosting
             HostBuilderContext hostBuilderContext,
             HostingEnvironment hostingEnvironment,
             PhysicalFileProvider defaultFileProvider,
-            IConfiguration appConfiguration)
+            IConfiguration appConfiguration,
+            Func<IServiceProvider> serviceProviderGetter)
         {
             var services = new ServiceCollection();
 #pragma warning disable CS0618 // Type or member is obsolete
@@ -261,8 +262,9 @@ namespace Microsoft.Extensions.Hosting
 
             AddLifetime(services);
 
-            services.AddSingleton<IHost>(appServices =>
+            services.AddSingleton<IHost>(_ =>
             {
+                IServiceProvider appServices = serviceProviderGetter();
                 return new Internal.Host(appServices,
                     hostingEnvironment,
                     defaultFileProvider,
@@ -306,7 +308,12 @@ namespace Microsoft.Extensions.Hosting
 
         private void InitializeServiceProvider()
         {
-            var services = CreateServiceCollection(_hostBuilderContext, _hostingEnvironment, _defaultProvider, _appConfiguration);
+            var services = CreateServiceCollection(
+                _hostBuilderContext,
+                _hostingEnvironment,
+                _defaultProvider,
+                _appConfiguration,
+                () => _appServices);
 
             foreach (Action<HostBuilderContext, IServiceCollection> configureServicesAction in _configureServicesActions)
             {
