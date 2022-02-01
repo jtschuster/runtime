@@ -4,7 +4,6 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting.Internal;
@@ -24,6 +23,11 @@ namespace Microsoft.Extensions.Hosting
         {
             Configuration = options.Configuration ?? new ConfigurationManager();
 
+            if (options.ConfigureDefaults)
+            {
+                HostingHostBuilderExtensions.ApplyDefaultHostConfiguration(Configuration, options.Args);
+            }
+
             var (hostingEnvironment, physicalFileProvider) = Hosting.HostBuilder.CreateHostingEnvironment(Configuration);
 
             Configuration.SetFileProvider(physicalFileProvider);
@@ -42,6 +46,13 @@ namespace Microsoft.Extensions.Hosting
                 physicalFileProvider,
                 Configuration,
                 () => _appServices);
+
+            if (options.ConfigureDefaults)
+            {
+                HostingHostBuilderExtensions.ApplyDefaultAppConfiguration(_hostBuilderContext, Configuration, options.Args);
+                HostingHostBuilderExtensions.AddDefaultServices(_hostBuilderContext, Services);
+                _serviceProviderFactory = new ServiceFactoryAdapter<IServiceCollection>(() => _hostBuilderContext, HostingHostBuilderExtensions.CreateDefaultServiceProvider);
+            }
         }
 
         public IHostEnvironment Environement { get; }
@@ -74,6 +85,8 @@ namespace Microsoft.Extensions.Hosting
             return host;
         }
 
+        // TODO: Provide compatibility implementation similar to https://github.com/dotnet/aspnetcore/blob/15fa3ad10859abcc54e3ad5557dc928f6c94994d/src/DefaultBuilder/src/ConfigureHostBuilder.cs
+        // This will prevent modifications to HostDefaults.ApplicationKey, HostDefaults.ContentRootKey and HostDefaults.EnvironmentKey in ConfigureHostConfiguration since it's too late.
         private class HostBuilderAdapter : IHostBuilder
         {
             /// <summary>
