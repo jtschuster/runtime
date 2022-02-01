@@ -19,11 +19,11 @@ namespace Microsoft.Extensions.Hosting
         private IServiceProvider _appServices;
         private bool _hostBuilt;
 
-        public HostApplicationBuilder(HostApplicationOptions options)
+        internal HostApplicationBuilder(HostApplicationOptions options)
         {
             Configuration = options.Configuration ?? new ConfigurationManager();
 
-            if (options.ConfigureDefaults)
+            if (!options.DisableDefaults)
             {
                 HostingHostBuilderExtensions.ApplyDefaultHostConfiguration(Configuration, options.Args);
             }
@@ -38,7 +38,7 @@ namespace Microsoft.Extensions.Hosting
                 Configuration = Configuration,
             };
 
-            Environement = hostingEnvironment;
+            Environment = hostingEnvironment;
 
             Services = Hosting.HostBuilder.CreateServiceCollection(
                 _hostBuilderContext,
@@ -47,7 +47,7 @@ namespace Microsoft.Extensions.Hosting
                 Configuration,
                 () => _appServices);
 
-            if (options.ConfigureDefaults)
+            if (!options.DisableDefaults)
             {
                 HostingHostBuilderExtensions.ApplyDefaultAppConfiguration(_hostBuilderContext, Configuration, options.Args);
                 HostingHostBuilderExtensions.AddDefaultServices(_hostBuilderContext, Services);
@@ -55,12 +55,25 @@ namespace Microsoft.Extensions.Hosting
             }
         }
 
-        public IHostEnvironment Environement { get; }
-
-        public IServiceCollection Services { get; }
-
+        /// <summary>
+        /// A collection of services for the application to compose. This is useful for adding user provided or framework provided services.
+        /// </summary>
         public ConfigurationManager Configuration { get; }
 
+        /// <summary>
+        /// A collection of services for the application to compose. This is useful for adding user provided or framework provided services.
+        /// </summary>
+        public IServiceCollection Services { get; }
+
+        /// <summary>
+        /// Provides information about the hosting environment an application is running in.
+        /// </summary>
+        public IHostEnvironment Environment { get; }
+
+        /// <summary>
+        /// An <see cref="IHostBuilder"/> for configuring host specific properties, but not building.
+        /// To build after configuration, call <see cref="Build"/>.
+        /// </summary>
         public IHostBuilder HostBuilder = new HostBuilderAdapter();
 
         public IHost Build()

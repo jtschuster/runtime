@@ -1,21 +1,19 @@
 ﻿// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace Microsoft.Extensions.Hosting
 {
+    /// <summary>
+    /// Options for constructing an <see cref="HostApplicationBuilder"/>.
+    /// </summary>
     public class HostApplicationOptions
     {
         /// <summary>
-        /// If <see langword="true"/>, configures the <see cref="HostApplicationBuilder"/> instance with pre-configured defaults.
+        /// If <see langword="false"/>, configures the <see cref="HostApplicationBuilder"/> instance with pre-configured defaults.
         /// This has a similar effect to calling <see cref="HostingHostBuilderExtensions.ConfigureDefaults(IHostBuilder, string[])"/>.
         /// </summary>
         /// <remarks>
@@ -29,16 +27,16 @@ namespace Microsoft.Extensions.Hosting
         ///     * configure the <see cref="ILoggerFactory"/> to log to the console, debug, and event source output
         ///     * enables scope validation on the dependency injection container when <see cref="IHostEnvironment.EnvironmentName"/> is 'Development'
         /// </remarks>
-        public bool ConfigureDefaults { get; set; }
+        public bool DisableDefaults { get; set; }
 
         /// <summary>
-        /// The command line arguments.
+        /// The command line arguments. This is unused if <see cref="DisableDefaults"/> is <see langword="true"/>.
         /// </summary>
         public string[] Args { get; set; }
 
         /// <summary>
         /// Initial configuration sources to be added to the <see cref="HostApplicationBuilder.Configuration"/>. These sources can influence
-        /// the <see cref="HostApplicationBuilder.Environement"/> through the use of <see cref="HostDefaults"/> keys.
+        /// the <see cref="HostApplicationBuilder.Environment"/> through the use of <see cref="HostDefaults"/> keys.
         /// </summary>
         public ConfigurationManager Configuration { get; set; }
     }
