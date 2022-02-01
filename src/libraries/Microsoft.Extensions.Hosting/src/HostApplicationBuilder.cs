@@ -13,22 +13,21 @@ namespace Microsoft.Extensions.Hosting
 {
     public class HostApplicationBuilder
     {
+        private readonly List<IConfigureContainerAdapter> _configureContainerActions = new();
+        private readonly HostBuilderContext _hostBuilderContext;
+
         private IServiceFactoryAdapter _serviceProviderFactory = new ServiceFactoryAdapter<IServiceCollection>(new DefaultServiceProviderFactory());
-        private List<IConfigureContainerAdapter> _configureContainerActions = new List<IConfigureContainerAdapter>();
         private bool _hostBuilt;
 
         public HostApplicationBuilder(HostApplicationOptions options)
         {
-            foreach (var configurationSource in options.InitialialConfigurationSources)
-            {
-                ((IConfigurationBuilder)Configuration).Add(configurationSource);
-            }
+            Configuration = options.Configuration ?? new ConfigurationManager();
 
             var (hostingEnvironment, physicalFileProvider) = Hosting.HostBuilder.CreateHostingEnvironment(Configuration);
 
             Configuration.SetFileProvider(physicalFileProvider);
 
-            var hostBuilderContext = new HostBuilderContext(HostBuilder.Properties)
+            _hostBuilderContext = new HostBuilderContext(HostBuilder.Properties)
             {
                 HostingEnvironment = hostingEnvironment,
                 Configuration = Configuration,
@@ -37,7 +36,7 @@ namespace Microsoft.Extensions.Hosting
             Environement = hostingEnvironment;
 
             Services = Hosting.HostBuilder.CreateServiceCollection(
-                hostBuilderContext,
+                _hostBuilderContext,
                 hostingEnvironment,
                 physicalFileProvider,
                 Configuration);
@@ -47,7 +46,7 @@ namespace Microsoft.Extensions.Hosting
 
         public IServiceCollection Services { get; }
 
-        public ConfigurationManager Configuration { get; } = new();
+        public ConfigurationManager Configuration { get; }
 
         public IHostBuilder HostBuilder = new HostBuilderAdapter();
 
@@ -73,7 +72,11 @@ namespace Microsoft.Extensions.Hosting
             object containerBuilder = _serviceProviderFactory.CreateBuilder(Services);
             var serviceProvider = _serviceProviderFactory.CreateServiceProvider(containerBuilder);
 
-            var appServices = Hosting.HostBuilder.CreateServiceProvider();
+            var appServices = Hosting.HostBuilder.CreateServiceProvider(
+                Services,
+                _serviceProviderFactory,
+                _configureContainerActions,
+                _hostBuilderContext);
 
             var host = appServices.GetRequiredService<IHost>();
             if (diagnosticListener.IsEnabled() && diagnosticListener.IsEnabled(hostBuiltEventName))

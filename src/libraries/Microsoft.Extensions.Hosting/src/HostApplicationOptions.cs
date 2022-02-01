@@ -34,13 +34,12 @@ namespace Microsoft.Extensions.Hosting
         /// <summary>
         /// The command line arguments.
         /// </summary>
-        public string[] Args { get; init; }
+        public string[] Args { get; set; }
 
         /// <summary>
         /// Initial configuration sources to be added to the <see cref="HostApplicationBuilder.Configuration"/>. These sources can influence
-        /// the <see cref="HostApplicationBuilder.Environement"/> through the use of <see cref="HostDefaults"/> keys. If <see cref="ConfigureDefaults"/>
-        /// is <see langword="true"/>, these sources will be added after the default sources.
+        /// the <see cref="HostApplicationBuilder.Environement"/> through the use of <see cref="HostDefaults"/> keys.
         /// </summary>
-        public IList<IConfigurationSource> InitialialConfigurationSources { get; } = new List<IConfigurationSource>();
+        public ConfigurationManager Configuration { get; set; }
     }
 }

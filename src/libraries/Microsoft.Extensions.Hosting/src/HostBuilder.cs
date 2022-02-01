@@ -145,7 +145,7 @@ namespace Microsoft.Extensions.Hosting
             InitializeHostingEnvironment();
             CreateHostBuilderContext();
             BuildAppConfiguration();
-            CreateServiceProvider();
+            InitializeServiceProvider();
 
             var host = _appServices.GetRequiredService<IHost>();
             if (diagnosticListener.IsEnabled() && diagnosticListener.IsEnabled(hostBuiltEventName))
@@ -307,6 +307,12 @@ namespace Microsoft.Extensions.Hosting
         private void InitializeServiceProvider()
         {
             var services = CreateServiceCollection(_hostBuilderContext, _hostingEnvironment, _defaultProvider, _appConfiguration);
+
+            foreach (Action<HostBuilderContext, IServiceCollection> configureServicesAction in _configureServicesActions)
+            {
+                configureServicesAction(_hostBuilderContext, services);
+            }
+
             _appServices = CreateServiceProvider(services, _serviceProviderFactory, _configureContainerActions, _hostBuilderContext);
         }
     }
