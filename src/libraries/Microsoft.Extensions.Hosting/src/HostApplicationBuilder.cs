@@ -74,7 +74,7 @@ namespace Microsoft.Extensions.Hosting
         /// An <see cref="IHostBuilder"/> for configuring host specific properties, but not building.
         /// To build after configuration, call <see cref="Build"/>.
         /// </summary>
-        public IHostBuilder HostBuilder = new HostBuilderAdapter();
+        public IHostBuilder HostBuilder { get; } = new HostBuilderAdapter();
 
         public IHost Build()
         {

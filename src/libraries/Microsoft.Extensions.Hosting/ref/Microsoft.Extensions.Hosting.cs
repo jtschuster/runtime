@@ -25,8 +25,27 @@ namespace Microsoft.Extensions.Hosting
     }
     public static partial class Host
     {
+        public static Microsoft.Extensions.Hosting.HostApplicationBuilder CreateApplicationBuilder() { throw null; }
+        public static Microsoft.Extensions.Hosting.HostApplicationBuilder CreateApplicationBuilder(Microsoft.Extensions.Hosting.HostApplicationOptions options) { throw null; }
+        public static Microsoft.Extensions.Hosting.HostApplicationBuilder CreateApplicationBuilder(string[] args) { throw null; }
         public static Microsoft.Extensions.Hosting.IHostBuilder CreateDefaultBuilder() { throw null; }
         public static Microsoft.Extensions.Hosting.IHostBuilder CreateDefaultBuilder(string[] args) { throw null; }
+    }
+    public partial class HostApplicationBuilder
+    {
+        internal HostApplicationBuilder() { }
+        public Microsoft.Extensions.Configuration.ConfigurationManager Configuration { get { throw null; } }
+        public Microsoft.Extensions.Hosting.IHostEnvironment Environment { get { throw null; } }
+        public Microsoft.Extensions.Hosting.IHostBuilder HostBuilder { get { throw null; } }
+        public Microsoft.Extensions.DependencyInjection.IServiceCollection Services { get { throw null; } }
+        public Microsoft.Extensions.Hosting.IHost Build() { throw null; }
+    }
+    public partial class HostApplicationOptions
+    {
+        public HostApplicationOptions() { }
+        public string[] Args { get { throw null; } set { } }
+        public Microsoft.Extensions.Configuration.ConfigurationManager Configuration { get { throw null; } set { } }
+        public bool DisableDefaults { get { throw null; } set { } }
     }
     public partial class HostBuilder : Microsoft.Extensions.Hosting.IHostBuilder
     {

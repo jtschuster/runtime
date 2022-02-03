@@ -7,7 +7,6 @@
     <!-- Use targeting pack references instead of granular ones in the project file. -->
     <DisableImplicitAssemblyReferences>false</DisableImplicitAssemblyReferences>
     <IsPackable>true</IsPackable>
-    <RunMatchingRefApiCompat>false</RunMatchingRefApiCompat>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(TargetFrameworkIdentifier)' == '.NETCoreApp'">
