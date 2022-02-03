@@ -26,14 +26,13 @@ namespace Microsoft.Extensions.Hosting
     public static partial class Host
     {
         public static Microsoft.Extensions.Hosting.HostApplicationBuilder CreateApplicationBuilder() { throw null; }
-        public static Microsoft.Extensions.Hosting.HostApplicationBuilder CreateApplicationBuilder(Microsoft.Extensions.Hosting.HostApplicationOptions options) { throw null; }
         public static Microsoft.Extensions.Hosting.HostApplicationBuilder CreateApplicationBuilder(string[] args) { throw null; }
         public static Microsoft.Extensions.Hosting.IHostBuilder CreateDefaultBuilder() { throw null; }
         public static Microsoft.Extensions.Hosting.IHostBuilder CreateDefaultBuilder(string[] args) { throw null; }
     }
     public partial class HostApplicationBuilder
     {
-        internal HostApplicationBuilder() { }
+        public HostApplicationBuilder(Microsoft.Extensions.Hosting.HostApplicationOptions options) { }
         public Microsoft.Extensions.Configuration.ConfigurationManager Configuration { get { throw null; } }
         public Microsoft.Extensions.Hosting.IHostEnvironment Environment { get { throw null; } }
         public Microsoft.Extensions.Hosting.IHostBuilder HostBuilder { get { throw null; } }

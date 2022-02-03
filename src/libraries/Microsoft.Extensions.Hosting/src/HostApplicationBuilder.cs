@@ -19,7 +19,11 @@ namespace Microsoft.Extensions.Hosting
         private IServiceProvider _appServices;
         private bool _hostBuilt;
 
-        internal HostApplicationBuilder(HostApplicationOptions options)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="HostApplicationBuilder"/>.
+        /// </summary>
+        /// <param name="options">Options controlling initial configuration and whether default settings should beOptions controlling initial configuration and whether default settings should be usedd.</param>
+        public HostApplicationBuilder(HostApplicationOptions options)
         {
             Configuration = options.Configuration ?? new ConfigurationManager();
 

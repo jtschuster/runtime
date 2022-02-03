@@ -74,7 +74,7 @@ namespace Microsoft.Extensions.Hosting
         ///   </list>
         /// </remarks>
         public static HostApplicationBuilder CreateApplicationBuilder() =>
-            CreateApplicationBuilder(new HostApplicationOptions());
+            CreateApplicationBuilder(args: null);
 
         /// <summary>
         /// Initializes a new instance of the <see cref="HostApplicationBuilder"/> class with pre-configured defaults.
@@ -96,19 +96,10 @@ namespace Microsoft.Extensions.Hosting
         /// <param name="args">The command line args.</param>
         public static HostApplicationBuilder CreateApplicationBuilder(string[] args)
         {
-            return CreateApplicationBuilder(new HostApplicationOptions
+            return new HostApplicationBuilder(new HostApplicationOptions
             {
                 Args = args
             });
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="HostApplicationBuilder"/>.
-        /// </summary>
-        /// <param name="options">Options controlling initial configuration and whether default settings should beOptions controlling initial configuration and whether default settings should be usedd.</param>
-        public static HostApplicationBuilder CreateApplicationBuilder(HostApplicationOptions options)
-        {
-            return new HostApplicationBuilder(options);
         }
     }
 }
