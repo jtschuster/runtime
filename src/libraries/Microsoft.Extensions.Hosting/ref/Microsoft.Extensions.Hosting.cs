@@ -43,8 +43,9 @@ namespace Microsoft.Extensions.Hosting
     {
         public HostApplicationOptions() { }
         public string[] Args { get { throw null; } set { } }
-        public Microsoft.Extensions.Configuration.ConfigurationManager Configuration { get { throw null; } set { } }
         public bool DisableDefaults { get { throw null; } set { } }
+        public Microsoft.Extensions.Configuration.ConfigurationManager InitialConfiguration { get { throw null; } set { } }
+        public System.Action<Microsoft.Extensions.Configuration.ConfigurationManager> OverrideDefaultConfigurationCallback { get { throw null; } set { } }
     }
     public partial class HostBuilder : Microsoft.Extensions.Hosting.IHostBuilder
     {

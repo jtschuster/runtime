@@ -25,11 +25,16 @@ namespace Microsoft.Extensions.Hosting
         /// <param name="options">Options controlling initial configuration and whether default settings should beOptions controlling initial configuration and whether default settings should be usedd.</param>
         public HostApplicationBuilder(HostApplicationOptions options)
         {
-            Configuration = options.Configuration ?? new ConfigurationManager();
+            Configuration = options.InitialConfiguration ?? new ConfigurationManager();
 
             if (!options.DisableDefaults)
             {
                 HostingHostBuilderExtensions.ApplyDefaultHostConfiguration(Configuration, options.Args);
+            }
+
+            if (options.OverrideDefaultConfigurationCallback is not null)
+            {
+                options.OverrideDefaultConfigurationCallback(Configuration);
             }
 
             var (hostingEnvironment, physicalFileProvider) = Hosting.HostBuilder.CreateHostingEnvironment(Configuration);

@@ -1,6 +1,7 @@
 ﻿// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System;
 using System.IO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -34,10 +35,17 @@ namespace Microsoft.Extensions.Hosting
         /// </summary>
         public string[] Args { get; set; }
 
+        // REVIEW: Do we want to combine InitialConfiguration and OverrideDefaultConfigurationCallback into an Action<ConfigurationManager, Action<ConfigurationManager>>?
+
         /// <summary>
         /// Initial configuration sources to be added to the <see cref="HostApplicationBuilder.Configuration"/>. These sources can influence
         /// the <see cref="HostApplicationBuilder.Environment"/> through the use of <see cref="HostDefaults"/> keys.
         /// </summary>
-        public ConfigurationManager Configuration { get; set; }
+        public ConfigurationManager InitialConfiguration { get; set; }
+
+        /// <summary>
+        /// Allows the caller to override configuration that influences the <see cref="HostApplicationBuilder.Environment"/> while overriding defaults.
+        /// </summary>
+        public Action<ConfigurationManager> OverrideDefaultConfigurationCallback { get; set; }
     }
 }
