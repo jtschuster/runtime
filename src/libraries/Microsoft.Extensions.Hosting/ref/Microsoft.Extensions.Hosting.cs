@@ -36,6 +36,7 @@ namespace Microsoft.Extensions.Hosting
         public Microsoft.Extensions.Configuration.ConfigurationManager Configuration { get { throw null; } }
         public Microsoft.Extensions.Hosting.IHostEnvironment Environment { get { throw null; } }
         public Microsoft.Extensions.Hosting.IHostBuilder HostBuilder { get { throw null; } }
+        public Microsoft.Extensions.Logging.ILoggingBuilder Logging { get { throw null; } }
         public Microsoft.Extensions.DependencyInjection.IServiceCollection Services { get { throw null; } }
         public Microsoft.Extensions.Hosting.IHost Build() { throw null; }
     }

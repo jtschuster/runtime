@@ -7,6 +7,7 @@ using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting.Internal;
+using Microsoft.Extensions.Logging;
 
 namespace Microsoft.Extensions.Hosting
 {
@@ -56,6 +57,8 @@ namespace Microsoft.Extensions.Hosting
                 Configuration,
                 () => _appServices);
 
+            Logging = new LoggingBuilder(Services);
+
             if (!options.DisableDefaults)
             {
                 HostingHostBuilderExtensions.ApplyDefaultAppConfiguration(_hostBuilderContext, Configuration, options.Args);
@@ -78,6 +81,11 @@ namespace Microsoft.Extensions.Hosting
         /// Provides information about the hosting environment an application is running in.
         /// </summary>
         public IHostEnvironment Environment { get; }
+
+        /// <summary>
+        /// A collection of logging providers for the application to compose. This is useful for adding new logging providers.
+        /// </summary>
+        public ILoggingBuilder Logging { get; }
 
         /// <summary>
         /// An <see cref="IHostBuilder"/> for configuring host specific properties, but not building.
@@ -123,6 +131,16 @@ namespace Microsoft.Extensions.Hosting
             public IHostBuilder ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureDelegate) => throw new NotImplementedException();
             public IHostBuilder UseServiceProviderFactory<TContainerBuilder>(IServiceProviderFactory<TContainerBuilder> factory) => throw new NotImplementedException();
             public IHostBuilder UseServiceProviderFactory<TContainerBuilder>(Func<HostBuilderContext, IServiceProviderFactory<TContainerBuilder>> factory) => throw new NotImplementedException();
+        }
+
+        private sealed class LoggingBuilder : ILoggingBuilder
+        {
+            public LoggingBuilder(IServiceCollection services)
+            {
+                Services = services;
+            }
+
+            public IServiceCollection Services { get; }
         }
     }
 }
