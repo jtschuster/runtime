@@ -35,8 +35,6 @@ namespace Microsoft.Extensions.Hosting
         /// </summary>
         public string[] Args { get; set; }
 
-        // REVIEW: Do we want to combine InitialConfiguration and OverrideDefaultConfigurationCallback into an Action<ConfigurationManager, Action<ConfigurationManager>>?
-
         /// <summary>
         /// Initial configuration sources to be added to the <see cref="HostApplicationBuilder.Configuration"/>. These sources can influence
         /// the <see cref="HostApplicationBuilder.Environment"/> through the use of <see cref="HostDefaults"/> keys.
@@ -44,8 +42,18 @@ namespace Microsoft.Extensions.Hosting
         public ConfigurationManager InitialConfiguration { get; set; }
 
         /// <summary>
-        /// Allows the caller to override configuration that influences the <see cref="HostApplicationBuilder.Environment"/> while overriding defaults.
+        /// The environment name.
         /// </summary>
-        public Action<ConfigurationManager> OverrideDefaultConfigurationCallback { get; set; }
+        public string EnvironmentName { get; set; }
+
+        /// <summary>
+        /// The application name.
+        /// </summary>
+        public string ApplicationName { get; set; }
+
+        /// <summary>
+        /// The content root path.
+        /// </summary>
+        public string ContentRootPath { get; set; }
     }
 }

@@ -293,19 +293,25 @@ namespace Microsoft.Extensions.Hosting
         }
 
         internal static IServiceProvider CreateServiceProvider(
+            HostBuilderContext hostBuilderContext,
             IServiceCollection services,
-            IServiceFactoryAdapter factory,
-            List<IConfigureContainerAdapter> adapters,
-            HostBuilderContext context)
+            IServiceFactoryAdapter serviceProviderFactory,
+            IEnumerable<Action<HostBuilderContext, IServiceCollection>> configureServicesActions,
+            IEnumerable<IConfigureContainerAdapter> configureContainerActions)
         {
-            object containerBuilder = factory.CreateBuilder(services);
-
-            foreach (IConfigureContainerAdapter containerAction in adapters)
+            foreach (Action<HostBuilderContext, IServiceCollection> configureServicesAction in configureServicesActions)
             {
-                containerAction.ConfigureContainer(context, containerBuilder);
+                configureServicesAction(hostBuilderContext, services);
             }
 
-            var serviceProvider = factory.CreateServiceProvider(containerBuilder);
+            object containerBuilder = serviceProviderFactory.CreateBuilder(services);
+
+            foreach (IConfigureContainerAdapter containerAction in configureContainerActions)
+            {
+                containerAction.ConfigureContainer(hostBuilderContext, containerBuilder);
+            }
+
+            var serviceProvider = serviceProviderFactory.CreateServiceProvider(containerBuilder);
 
             if (serviceProvider is null)
             {
@@ -328,12 +334,12 @@ namespace Microsoft.Extensions.Hosting
                 _appConfiguration,
                 () => _appServices);
 
-            foreach (Action<HostBuilderContext, IServiceCollection> configureServicesAction in _configureServicesActions)
-            {
-                configureServicesAction(_hostBuilderContext, services);
-            }
-
-            _appServices = CreateServiceProvider(services, _serviceProviderFactory, _configureContainerActions, _hostBuilderContext);
+            _appServices = CreateServiceProvider(
+                _hostBuilderContext,
+                services,
+                _serviceProviderFactory,
+                _configureServicesActions,
+                _configureContainerActions);
         }
     }
 }

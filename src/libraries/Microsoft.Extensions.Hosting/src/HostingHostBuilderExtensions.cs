@@ -190,7 +190,7 @@ namespace Microsoft.Extensions.Hosting
             return builder.ConfigureHostConfiguration(config => ApplyDefaultHostConfiguration(config, args))
                           .ConfigureAppConfiguration((hostingContext, config) => ApplyDefaultAppConfiguration(hostingContext, config, args))
                           .ConfigureServices(AddDefaultServices)
-                          .UseServiceProviderFactory(CreateDefaultServiceProvider);
+                          .UseServiceProviderFactory(CreateDefaultServiceProviderFactory);
         }
 
         internal static void ApplyDefaultHostConfiguration(IConfigurationBuilder hostConfigBuilder, string[] args)
@@ -280,7 +280,7 @@ namespace Microsoft.Extensions.Hosting
             });
         }
 
-        internal static IServiceProviderFactory<IServiceCollection> CreateDefaultServiceProvider(HostBuilderContext context)
+        internal static DefaultServiceProviderFactory CreateDefaultServiceProviderFactory(HostBuilderContext context)
         {
             bool isDevelopment = context.HostingEnvironment.IsDevelopment();
             return new DefaultServiceProviderFactory(new ServiceProviderOptions

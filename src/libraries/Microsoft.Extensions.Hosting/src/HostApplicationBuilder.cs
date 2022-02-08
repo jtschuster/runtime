@@ -13,10 +13,9 @@ namespace Microsoft.Extensions.Hosting
 {
     public class HostApplicationBuilder
     {
-        private readonly List<IConfigureContainerAdapter> _configureContainerActions = new();
         private readonly HostBuilderContext _hostBuilderContext;
+        private readonly DefaultServiceProviderFactory _defaultServiceProviderFactory;
 
-        private IServiceFactoryAdapter _serviceProviderFactory = new ServiceFactoryAdapter<IServiceCollection>(new DefaultServiceProviderFactory());
         private IServiceProvider _appServices;
         private bool _hostBuilt;
 
@@ -33,16 +32,33 @@ namespace Microsoft.Extensions.Hosting
                 HostingHostBuilderExtensions.ApplyDefaultHostConfiguration(Configuration, options.Args);
             }
 
-            if (options.OverrideDefaultConfigurationCallback is not null)
+            // HostApplicationOptions override all other config sources.
+            List<KeyValuePair<string, string>> optionList = null;
+            if (options.ApplicationName is not null)
             {
-                options.OverrideDefaultConfigurationCallback(Configuration);
+                optionList ??= new();
+                optionList.Add(new KeyValuePair<string, string>(HostDefaults.ApplicationKey, options.ApplicationName));
+            }
+            if (options.EnvironmentName is not null)
+            {
+                optionList ??= new();
+                optionList.Add(new KeyValuePair<string, string>(HostDefaults.EnvironmentKey, options.EnvironmentName));
+            }
+            if (options.ContentRootPath is not null)
+            {
+                optionList ??= new();
+                optionList.Add(new KeyValuePair<string, string>(HostDefaults.ContentRootKey, options.ContentRootPath));
+            }
+            if (optionList is not null)
+            {
+                Configuration.AddInMemoryCollection(optionList);
             }
 
-            var (hostingEnvironment, physicalFileProvider) = Hosting.HostBuilder.CreateHostingEnvironment(Configuration);
+            var (hostingEnvironment, physicalFileProvider) = HostBuilder.CreateHostingEnvironment(Configuration);
 
             Configuration.SetFileProvider(physicalFileProvider);
 
-            _hostBuilderContext = new HostBuilderContext(HostBuilder.Properties)
+            _hostBuilderContext = new HostBuilderContext(new Dictionary<object, object>())
             {
                 HostingEnvironment = hostingEnvironment,
                 Configuration = Configuration,
@@ -50,7 +66,7 @@ namespace Microsoft.Extensions.Hosting
 
             Environment = hostingEnvironment;
 
-            Services = Hosting.HostBuilder.CreateServiceCollection(
+            Services = HostBuilder.CreateServiceCollection(
                 _hostBuilderContext,
                 hostingEnvironment,
                 physicalFileProvider,
@@ -59,11 +75,15 @@ namespace Microsoft.Extensions.Hosting
 
             Logging = new LoggingBuilder(Services);
 
-            if (!options.DisableDefaults)
+            if (options.DisableDefaults)
+            {
+                _defaultServiceProviderFactory = new DefaultServiceProviderFactory();
+            }
+            else
             {
                 HostingHostBuilderExtensions.ApplyDefaultAppConfiguration(_hostBuilderContext, Configuration, options.Args);
                 HostingHostBuilderExtensions.AddDefaultServices(_hostBuilderContext, Services);
-                _serviceProviderFactory = new ServiceFactoryAdapter<IServiceCollection>(() => _hostBuilderContext, HostingHostBuilderExtensions.CreateDefaultServiceProvider);
+                _defaultServiceProviderFactory = HostingHostBuilderExtensions.CreateDefaultServiceProviderFactory(_hostBuilderContext);
             }
         }
 
@@ -88,49 +108,128 @@ namespace Microsoft.Extensions.Hosting
         public ILoggingBuilder Logging { get; }
 
         /// <summary>
-        /// An <see cref="IHostBuilder"/> for configuring host specific properties, but not building.
-        /// To build after configuration, call <see cref="Build"/>.
+        /// Build the host. This can only be called once.
         /// </summary>
-        public IHostBuilder HostBuilder { get; } = new HostBuilderAdapter();
-
+        /// <returns>An initialized <see cref="IHost"/>.</returns>
         public IHost Build()
         {
+            return Build(_defaultServiceProviderFactory);
+        }
+
+        /// <summary>
+        /// Build the host. This can only be called once.
+        /// </summary>
+        /// <returns>An initialized <see cref="IHost"/>.</returns>
+        public IHost Build<TContainerBuilder>(IServiceProviderFactory<TContainerBuilder> serviceProviderFactory)
+        {
+            if (serviceProviderFactory is null)
+            {
+                throw new ArgumentNullException(nameof(serviceProviderFactory));
+            }
             if (_hostBuilt)
             {
                 throw new InvalidOperationException(SR.BuildCalled);
             }
+
             _hostBuilt = true;
 
-            using DiagnosticListener diagnosticListener = Hosting.HostBuilder.LogHostBuilding(HostBuilder);
+            var hostBuilderAdapter = new HostBuilderAdapter(_hostBuilderContext, Configuration, Services,
+                new ServiceFactoryAdapter<TContainerBuilder>(serviceProviderFactory));
 
-            _appServices = Hosting.HostBuilder.CreateServiceProvider(
-                Services,
-                _serviceProviderFactory,
-                _configureContainerActions,
-                _hostBuilderContext);
+            using DiagnosticListener diagnosticListener = HostBuilder.LogHostBuilding(hostBuilderAdapter);
 
+            _appServices = hostBuilderAdapter.CreateServiceProvider();
             var host = _appServices.GetRequiredService<IHost>();
-            Hosting.HostBuilder.LogHostBuilt(diagnosticListener, host);
+
+            HostBuilder.LogHostBuilt(diagnosticListener, host);
 
             return host;
         }
 
-        // TODO: Provide compatibility implementation similar to https://github.com/dotnet/aspnetcore/blob/15fa3ad10859abcc54e3ad5557dc928f6c94994d/src/DefaultBuilder/src/ConfigureHostBuilder.cs
-        // This will prevent modifications to HostDefaults.ApplicationKey, HostDefaults.ContentRootKey and HostDefaults.EnvironmentKey in ConfigureHostConfiguration since it's too late.
         private class HostBuilderAdapter : IHostBuilder
         {
-            /// <summary>
-            /// A central location for sharing state between components during the host building process.
-            /// </summary>
-            public IDictionary<object, object> Properties { get; } = new Dictionary<object, object>();
+            private readonly HostBuilderContext _hostBuilderContext;
+            private readonly ConfigurationManager _configuration;
+            private readonly IServiceCollection _services;
+
+            private readonly List<Action<IConfigurationBuilder>> _configureHostConfigActions = new();
+            private readonly List<Action<HostBuilderContext, IConfigurationBuilder>> _configureAppConfigActions = new();
+            private readonly List<IConfigureContainerAdapter> _configureContainerActions = new();
+            private readonly List<Action<HostBuilderContext, IServiceCollection>> _configureServicesActions = new();
+
+            private IServiceFactoryAdapter _serviceProviderFactory;
+
+            public HostBuilderAdapter(HostBuilderContext hostBuilderContext, ConfigurationManager configuration, IServiceCollection services, IServiceFactoryAdapter serviceProviderFactory)
+            {
+                _hostBuilderContext = hostBuilderContext;
+                _configuration = configuration;
+                _services = services;
+                _serviceProviderFactory = serviceProviderFactory;
+            }
+
+            public IServiceProvider CreateServiceProvider()
+            {
+                foreach (Action<IConfigurationBuilder> configureHostAction in _configureHostConfigActions)
+                {
+                    configureHostAction(_configuration);
+                }
+                foreach (Action<HostBuilderContext, IConfigurationBuilder> configureAppAction in _configureAppConfigActions)
+                {
+                    configureAppAction(_hostBuilderContext, _configuration);
+                }
+
+                return HostBuilder.CreateServiceProvider(
+                    _hostBuilderContext,
+                    _services,
+                    _serviceProviderFactory,
+                    _configureServicesActions,
+                    _configureContainerActions);
+            }
+
+            public IDictionary<object, object> Properties => _hostBuilderContext.Properties;
 
             public IHost Build() => throw new NotImplementedException();
-            public IHostBuilder ConfigureAppConfiguration(Action<HostBuilderContext, IConfigurationBuilder> configureDelegate) => throw new NotImplementedException();
-            public IHostBuilder ConfigureContainer<TContainerBuilder>(Action<HostBuilderContext, TContainerBuilder> configureDelegate) => throw new NotImplementedException();
-            public IHostBuilder ConfigureHostConfiguration(Action<IConfigurationBuilder> configureDelegate) => throw new NotImplementedException();
-            public IHostBuilder ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureDelegate) => throw new NotImplementedException();
-            public IHostBuilder UseServiceProviderFactory<TContainerBuilder>(IServiceProviderFactory<TContainerBuilder> factory) => throw new NotImplementedException();
-            public IHostBuilder UseServiceProviderFactory<TContainerBuilder>(Func<HostBuilderContext, IServiceProviderFactory<TContainerBuilder>> factory) => throw new NotImplementedException();
+
+            public IHostBuilder ConfigureHostConfiguration(Action<IConfigurationBuilder> configureDelegate)
+            {
+                // TODO: Provide compatibility implementation similar to https://github.com/dotnet/aspnetcore/blob/15fa3ad10859abcc54e3ad5557dc928f6c94994d/src/DefaultBuilder/src/ConfigureHostBuilder.cs
+                // that prevents modifications to HostDefaults.ApplicationKey, HostDefaults.ContentRootKey and HostDefaults.EnvironmentKey in ConfigureHostConfiguration since it's too late.
+                _configureHostConfigActions.Add(configureDelegate ?? throw new ArgumentNullException(nameof(configureDelegate)));
+                return this;
+            }
+
+            public IHostBuilder ConfigureAppConfiguration(Action<HostBuilderContext, IConfigurationBuilder> configureDelegate)
+            {
+                _configureAppConfigActions.Add(configureDelegate ?? throw new ArgumentNullException(nameof(configureDelegate)));
+                return this;
+            }
+
+            public IHostBuilder ConfigureServices(Action<HostBuilderContext, IServiceCollection> configureDelegate)
+            {
+                _configureServicesActions.Add(configureDelegate ?? throw new ArgumentNullException(nameof(configureDelegate)));
+                return this;
+            }
+
+            public IHostBuilder UseServiceProviderFactory<TContainerBuilder>(IServiceProviderFactory<TContainerBuilder> factory)
+            {
+                _serviceProviderFactory = new ServiceFactoryAdapter<TContainerBuilder>(factory ?? throw new ArgumentNullException(nameof(factory)));
+                return this;
+
+            }
+
+            public IHostBuilder UseServiceProviderFactory<TContainerBuilder>(Func<HostBuilderContext, IServiceProviderFactory<TContainerBuilder>> factory)
+            {
+                _serviceProviderFactory = new ServiceFactoryAdapter<TContainerBuilder>(() => _hostBuilderContext, factory ?? throw new ArgumentNullException(nameof(factory)));
+                return this;
+            }
+
+            public IHostBuilder ConfigureContainer<TContainerBuilder>(Action<HostBuilderContext, TContainerBuilder> configureDelegate)
+            {
+                _configureContainerActions.Add(new ConfigureContainerAdapter<TContainerBuilder>(configureDelegate
+                    ?? throw new ArgumentNullException(nameof(configureDelegate))));
+
+                return this;
+            }
         }
 
         private sealed class LoggingBuilder : ILoggingBuilder
