@@ -21,6 +21,9 @@ namespace Microsoft.Extensions.Hosting
     /// </summary>
     public partial class HostBuilder : IHostBuilder
     {
+        private const string _hostBuildingEventName = "HostBuilding";
+        private const string _hostBuiltEventName = "HostBuilt";
+
         private List<Action<IConfigurationBuilder>> _configureHostConfigActions = new List<Action<IConfigurationBuilder>>();
         private List<Action<HostBuilderContext, IConfigurationBuilder>> _configureAppConfigActions = new List<Action<HostBuilderContext, IConfigurationBuilder>>();
         private List<Action<HostBuilderContext, IServiceCollection>> _configureServicesActions = new List<Action<HostBuilderContext, IServiceCollection>>();
@@ -134,39 +137,25 @@ namespace Microsoft.Extensions.Hosting
             // stash this in a field.
             using DiagnosticListener diagnosticListener = LogHostBuilding(this);
 
-            BuildHostConfiguration();
+            InitializeHostConfiguration();
             InitializeHostingEnvironment();
             InitializeHostBuilderContext();
-            BuildAppConfiguration();
+            InitializeAppConfiguration();
             InitializeServiceProvider();
 
-            var host = _appServices.GetRequiredService<IHost>();
-            LogHostBuilt(diagnosticListener, host);
-
-            return host;
+            return ResolveHost(_appServices, diagnosticListener);
         }
 
         internal static DiagnosticListener LogHostBuilding(IHostBuilder builder)
         {
             var diagnosticListener = new DiagnosticListener("Microsoft.Extensions.Hosting");
-            const string hostBuildingEventName = "HostBuilding";
 
-            if (diagnosticListener.IsEnabled() && diagnosticListener.IsEnabled(hostBuildingEventName))
+            if (diagnosticListener.IsEnabled() && diagnosticListener.IsEnabled(_hostBuildingEventName))
             {
-                Write(diagnosticListener, hostBuildingEventName, builder);
+                Write(diagnosticListener, _hostBuildingEventName, builder);
             }
 
             return diagnosticListener;
-        }
-
-        internal static void LogHostBuilt(DiagnosticListener diagnosticListener, IHost host)
-        {
-            const string hostBuiltEventName = "HostBuilt";
-
-            if (diagnosticListener.IsEnabled() && diagnosticListener.IsEnabled(hostBuiltEventName))
-            {
-                Write(diagnosticListener, hostBuiltEventName, host);
-            }
         }
 
         [UnconditionalSuppressMessage("ReflectionAnalysis", "IL2026:UnrecognizedReflectionPattern",
@@ -179,7 +168,7 @@ namespace Microsoft.Extensions.Hosting
             diagnosticSource.Write(name, value);
         }
 
-        private void BuildHostConfiguration()
+        private void InitializeHostConfiguration()
         {
             IConfigurationBuilder configBuilder = new ConfigurationBuilder()
                 .AddInMemoryCollection(); // Make sure there's some default storage since there are no default providers
@@ -217,7 +206,7 @@ namespace Microsoft.Extensions.Hosting
             return (hostingEnvironment, physicalFileProvider);
         }
 
-        private static string ResolveContentRootPath(string contentRootPath, string basePath)
+        internal static string ResolveContentRootPath(string contentRootPath, string basePath)
         {
             if (string.IsNullOrEmpty(contentRootPath))
             {
@@ -239,7 +228,7 @@ namespace Microsoft.Extensions.Hosting
             };
         }
 
-        private void BuildAppConfiguration()
+        private void InitializeAppConfiguration()
         {
             IConfigurationBuilder configBuilder = new ConfigurationBuilder()
                 .SetBasePath(_hostingEnvironment.ContentRootPath)
@@ -292,39 +281,6 @@ namespace Microsoft.Extensions.Hosting
             return services;
         }
 
-        internal static IServiceProvider CreateServiceProvider(
-            HostBuilderContext hostBuilderContext,
-            IServiceCollection services,
-            IServiceFactoryAdapter serviceProviderFactory,
-            IEnumerable<Action<HostBuilderContext, IServiceCollection>> configureServicesActions,
-            IEnumerable<IConfigureContainerAdapter> configureContainerActions)
-        {
-            foreach (Action<HostBuilderContext, IServiceCollection> configureServicesAction in configureServicesActions)
-            {
-                configureServicesAction(hostBuilderContext, services);
-            }
-
-            object containerBuilder = serviceProviderFactory.CreateBuilder(services);
-
-            foreach (IConfigureContainerAdapter containerAction in configureContainerActions)
-            {
-                containerAction.ConfigureContainer(hostBuilderContext, containerBuilder);
-            }
-
-            var serviceProvider = serviceProviderFactory.CreateServiceProvider(containerBuilder);
-
-            if (serviceProvider is null)
-            {
-                throw new InvalidOperationException(SR.NullIServiceProvider);
-            }
-
-            // resolve configuration explicitly once to mark it as resolved within the
-            // service provider, ensuring it will be properly disposed with the provider
-            _ = serviceProvider.GetService<IConfiguration>();
-
-            return serviceProvider;
-        }
-
         private void InitializeServiceProvider()
         {
             var services = CreateServiceCollection(
@@ -334,12 +290,40 @@ namespace Microsoft.Extensions.Hosting
                 _appConfiguration,
                 () => _appServices);
 
-            _appServices = CreateServiceProvider(
-                _hostBuilderContext,
-                services,
-                _serviceProviderFactory,
-                _configureServicesActions,
-                _configureContainerActions);
+            foreach (Action<HostBuilderContext, IServiceCollection> configureServicesAction in _configureServicesActions)
+            {
+                configureServicesAction(_hostBuilderContext, services);
+            }
+
+            object containerBuilder = _serviceProviderFactory.CreateBuilder(services);
+
+            foreach (IConfigureContainerAdapter containerAction in _configureContainerActions)
+            {
+                containerAction.ConfigureContainer(_hostBuilderContext, containerBuilder);
+            }
+
+            _appServices = _serviceProviderFactory.CreateServiceProvider(containerBuilder);
+        }
+
+        internal static IHost ResolveHost(IServiceProvider serviceProvider, DiagnosticListener diagnosticListener)
+        {
+            if (serviceProvider is null)
+            {
+                throw new InvalidOperationException(SR.NullIServiceProvider);
+            }
+
+            // resolve configuration explicitly once to mark it as resolved within the
+            // service provider, ensuring it will be properly disposed with the provider
+            _ = serviceProvider.GetService<IConfiguration>();
+
+            var host = serviceProvider.GetRequiredService<IHost>();
+
+            if (diagnosticListener.IsEnabled() && diagnosticListener.IsEnabled(_hostBuiltEventName))
+            {
+                Write(diagnosticListener, _hostBuiltEventName, host);
+            }
+
+            return host;
         }
     }
 }

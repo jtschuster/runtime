@@ -30,25 +30,27 @@ namespace Microsoft.Extensions.Hosting
         public static Microsoft.Extensions.Hosting.IHostBuilder CreateDefaultBuilder() { throw null; }
         public static Microsoft.Extensions.Hosting.IHostBuilder CreateDefaultBuilder(string[] args) { throw null; }
     }
-    public partial class HostApplicationBuilder
+    public sealed partial class HostApplicationBuilder
     {
-        public HostApplicationBuilder(Microsoft.Extensions.Hosting.HostApplicationOptions options) { }
+        public HostApplicationBuilder() { }
+        public HostApplicationBuilder(Microsoft.Extensions.Hosting.HostApplicationBuilderSettings settings) { }
+        public HostApplicationBuilder(string[] args) { }
         public Microsoft.Extensions.Configuration.ConfigurationManager Configuration { get { throw null; } }
         public Microsoft.Extensions.Hosting.IHostEnvironment Environment { get { throw null; } }
         public Microsoft.Extensions.Logging.ILoggingBuilder Logging { get { throw null; } }
         public Microsoft.Extensions.DependencyInjection.IServiceCollection Services { get { throw null; } }
         public Microsoft.Extensions.Hosting.IHost Build() { throw null; }
-        public Microsoft.Extensions.Hosting.IHost Build<TContainerBuilder>(Microsoft.Extensions.DependencyInjection.IServiceProviderFactory<TContainerBuilder> serviceProviderFactory) { throw null; }
+        public void ConfigureContainer<TContainerBuilder>(Microsoft.Extensions.DependencyInjection.IServiceProviderFactory<TContainerBuilder> factory, System.Action<TContainerBuilder> configure = null) where TContainerBuilder : notnull { }
     }
-    public partial class HostApplicationOptions
+    public sealed partial class HostApplicationBuilderSettings
     {
-        public HostApplicationOptions() { }
+        public HostApplicationBuilderSettings() { }
         public string ApplicationName { get { throw null; } set { } }
         public string[] Args { get { throw null; } set { } }
+        public Microsoft.Extensions.Configuration.ConfigurationManager Configuration { get { throw null; } set { } }
         public string ContentRootPath { get { throw null; } set { } }
         public bool DisableDefaults { get { throw null; } set { } }
         public string EnvironmentName { get { throw null; } set { } }
-        public Microsoft.Extensions.Configuration.ConfigurationManager InitialConfiguration { get { throw null; } set { } }
     }
     public partial class HostBuilder : Microsoft.Extensions.Hosting.IHostBuilder
     {

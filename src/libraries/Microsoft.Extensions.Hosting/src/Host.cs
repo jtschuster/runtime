@@ -56,6 +56,7 @@ namespace Microsoft.Extensions.Hosting
             return builder.ConfigureDefaults(args);
         }
 
+#nullable enable
         /// <summary>
         /// Initializes a new instance of the <see cref="HostApplicationBuilder"/> class with pre-configured defaults.
         /// </summary>
@@ -73,8 +74,7 @@ namespace Microsoft.Extensions.Hosting
         ///     <item><description>enables scope validation on the dependency injection container when <see cref="IHostEnvironment.EnvironmentName"/> is 'Development'</description></item>
         ///   </list>
         /// </remarks>
-        public static HostApplicationBuilder CreateApplicationBuilder() =>
-            CreateApplicationBuilder(args: null);
+        public static HostApplicationBuilder CreateApplicationBuilder() => new HostApplicationBuilder();
 
         /// <summary>
         /// Initializes a new instance of the <see cref="HostApplicationBuilder"/> class with pre-configured defaults.
@@ -94,12 +94,7 @@ namespace Microsoft.Extensions.Hosting
         ///   </list>
         /// </remarks>
         /// <param name="args">The command line args.</param>
-        public static HostApplicationBuilder CreateApplicationBuilder(string[] args)
-        {
-            return new HostApplicationBuilder(new HostApplicationOptions
-            {
-                Args = args
-            });
-        }
+        public static HostApplicationBuilder CreateApplicationBuilder(string[]? args) => new HostApplicationBuilder(args);
+#nullable disable
     }
 }

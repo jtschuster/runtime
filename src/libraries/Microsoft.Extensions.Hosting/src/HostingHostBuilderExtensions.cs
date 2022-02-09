@@ -190,7 +190,7 @@ namespace Microsoft.Extensions.Hosting
             return builder.ConfigureHostConfiguration(config => ApplyDefaultHostConfiguration(config, args))
                           .ConfigureAppConfiguration((hostingContext, config) => ApplyDefaultAppConfiguration(hostingContext, config, args))
                           .ConfigureServices(AddDefaultServices)
-                          .UseServiceProviderFactory(CreateDefaultServiceProviderFactory);
+                          .UseServiceProviderFactory(context => new DefaultServiceProviderFactory(CreateDefaultServiceProviderOptions(context)));
         }
 
         internal static void ApplyDefaultHostConfiguration(IConfigurationBuilder hostConfigBuilder, string[] args)
@@ -280,14 +280,14 @@ namespace Microsoft.Extensions.Hosting
             });
         }
 
-        internal static DefaultServiceProviderFactory CreateDefaultServiceProviderFactory(HostBuilderContext context)
+        internal static ServiceProviderOptions CreateDefaultServiceProviderOptions(HostBuilderContext context)
         {
             bool isDevelopment = context.HostingEnvironment.IsDevelopment();
-            return new DefaultServiceProviderFactory(new ServiceProviderOptions
+            return new ServiceProviderOptions
             {
                 ValidateScopes = isDevelopment,
                 ValidateOnBuild = isDevelopment,
-            });
+            };
         }
 
         /// <summary>
