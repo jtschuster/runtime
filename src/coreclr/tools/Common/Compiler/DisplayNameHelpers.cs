@@ -4,6 +4,7 @@
 using System;
 using System.Reflection.Metadata;
 using System.Text;
+
 using Internal.TypeSystem;
 using Internal.TypeSystem.Ecma;
 
@@ -11,7 +12,7 @@ using Debug = System.Diagnostics.Debug;
 
 namespace ILCompiler
 {
-    public static class DisplayNameHelpers
+    internal static class DisplayNameHelpers
     {
         public static string GetDisplayName(this TypeSystemEntity entity)
         {
@@ -43,7 +44,7 @@ namespace ILCompiler
             {
                 sb.Append(property.Name);
                 sb.Append('.');
-                sb.Append(property.GetMethod.Name == method.Name ? "get" : "set");
+                sb.Append(property.GetMethod == method ? "get" : "set");
             }
             else
             {
@@ -73,11 +74,6 @@ namespace ILCompiler
             sb.Append(')');
 
             return sb.ToString();
-        }
-
-        public static string GetParameterDisplayName(this EcmaMethod method, Parameter parameter)
-        {
-            return method.MetadataReader.GetString(parameter.Name);
         }
 
         public static string GetParameterDisplayName(this EcmaMethod method, int parameterIndex)
