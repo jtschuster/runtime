@@ -4,7 +4,8 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Reflection.Metadata;
-
+using System.Reflection.Metadata.Ecma335;
+using Internal.IL;
 using Internal.TypeSystem;
 using Internal.TypeSystem.Ecma;
 
@@ -128,6 +129,8 @@ namespace ILCompiler.DependencyAnalysis
                     // Make a new list in case we need to abort.
                     var caDependencies = factory.MetadataManager.GetDependenciesForCustomAttribute(factory, constructor, decodedValue) ?? new DependencyList();
 
+                    if(constructor is EcmaMethod ecmaCtor)
+                        caDependencies.Add(factory.DataflowAnalyzedMethod(EcmaMethodIL.Create(ecmaCtor)), "Attribute constructor");
                     caDependencies.Add(factory.ReflectableMethod(constructor), "Attribute constructor");
                     caDependencies.Add(factory.ConstructedTypeSymbol(constructor.OwningType), "Attribute type");
 
