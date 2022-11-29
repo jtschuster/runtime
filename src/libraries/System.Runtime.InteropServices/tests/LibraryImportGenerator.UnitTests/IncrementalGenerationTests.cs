@@ -1,4 +1,5 @@
-﻿// Licensed to the .NET Foundation under one or more agreements.
+﻿//
+// Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Microsoft.CodeAnalysis;
@@ -217,8 +218,7 @@ namespace LibraryImportGenerator.UnitTests
             // Basic stub
             yield return new[] { CodeSnippets.BasicParametersAndModifiers<int>() };
             // Stub with custom string marshaller
-            // TODO: Compilation is held alive by the CustomStringMarshallingType property in LibraryImportData
-            // yield return new[] { CodeSnippets.CustomStringMarshallingParametersAndModifiers<string>() }; 
+            yield return new[] { CodeSnippets.CustomStringMarshallingParametersAndModifiers<string>() }; 
         }
 
         // This test requires precise GC to ensure that we're accurately testing that we aren't
