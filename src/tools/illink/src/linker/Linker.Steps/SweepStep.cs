@@ -448,6 +448,12 @@ namespace Mono.Linker.Steps
 		}
 		void SweepOverrides (MethodDefinition method)
 		{
+			if (method.Name == "op_Addition") {
+				_ = 0;
+				if (method.DeclaringType.Name == "AbstractType") {
+					_ = 0;
+				}
+			}
 			for (int i = 0; i < method.Overrides.Count;) {
 				// We can't rely on the context resolution cache anymore, since it may remember methods which are already removed
 				// So call the direct Resolve here and avoid the cache.
