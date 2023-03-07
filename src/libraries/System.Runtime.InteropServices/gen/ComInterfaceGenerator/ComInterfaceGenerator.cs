@@ -61,7 +61,15 @@ namespace Microsoft.Interop
                 // Start at offset 3 as 0-2 are IUnknown.
                 // TODO: Calculate starting offset based on base types.
                 // TODO: Extract IID from source.
-                return new ComInterfaceContext(3, Guid.Empty);
+                Guid? guid = null;
+                var guidAttr = data.Symbol.GetAttributes().Where(attr => attr.AttributeClass.ToDisplayString() == TypeNames.GuidAttribute).SingleOrDefault();
+                if (guidAttr is not null)
+                {
+                    string? guidstr = guidAttr.ConstructorArguments.SingleOrDefault().Value as string;
+                    if (guidstr is not null)
+                        guid = new Guid(guidstr);
+                }
+                return new ComInterfaceContext(3, guid ?? Guid.Empty);
             });
 
             context.RegisterSourceOutput(invalidTypeDiagnostics, static (context, invalidType) =>
@@ -80,7 +88,7 @@ namespace Microsoft.Interop
                 var (interfaceData, interfaceContext) = data;
                 ContainingSyntaxContext containingSyntax = new(interfaceData.Syntax);
                 Location interfaceLocation = interfaceData.Syntax.GetLocation();
-                var methods = ImmutableArray.CreateBuilder<(MethodDeclarationSyntax Syntax, IMethodSymbol Symbol, int Index, Diagnostic? Diagnostic)>();
+                var methods = ImmutableArray.CreateBuilder<(MethodDeclarationSyntax Syntax, IMethodSymbol Symbol, int Index, ComInterfaceContext InterfaceContext, Diagnostic? Diagnostic)>();
                 int methodVtableOffset = interfaceContext.MethodStartIndex;
                 foreach (var member in interfaceData.Symbol.GetMembers())
                 {
@@ -106,6 +114,7 @@ namespace Microsoft.Interop
                                 null!,
                                 (IMethodSymbol)member,
                                 0,
+                                interfaceContext,
                                 member.CreateDiagnostic(
                                     GeneratorDiagnostics.MethodNotDeclaredInAttributedInterface,
                                     member.ToDisplayString(),
@@ -116,7 +125,7 @@ namespace Microsoft.Interop
                             var syntax = (MethodDeclarationSyntax)interfaceData.Syntax.FindNode(locationInAttributeSyntax.SourceSpan);
                             var method = (IMethodSymbol)member;
                             Diagnostic? diagnostic = GetDiagnosticIfInvalidMethodForGeneration(syntax, method);
-                            methods.Add((syntax, method, diagnostic is not null ? methodVtableOffset++ : 0, diagnostic));
+                            methods.Add((syntax, method, diagnostic is not null ? methodVtableOffset++ : 0, interfaceContext, diagnostic));
                         }
                     }
                 }
@@ -134,25 +143,26 @@ namespace Microsoft.Interop
 
             // Calculate all of information to generate both managed-to-unmanaged and unmanaged-to-managed stubs
             // for each method.
-            IncrementalValuesProvider<IncrementalMethodStubGenerationContext> generateStubInformation = methodsToGenerate
+            IncrementalValuesProvider<(IncrementalMethodStubGenerationContext, ComInterfaceContext)> generateStubInformation = methodsToGenerate
                 .Combine(context.CreateStubEnvironmentProvider())
                 .Select(static (data, ct) => new
                 {
                     data.Left.Syntax,
                     data.Left.Symbol,
                     data.Left.Index,
-                    Environment = data.Right
+                    Environment = data.Right,
+                    data.Left.InterfaceContext
                 })
                 .Select(
-                    static (data, ct) => CalculateStubInformation(data.Syntax, data.Symbol, data.Index, data.Environment, ct)
+                    static (data, ct) => (CalculateStubInformation(data.Syntax, data.Symbol, data.Index, data.Environment, ct), data.InterfaceContext)
                 )
                 .WithTrackingName(StepNames.CalculateStubInformation);
 
             // Generate the code for the managed-to-unmanaged stubs and the diagnostics from code-generation.
             IncrementalValuesProvider<(MemberDeclarationSyntax, ImmutableArray<Diagnostic>)> generateManagedToNativeStub = generateStubInformation
-                .Where(data => data.VtableIndexData.Direction is MarshalDirection.ManagedToUnmanaged or MarshalDirection.Bidirectional)
+                .Where(data => data.Item1.VtableIndexData.Direction is MarshalDirection.ManagedToUnmanaged or MarshalDirection.Bidirectional)
                 .Select(
-                    static (data, ct) => VtableIndexStubGenerator.GenerateManagedToNativeStub(data)
+                    static (data, ct) => VtableIndexStubGenerator.GenerateManagedToNativeStub(data.Item1)
                 )
                 .WithComparer(Comparers.GeneratedSyntax)
                 .WithTrackingName(StepNames.GenerateManagedToNativeStub);
@@ -162,14 +172,14 @@ namespace Microsoft.Interop
             context.RegisterConcatenatedSyntaxOutputs(generateManagedToNativeStub.Select((data, ct) => data.Item1), "ManagedToNativeStubs.g.cs");
 
             // Filter the list of all stubs to only the stubs that requested unmanaged-to-managed stub generation.
-            IncrementalValuesProvider<IncrementalMethodStubGenerationContext> nativeToManagedStubContexts =
+            IncrementalValuesProvider<(IncrementalMethodStubGenerationContext, ComInterfaceContext)> nativeToManagedStubContexts =
                 generateStubInformation
-                .Where(data => data.VtableIndexData.Direction is MarshalDirection.UnmanagedToManaged or MarshalDirection.Bidirectional);
+                .Where(data => data.Item1.VtableIndexData.Direction is MarshalDirection.UnmanagedToManaged or MarshalDirection.Bidirectional);
 
             // Generate the code for the unmanaged-to-managed stubs and the diagnostics from code-generation.
             IncrementalValuesProvider<(MemberDeclarationSyntax, ImmutableArray<Diagnostic>)> generateNativeToManagedStub = nativeToManagedStubContexts
                 .Select(
-                    static (data, ct) => VtableIndexStubGenerator.GenerateNativeToManagedStub(data)
+                    static (data, ct) => VtableIndexStubGenerator.GenerateNativeToManagedStub(data.Item1)
                 )
                 .WithComparer(Comparers.GeneratedSyntax)
                 .WithTrackingName(StepNames.GenerateNativeToManagedStub);
@@ -180,7 +190,7 @@ namespace Microsoft.Interop
 
             // Generate the native interface metadata for each interface that contains a method with the [VirtualMethodIndex] attribute.
             IncrementalValuesProvider<MemberDeclarationSyntax> generateNativeInterface = generateStubInformation
-                .Select(static (context, ct) => context.ContainingSyntaxContext)
+                .Select(static (context, ct) => context.Item1.ContainingSyntaxContext)
                 .Collect()
                 .SelectMany(static (syntaxContexts, ct) => syntaxContexts.Distinct())
                 .Select(static (context, ct) => GenerateNativeInterfaceMetadata(context));
@@ -193,23 +203,23 @@ namespace Microsoft.Interop
             IncrementalValuesProvider<MemberDeclarationSyntax> populateVTable =
                 nativeToManagedStubContexts
                 .Collect()
-                .SelectMany(static (data, ct) => data.GroupBy(stub => stub.ContainingSyntaxContext))
-                .Select(static (vtable, ct) => GeneratePopulateVTableMethod(vtable));
+                .SelectMany(static (data, ct) => data.GroupBy(stub => stub.Item1.ContainingSyntaxContext))
+                .Select(static (group, ct) => GeneratePopulateVTableMethod(group));
 
             context.RegisterConcatenatedSyntaxOutputs(populateVTable, "PopulateVTable.g.cs");
 
             IncrementalValuesProvider<MemberDeclarationSyntax> iIUnknownInterfaceTypeImplementation =
-                nativeToManagedStubContexts
+                generateStubInformation
                 .Collect()
-                .SelectMany(static (data, ct) => data.GroupBy(stub => stub.ContainingSyntaxContext))
-                .Select(static (context, ct) => GenerateIIUnknownInterfaceTypeImplementation(context.Key, context.Count()));
+                .SelectMany(static (data, ct) => data.GroupBy(stub => stub.Item1.ContainingSyntaxContext))
+                .Select(static (context, ct) => GenerateIIUnknownInterfaceTypeImplementation(context.Key, context.Count(), context.First().Item2));
 
             context.RegisterConcatenatedSyntaxOutputs(iIUnknownInterfaceTypeImplementation, "IIUnknownInterfaceTypeImplementation.g.cs");
         }
 
-        private static MemberDeclarationSyntax GenerateIIUnknownInterfaceTypeImplementation(ContainingSyntaxContext context, int methodsCount)
+        private static MemberDeclarationSyntax GenerateIIUnknownInterfaceTypeImplementation(ContainingSyntaxContext context, int methodsCount, ComInterfaceContext interfaceContext)
         {
-            // static Guid IIUnknownInterfaceType.Iid => new Guid("00000000-0000-0000-0000-000000000000");
+            // static Guid IIUnknownInterfaceType.Iid => new Guid("XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX");
             var iid = PropertyDeclaration(List<AttributeListSyntax>(),
                 TokenList(Token(SyntaxKind.StaticKeyword)),
                 ParseTypeName("System.Guid"),
@@ -225,7 +235,7 @@ namespace Microsoft.Interop
                                         ArgumentList(
                                             SingletonSeparatedList(
                                                 Argument(
-                                                    LiteralExpression(SyntaxKind.StringLiteralExpression, Literal("00000000-0000-0000-0000-000000000000")))))))))))));
+                                                    LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(interfaceContext.InterfaceId.ToString())))))))))))));
             // private static readonly void** m_vtable = (void**)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(<InterfaceName>), sizeof(void*) * <3 + numberOfInterfaceMethods>);
             var m_vtable = FieldDeclaration(
                 List<AttributeListSyntax>(),
@@ -472,6 +482,15 @@ namespace Microsoft.Interop
                     return Diagnostic.Create(GeneratorDiagnostics.InvalidAttributedMethodContainingTypeMissingModifiers, syntax.Identifier.GetLocation(), type.Name, typeDecl.Identifier);
                 }
             }
+            var guidAttr = type.GetAttributes().Where(attr => attr.AttributeClass.ToDisplayString() == TypeNames.GuidAttribute).SingleOrDefault();
+            var interfaceTypeAttr = type.GetAttributes().Where(attr => attr.AttributeClass.ToDisplayString() == TypeNames.InterfaceTypeAttribute).SingleOrDefault();
+            // Assume interfaceType is IUnknown for now
+            if (interfaceTypeAttr is not null
+                && (guidAttr is null
+                    || guidAttr.ConstructorArguments.SingleOrDefault().Value as string is null))
+            {
+                // Missing Guid
+            }
 
             return null;
         }
@@ -514,9 +533,10 @@ namespace Microsoft.Interop
                     Parameter(Identifier(VTableParameterName))
                     .WithType(PointerType(PointerType(PredefinedType(Token(SyntaxKind.VoidKeyword))))));
 
-        private static MemberDeclarationSyntax GeneratePopulateVTableMethod(IGrouping<ContainingSyntaxContext, IncrementalMethodStubGenerationContext> vtableMethods)
+        private static MemberDeclarationSyntax GeneratePopulateVTableMethod(IGrouping<ContainingSyntaxContext, (IncrementalMethodStubGenerationContext, ComInterfaceContext)> group)
         {
-            ContainingSyntaxContext containingSyntax = vtableMethods.Key.AddContainingSyntax(NativeTypeContainingSyntax);
+            var vtableMethods = group.Select(x => x.Item1);
+            ContainingSyntaxContext containingSyntax = group.Key.AddContainingSyntax(NativeTypeContainingSyntax);
             MethodDeclarationSyntax populateVtableMethod = ManagedVirtualMethodTableImplementationSyntaxTemplate;
 
             foreach (var method in vtableMethods)

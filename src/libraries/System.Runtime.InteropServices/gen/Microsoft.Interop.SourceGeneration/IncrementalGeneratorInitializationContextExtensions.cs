@@ -44,6 +44,8 @@ namespace Microsoft.Interop
                 context.ReportDiagnostic(diagnostic);
             });
         }
+        public static void RegisterConcatenatedSyntaxOutputs<TNode>(this IncrementalGeneratorInitializationContext context, IncrementalValuesProvider<TNode> nodes, string fileName)
+            => RegisterConcatenatedSyntaxOutputs<TNode>(context, nodes, fileName);
 
         public static void RegisterConcatenatedSyntaxOutputs<TNode>(this IncrementalGeneratorInitializationContext context, IncrementalValuesProvider<TNode> nodes, string fileName, string constantSource = "")
             where TNode : SyntaxNode

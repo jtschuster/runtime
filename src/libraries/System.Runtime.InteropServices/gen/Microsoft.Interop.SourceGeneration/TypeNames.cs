@@ -113,5 +113,6 @@ namespace Microsoft.Interop
         public const string IIUnknownInterfaceType = "System.Runtime.InteropServices.Marshalling.IIUnknownInterfaceType";
         public const string RuntimeHelpers = "System.Runtime.CompilerServices.RuntimeHelpers";
         public const string ComWrappers = "System.Runtime.InteropServices.ComWrappers";
+        public const string GuidAttribute = "System.Runtime.InteropServices.GuidAttribute";
     }
 }
