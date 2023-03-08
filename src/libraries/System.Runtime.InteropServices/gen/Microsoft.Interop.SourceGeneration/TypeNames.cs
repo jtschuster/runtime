@@ -125,9 +125,5 @@ namespace Microsoft.Interop
 
         public const string IUnmanagedObjectUnwrapper = "System.Runtime.InteropServices.Marshalling.IUnmanagedObjectUnwrapper";
         public const string UnmanagedObjectUnwrapper = "System.Runtime.InteropServices.Marshalling.UnmanagedObjectUnwrapper";
-        public const string IIUnknownInterfaceType = "System.Runtime.InteropServices.Marshalling.IIUnknownInterfaceType";
-        public const string RuntimeHelpers = "System.Runtime.CompilerServices.RuntimeHelpers";
-        public const string ComWrappers = "System.Runtime.InteropServices.ComWrappers";
-        public const string GuidAttribute = "System.Runtime.InteropServices.GuidAttribute";
     }
 }
