@@ -30,7 +30,7 @@ internal sealed unsafe partial class MyGeneratedComWrappers : StrategyBasedComWr
 
 public static unsafe partial class Native
 {
-    [LibraryImport(NativeExportsNE.NativeExportsNE_Binary, EntryPoint = "get_com_object")]
+    [LibraryImport(NativeExportsNE.NativeExportsNE_Binary, EntryPoint = "new_get_and_set_int")]
     public static partial void* NewNativeObject();
 }
 

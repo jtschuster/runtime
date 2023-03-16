@@ -13,11 +13,11 @@ using System.Text;
 using System.Threading.Tasks;
 using static System.Runtime.InteropServices.ComWrappers;
 
-namespace NativeExports;
+namespace NativeExports.ComInterfaceGenerator;
 
-public static unsafe class ComInterfaceGeneratorExports
+public static unsafe class GetAndSetInt
 {
-    interface IComInterface1
+    interface IGetAndSetInt
     {
         public int GetData();
 
@@ -27,17 +27,17 @@ public static unsafe class ComInterfaceGeneratorExports
     }
 
     // Call from another assembly to get a ptr to make an RCW
-    [UnmanagedCallersOnly(EntryPoint = "get_com_object")]
+    [UnmanagedCallersOnly(EntryPoint = "new_get_and_set_int")]
     public static void* CreateComObject()
     {
         MyComWrapper cw = new();
-        var myObject = new MyObject();
+        var myObject = new ImplementingObject();
         nint ptr = cw.GetOrCreateComInterfaceForObject(myObject, CreateComInterfaceFlags.None);
 
         return (void*)ptr;
     }
 
-    class MyComWrapper : System.Runtime.InteropServices.ComWrappers
+    class MyComWrapper : System.Runtime.InteropServices.Marshalling.StrategyBasedComWrappers
     {
         static void* _s_comInterface1VTable = null;
         static void* s_comInterface1VTable
@@ -46,23 +46,23 @@ public static unsafe class ComInterfaceGeneratorExports
             {
                 if (MyComWrapper._s_comInterface1VTable != null)
                     return _s_comInterface1VTable;
-                void** vtable = (void**)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(ComInterfaceGeneratorExports), sizeof(void*) * 5);
+                void** vtable = (void**)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(GetAndSetInt), sizeof(void*) * 5);
                 GetIUnknownImpl(out var fpQueryInterface, out var fpAddReference, out var fpRelease);
                 vtable[0] = (void*)fpQueryInterface;
                 vtable[1] = (void*)fpAddReference;
                 vtable[2] = (void*)fpRelease;
-                vtable[3] = (delegate* unmanaged<void*, int*, int>)&MyObject.ABI.GetData;
-                vtable[4] = (delegate* unmanaged<void*, int, int>)&MyObject.ABI.SetData;
+                vtable[3] = (delegate* unmanaged<void*, int*, int>)&ImplementingObject.ABI.GetData;
+                vtable[4] = (delegate* unmanaged<void*, int, int>)&ImplementingObject.ABI.SetData;
                 _s_comInterface1VTable = vtable;
                 return _s_comInterface1VTable;
             }
         }
         protected override ComInterfaceEntry* ComputeVtables(object obj, CreateComInterfaceFlags flags, out int count)
         {
-            if (obj is MyObject)
+            if (obj is ImplementingObject)
             {
-                ComInterfaceEntry* comInterfaceEntry = (ComInterfaceEntry*)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(MyObject), sizeof(ComInterfaceEntry));
-                comInterfaceEntry->IID = IComInterface1.IID;
+                ComInterfaceEntry* comInterfaceEntry = (ComInterfaceEntry*)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(ImplementingObject), sizeof(ComInterfaceEntry));
+                comInterfaceEntry->IID = IGetAndSetInt.IID;
                 comInterfaceEntry->Vtable = (nint)s_comInterface1VTable;
                 count = 1;
                 return comInterfaceEntry;
@@ -70,63 +70,17 @@ public static unsafe class ComInterfaceGeneratorExports
             count = 0;
             return null;
         }
-        protected override object CreateObject(nint ptr, CreateObjectFlags flags)
-        {
-            int hr = Marshal.QueryInterface(ptr, ref IComInterface1.IID, out IntPtr IComInterfaceImpl);
-            if (hr != 0)
-            {
-                return null;
-            }
-            return new IComInterface1Impl(ptr);
-        }
-
-        protected override void ReleaseObjects(IEnumerable objects) { }
     }
 
-    // Wrapper for calling CCWs from the ComInterfaceGenerator
-    class IComInterface1Impl : IComInterface1
-    {
-        nint _ptr;
-
-        public IComInterface1Impl(nint @this)
-        {
-            _ptr = @this;
-        }
-
-        int GetData(nint inst)
-        {
-            int value;
-            int hr = ((delegate* unmanaged<nint, int*, int>)(*(*(void***)inst + 3)))(inst, &value);
-            if (hr != 0)
-            {
-                Marshal.GetExceptionForHR(hr);
-            }
-            return value;
-        }
-
-        void SetData(nint inst, int newValue)
-        {
-            int hr = ((delegate* unmanaged<nint, int, int>)(*(*(void***)inst + 4)))(inst, newValue);
-            if (hr != 0)
-            {
-                Marshal.GetExceptionForHR(hr);
-            }
-        }
-
-        int IComInterface1.GetData() => GetData(_ptr);
-
-        void IComInterface1.SetData(int newValue) => SetData(_ptr, newValue);
-    }
-
-    class MyObject : IComInterface1
+    class ImplementingObject : IGetAndSetInt
     {
         int _data = 0;
 
-        int IComInterface1.GetData()
+        int IGetAndSetInt.GetData()
         {
             return _data;
         }
-        void IComInterface1.SetData(int x)
+        void IGetAndSetInt.SetData(int x)
         {
             _data = x;
         }
@@ -140,7 +94,7 @@ public static unsafe class ComInterfaceGeneratorExports
             {
                 try
                 {
-                    *value = ComInterfaceDispatch.GetInstance<IComInterface1>((ComInterfaceDispatch*)@this).GetData();
+                    *value = ComInterfaceDispatch.GetInstance<IGetAndSetInt>((ComInterfaceDispatch*)@this).GetData();
                     return 0;
                 }
                 catch (Exception e)
@@ -154,7 +108,7 @@ public static unsafe class ComInterfaceGeneratorExports
             {
                 try
                 {
-                    ComInterfaceDispatch.GetInstance<IComInterface1>((ComInterfaceDispatch*)@this).SetData(newValue);
+                    ComInterfaceDispatch.GetInstance<IGetAndSetInt>((ComInterfaceDispatch*)@this).SetData(newValue);
                     return 0;
                 }
                 catch (Exception e)

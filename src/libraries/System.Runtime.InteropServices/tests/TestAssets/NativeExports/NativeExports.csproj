@@ -13,21 +13,13 @@
     <!-- To integrate with DNNE's architecture calculation, we need to set the RID for this project. -->
     <RuntimeIdentifier>$(OutputRid)</RuntimeIdentifier>
     <AppHostRuntimeIdentifier>$(PackageRID)</AppHostRuntimeIdentifier>
-    <_TargetsAppleOS Condition="'$(TargetOS)' == 'osx' or '$(TargetOS)' == 'maccatalyst' or
-      '$(TargetOS)' == 'ios' or '$(TargetOS)' == 'tvos' or '$(TargetOS)' == 'iossimulator' or
-      '$(TargetOS)' == 'tvossimulator'">true</_TargetsAppleOS>
+    <_TargetsAppleOS Condition="'$(TargetOS)' == 'osx' or '$(TargetOS)' == 'maccatalyst' or&#xD;&#xA;      '$(TargetOS)' == 'ios' or '$(TargetOS)' == 'tvos' or '$(TargetOS)' == 'iossimulator' or&#xD;&#xA;      '$(TargetOS)' == 'tvossimulator'">true</_TargetsAppleOS>
   </PropertyGroup>
 
   <!-- Until we use the live app host, use a prebuilt from the 7.0 SDK.
        Issue: https://github.com/dotnet/runtime/issues/58109. -->
   <ItemGroup Condition="'$(UseLocalAppHostPack)' != 'true'">
-    <KnownAppHostPack Include="Microsoft.NETCore.App"
-                      ExcludedRuntimeIdentifiers="android"
-                      AppHostPackNamePattern="Microsoft.NETCore.App.Host.**RID**"
-                      AppHostPackVersion="7.0.0"
-                      AppHostRuntimeIdentifiers="linux-arm;linux-arm64;linux-musl-arm64;linux-musl-x64;linux-x64;osx-x64;rhel.6-x64;tizen.4.0.0-armel;tizen.5.0.0-armel;win-arm;win-arm64;win-x64;win-x86;linux-musl-arm;osx-arm64;linux-s390x;linux-bionic-arm;linux-bionic-arm64;linux-bionic-x64;linux-bionic-x86"
-                      TargetFramework="$(NetCoreAppCurrent)"
-                      Condition="'@(KnownAppHostPack)' == '' or !@(KnownAppHostPack->AnyHaveMetadataValue('TargetFramework', '$(NetCoreAppCurrent)'))" />
+    <KnownAppHostPack Include="Microsoft.NETCore.App" ExcludedRuntimeIdentifiers="android" AppHostPackNamePattern="Microsoft.NETCore.App.Host.**RID**" AppHostPackVersion="7.0.0" AppHostRuntimeIdentifiers="linux-arm;linux-arm64;linux-musl-arm64;linux-musl-x64;linux-x64;osx-x64;rhel.6-x64;tizen.4.0.0-armel;tizen.5.0.0-armel;win-arm;win-arm64;win-x64;win-x86;linux-musl-arm;osx-arm64;linux-s390x;linux-bionic-arm;linux-bionic-arm64;linux-bionic-x64;linux-bionic-x86" TargetFramework="$(NetCoreAppCurrent)" Condition="'@(KnownAppHostPack)' == '' or !@(KnownAppHostPack-&gt;AnyHaveMetadataValue('TargetFramework', '$(NetCoreAppCurrent)'))" />
   </ItemGroup>
 
   <ItemGroup>
@@ -44,30 +36,18 @@
       <NativeCompiler Condition="'$(NativeCompiler)' == ''">clang</NativeCompiler>
     </PropertyGroup>
 
-    <Exec Command="sh -c 'build_arch=&quot;$(TargetArchitecture)&quot; compiler=&quot;$(NativeCompiler)&quot; . &quot;$(RepositoryEngineeringDir)/common/native/init-compiler.sh&quot; &amp;&amp; echo $CC' 2>/dev/null"
-          EchoOff="true"
-          ConsoleToMsBuild="true"
-          StandardOutputImportance="Low">
+    <Exec Command="sh -c 'build_arch=&quot;$(TargetArchitecture)&quot; compiler=&quot;$(NativeCompiler)&quot; . &quot;$(RepositoryEngineeringDir)/common/native/init-compiler.sh&quot; &amp;&amp; echo $CC' 2&gt;/dev/null" EchoOff="true" ConsoleToMsBuild="true" StandardOutputImportance="Low">
       <Output TaskParameter="ConsoleOutput" PropertyName="DnneCompilerCommand" />
     </Exec>
 
-    <Exec Command="sh -c 'build_arch=&quot;$(TargetArchitecture)&quot; compiler=&quot;$(NativeCompiler)&quot; . &quot;$(RepositoryEngineeringDir)/common/native/init-compiler.sh&quot; &amp;&amp; echo $LDFLAGS' 2>/dev/null"
-          EchoOff="true"
-          ConsoleToMsBuild="true"
-          StandardOutputImportance="Low">
+    <Exec Command="sh -c 'build_arch=&quot;$(TargetArchitecture)&quot; compiler=&quot;$(NativeCompiler)&quot; . &quot;$(RepositoryEngineeringDir)/common/native/init-compiler.sh&quot; &amp;&amp; echo $LDFLAGS' 2&gt;/dev/null" EchoOff="true" ConsoleToMsBuild="true" StandardOutputImportance="Low">
       <Output TaskParameter="ConsoleOutput" PropertyName="DnneLinkerCommand" />
     </Exec>
   </Target>
 
-  <Target Name="GetUnixCrossBuildArgumentsForDNNE"
-          Condition="'$(CrossBuild)' == 'true' and
-            '$(OS)' == 'Unix' and '$(_TargetsAppleOS)' != 'true'">
+  <Target Name="GetUnixCrossBuildArgumentsForDNNE" Condition="'$(CrossBuild)' == 'true' and&#xD;&#xA;            '$(OS)' == 'Unix' and '$(_TargetsAppleOS)' != 'true'">
 
-    <Exec Command="cmake -P &quot;$(RepositoryEngineeringDir)/native/output-toolchain-info.cmake&quot;"
-          EchoOff="true"
-          ConsoleToMsBuild="true"
-          StandardOutputImportance="Low"
-          EnvironmentVariables="TARGET_BUILD_ARCH=$(TargetArchitecture)">
+    <Exec Command="cmake -P &quot;$(RepositoryEngineeringDir)/native/output-toolchain-info.cmake&quot;" EchoOff="true" ConsoleToMsBuild="true" StandardOutputImportance="Low" EnvironmentVariables="TARGET_BUILD_ARCH=$(TargetArchitecture)">
       <Output TaskParameter="ConsoleOutput" PropertyName="CrossTargetXml" />
     </Exec>
 
@@ -103,25 +83,17 @@
     <Error Condition="'$(XCodeSdkName)' == ''" Text="The name of the XCode SDK for the target platform, as passed to xcrun to locate the sdk, must be specified." />
 
     <!-- xcrun is used to locate the XCode SDKs and tools within them. See the xcrun manpage for usage information. -->
-    <Exec Command="xcrun --sdk $(XCodeSdkName) --show-sdk-path"
-          EchoOff="true"
-          ConsoleToMsBuild="true"
-          StandardOutputImportance="Low">
+    <Exec Command="xcrun --sdk $(XCodeSdkName) --show-sdk-path" EchoOff="true" ConsoleToMsBuild="true" StandardOutputImportance="Low">
       <Output TaskParameter="ConsoleOutput" PropertyName="SysRootIncludePath" />
     </Exec>
 
     <PropertyGroup>
       <DnneLinkerUserFlags>-target $(TargetTriple)</DnneLinkerUserFlags>
-      <DnneCompilerUserFlags>-isysroot &quot;$(SysRootIncludePath)&quot; -target $(TargetTriple)</DnneCompilerUserFlags>
+      <DnneCompilerUserFlags>-isysroot "$(SysRootIncludePath)" -target $(TargetTriple)</DnneCompilerUserFlags>
     </PropertyGroup>
   </Target>
 
-  <Target Name="GetBuildArgumentsForDNNE"
-          DependsOnTargets="ResolveFrameworkReferences;
-                            GetUnixBuildArgumentsForDNNE;
-                            GetAppleBuildArgumentsForDNNE;
-                            GetUnixCrossBuildArgumentsForDNNE"
-          BeforeTargets="DnneBuildNativeExports">
+  <Target Name="GetBuildArgumentsForDNNE" DependsOnTargets="ResolveFrameworkReferences;&#xD;&#xA;                            GetUnixBuildArgumentsForDNNE;&#xD;&#xA;                            GetAppleBuildArgumentsForDNNE;&#xD;&#xA;                            GetUnixCrossBuildArgumentsForDNNE" BeforeTargets="DnneBuildNativeExports">
     <PropertyGroup>
       <DnneNetHostDir>$([System.IO.Path]::GetDirectoryName('$(AppHostSourcePath)'))</DnneNetHostDir>
     </PropertyGroup>
