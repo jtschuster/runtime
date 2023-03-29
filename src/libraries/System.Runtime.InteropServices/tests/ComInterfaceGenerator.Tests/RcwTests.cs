@@ -8,39 +8,44 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
+using SharedTypes.ComInterfaces;
 using Xunit;
 using Xunit.Sdk;
 
-namespace ComInterfaceGenerator.Tests;
-
-[GeneratedComInterface]
-[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-[Guid("2c3f9903-b586-46b1-881b-adfce9af47b1")]
-public partial interface IComInterface1
+namespace SharedTypes.ComInterfaces
 {
-    int GetData();
-    void SetData(int n);
+    [GeneratedComInterface]
+    partial interface IGetAndSetInt;
 }
-
-internal unsafe partial class NativeExportsNE
+namespace ComInterfaceGenerator.Tests
 {
-    [LibraryImport(NativeExportsNE_Binary, EntryPoint = "get_com_object")]
-    public static partial void* NewNativeObject();
-}
-
-
-public class RcwTests
-{
-    [Fact]
-    public unsafe void CallRcwFromGeneratedComInterface()
+    [GeneratedComClass]
+    public class Impl : IGetAndSetInt
     {
-        var ptr = NativeExportsNE.NewNativeObject(); // new_native_object
-        var cw = new StrategyBasedComWrappers();
-        var obj = cw.GetOrCreateObjectForComInstance((nint)ptr, CreateObjectFlags.None);
+        public int GetData() => throw new System.NotImplementedException();
+        public void SetData(int x) => throw new System.NotImplementedException();
+    }
 
-        var intObj = (IComInterface1)obj;
-        Assert.Equal(0, intObj.GetData());
-        intObj.SetData(2);
-        Assert.Equal(2, intObj.GetData());
+    internal unsafe partial class NativeExportsNE
+    {
+        [LibraryImport(NativeExportsNE_Binary, EntryPoint = "get_com_object")]
+        public static partial void* NewNativeObject();
+    }
+
+
+    public class RcwTests
+    {
+        [Fact]
+        public unsafe void CallRcwFromGeneratedComInterface()
+        {
+            var ptr = NativeExportsNE.NewNativeObject(); // new_native_object
+            var cw = new StrategyBasedComWrappers();
+            var obj = cw.GetOrCreateObjectForComInstance((nint)ptr, CreateObjectFlags.None);
+
+            var intObj = (IGetAndSetInt)obj;
+            Assert.Equal(0, intObj.GetData());
+            intObj.SetData(2);
+            Assert.Equal(2, intObj.GetData());
+        }
     }
 }

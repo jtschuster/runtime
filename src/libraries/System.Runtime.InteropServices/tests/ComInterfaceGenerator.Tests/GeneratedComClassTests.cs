@@ -18,11 +18,11 @@ namespace ComInterfaceGenerator.Tests
     }
 
     [GeneratedComClass]
-    partial class ManagedObjectExposedToCom : IComInterface1
+    partial class ManagedObjectExposedToCom : IGetAndSetInt
     {
         public int Data { get; set; }
-        int IComInterface1.GetData() => Data;
-        void IComInterface1.SetData(int n) => Data = n;
+        int IGetAndSetInt.GetData() => Data;
+        void IGetAndSetInt.SetData(int n) => Data = n;
     }
 
     [GeneratedComClass]
@@ -39,7 +39,7 @@ namespace ComInterfaceGenerator.Tests
             StrategyBasedComWrappers wrappers = new();
             nint ptr = wrappers.GetOrCreateComInterfaceForObject(obj, CreateComInterfaceFlags.None);
             Assert.NotEqual(0, ptr);
-            var iid = typeof(IComInterface1).GUID;
+            var iid = typeof(IGetAndSetInt).GUID;
             Assert.Equal(0, Marshal.QueryInterface(ptr, ref iid, out nint iComInterface));
             Assert.NotEqual(0, iComInterface);
             Marshal.Release(iComInterface);
@@ -53,7 +53,7 @@ namespace ComInterfaceGenerator.Tests
             StrategyBasedComWrappers wrappers = new();
             nint ptr = wrappers.GetOrCreateComInterfaceForObject(obj, CreateComInterfaceFlags.None);
             Assert.NotEqual(0, ptr);
-            var iid = typeof(IComInterface1).GUID;
+            var iid = typeof(IGetAndSetInt).GUID;
             Assert.Equal(0, Marshal.QueryInterface(ptr, ref iid, out nint iComInterface));
             Assert.NotEqual(0, iComInterface);
             Marshal.Release(iComInterface);

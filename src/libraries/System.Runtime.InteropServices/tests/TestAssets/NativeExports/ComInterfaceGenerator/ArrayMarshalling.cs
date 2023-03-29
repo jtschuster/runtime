@@ -9,89 +9,93 @@ using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using System.Text;
 using System.Threading.Tasks;
+using SharedTypes.ComInterfaces;
 using static System.Runtime.InteropServices.ComWrappers;
 
-namespace NativeExports.ComInterfaceGenerator;
-public static unsafe class ArrayMarshalling
+namespace SharedTypes.ComInterfaces
 {
-    interface IGetIntArray
+    partial interface IGetIntArray
     {
-        int[] GetInts();
-        static Guid IID => new Guid("7D802A0A-630A-4C8E-A21F-771CC9031FB9");
+        static Guid IID = new Guid(_guid);
     }
+}
+namespace NativeExports.ComInterfaceGenerator
+{
 
-    [UnmanagedCallersOnly(EntryPoint = "new_")]
-    public static void* CreateComObject()
+    public static unsafe class ArrayMarshalling
     {
-        MyComWrapper cw = new();
-        var myObject = new ImplementingObject();
-        nint ptr = cw.GetOrCreateComInterfaceForObject(myObject, CreateComInterfaceFlags.None);
 
-        return (void*)ptr;
-    }
-
-    class MyComWrapper : StrategyBasedComWrappers
-    {
-        static void* _s_comInterface1VTable = null;
-        static void* s_comInterface1VTable
+        [UnmanagedCallersOnly(EntryPoint = "new_")]
+        public static void* CreateComObject()
         {
-            get
+            MyComWrapper cw = new();
+            var myObject = new ImplementingObject();
+            nint ptr = cw.GetOrCreateComInterfaceForObject(myObject, CreateComInterfaceFlags.None);
+
+            return (void*)ptr;
+        }
+
+        class MyComWrapper : NonGeneratedStrategyBasedComWrappers
+        {
+            static void* _s_comInterface1VTable = null;
+            static void* s_comInterface1VTable
             {
-                if (MyComWrapper._s_comInterface1VTable != null)
+                get
+                {
+                    if (MyComWrapper._s_comInterface1VTable != null)
+                        return _s_comInterface1VTable;
+                    void** vtable = (void**)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(GetAndSetInt), sizeof(void*) * 4);
+                    GetIUnknownImpl(out var fpQueryInterface, out var fpAddReference, out var fpRelease);
+                    vtable[0] = (void*)fpQueryInterface;
+                    vtable[1] = (void*)fpAddReference;
+                    vtable[2] = (void*)fpRelease;
+                    vtable[3] = (delegate* unmanaged<void*, int*, int>)&ImplementingObject.ABI.GetInts;
+                    _s_comInterface1VTable = vtable;
                     return _s_comInterface1VTable;
-                void** vtable = (void**)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(GetAndSetInt), sizeof(void*) * 4);
-                GetIUnknownImpl(out var fpQueryInterface, out var fpAddReference, out var fpRelease);
-                vtable[0] = (void*)fpQueryInterface;
-                vtable[1] = (void*)fpAddReference;
-                vtable[2] = (void*)fpRelease;
-                vtable[3] = (delegate* unmanaged<void*, int*, int>)&ImplementingObject.ABI.GetInts;
-                _s_comInterface1VTable = vtable;
-                return _s_comInterface1VTable;
+                }
             }
-        }
-        protected override ComInterfaceEntry* ComputeVtables(object obj, CreateComInterfaceFlags flags, out int count)
-        {
-            if (obj is ImplementingObject)
+            protected override ComInterfaceEntry* ComputeVtables(object obj, CreateComInterfaceFlags flags, out int count)
             {
-                ComInterfaceEntry* comInterfaceEntry = (ComInterfaceEntry*)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(ImplementingObject), sizeof(ComInterfaceEntry));
-                comInterfaceEntry->IID = IGetIntArray.IID;
-                comInterfaceEntry->Vtable = (nint)s_comInterface1VTable;
-                count = 1;
-                return comInterfaceEntry;
-            }
-            count = 0;
-            return null;
-        }
-    }
-    class ImplementingObject : IGetIntArray
-    {
-        int[] _data;
-
-        public int[] GetInts() => _data;
-
-        public static class ABI
-        {
-            [UnmanagedCallersOnly]
-            public static int GetInts(void* @this, int* values)
-            {
-
-                try
+                if (obj is ImplementingObject)
                 {
-                    int[] arr = ComInterfaceDispatch.GetInstance<IGetIntArray>((ComInterfaceDispatch*)@this).GetInts();
-                    values = (int*)Marshal.AllocCoTaskMem(sizeof(int) * arr.Length);
-                    for (int i = 0; i < arr.Length; i++)
+                    ComInterfaceEntry* comInterfaceEntry = (ComInterfaceEntry*)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(ImplementingObject), sizeof(ComInterfaceEntry));
+                    comInterfaceEntry->IID = IGetIntArray.IID;
+                    comInterfaceEntry->Vtable = (nint)s_comInterface1VTable;
+                    count = 1;
+                    return comInterfaceEntry;
+                }
+                count = 0;
+                return null;
+            }
+        }
+        class ImplementingObject : IGetIntArray
+        {
+            int[] _data;
+
+            public int[] GetInts() => _data;
+
+            public static class ABI
+            {
+                [UnmanagedCallersOnly]
+                public static int GetInts(void* @this, int* values)
+                {
+
+                    try
                     {
-                        values[i] = arr[i];
+                        int[] arr = ComInterfaceDispatch.GetInstance<IGetIntArray>((ComInterfaceDispatch*)@this).GetInts();
+                        values = (int*)Marshal.AllocCoTaskMem(sizeof(int) * arr.Length);
+                        for (int i = 0; i < arr.Length; i++)
+                        {
+                            values[i] = arr[i];
+                        }
+                        return 0;
                     }
-                    return 0;
-                }
-                catch (Exception e)
-                {
-                    return e.HResult;
+                    catch (Exception e)
+                    {
+                        return e.HResult;
+                    }
                 }
             }
         }
     }
-
-
 }

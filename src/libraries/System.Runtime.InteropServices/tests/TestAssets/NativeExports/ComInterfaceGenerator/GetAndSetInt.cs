@@ -8,112 +8,113 @@ using System.Diagnostics;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.Marshalling;
 using System.Runtime.InteropServices.ObjectiveC;
 using System.Text;
 using System.Threading.Tasks;
+using SharedTypes.ComInterfaces;
 using static System.Runtime.InteropServices.ComWrappers;
 
-namespace NativeExports.ComInterfaceGenerator;
-
-public static unsafe class GetAndSetInt
+namespace SharedTypes.ComInterfaces
 {
-    interface IGetAndSetInt
+    partial interface IGetAndSetInt
     {
-        public int GetData();
-
-        public void SetData(int x);
-
-        public static Guid IID = new Guid("2c3f9903-b586-46b1-881b-adfce9af47b1");
+        public static Guid IID => new Guid(_guid);
     }
-
-    // Call from another assembly to get a ptr to make an RCW
-    [UnmanagedCallersOnly(EntryPoint = "new_get_and_set_int")]
-    public static void* CreateComObject()
+}
+namespace NativeExports.ComInterfaceGenerator
+{
+    public static unsafe class GetAndSetInt
     {
-        MyComWrapper cw = new();
-        var myObject = new ImplementingObject();
-        nint ptr = cw.GetOrCreateComInterfaceForObject(myObject, CreateComInterfaceFlags.None);
-
-        return (void*)ptr;
-    }
-
-    class MyComWrapper : System.Runtime.InteropServices.Marshalling.StrategyBasedComWrappers
-    {
-        static void* _s_comInterface1VTable = null;
-        static void* s_comInterface1VTable
+        // Call from another assembly to get a ptr to make an RCW
+        [UnmanagedCallersOnly(EntryPoint = "new_get_and_set_int")]
+        public static void* CreateComObject()
         {
-            get
+            MyComWrapper cw = new();
+            var myObject = new ImplementingObject();
+            nint ptr = cw.GetOrCreateComInterfaceForObject(myObject, CreateComInterfaceFlags.None);
+
+            return (void*)ptr;
+        }
+
+        class MyComWrapper : NonGeneratedStrategyBasedComWrappers
+        {
+            static void* _s_comInterface1VTable = null;
+            static void* s_comInterface1VTable
             {
-                if (MyComWrapper._s_comInterface1VTable != null)
+                get
+                {
+                    if (MyComWrapper._s_comInterface1VTable != null)
+                        return _s_comInterface1VTable;
+                    void** vtable = (void**)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(GetAndSetInt), sizeof(void*) * 5);
+                    GetIUnknownImpl(out var fpQueryInterface, out var fpAddReference, out var fpRelease);
+                    vtable[0] = (void*)fpQueryInterface;
+                    vtable[1] = (void*)fpAddReference;
+                    vtable[2] = (void*)fpRelease;
+                    vtable[3] = (delegate* unmanaged<void*, int*, int>)&ImplementingObject.ABI.GetData;
+                    vtable[4] = (delegate* unmanaged<void*, int, int>)&ImplementingObject.ABI.SetData;
+                    _s_comInterface1VTable = vtable;
                     return _s_comInterface1VTable;
-                void** vtable = (void**)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(GetAndSetInt), sizeof(void*) * 5);
-                GetIUnknownImpl(out var fpQueryInterface, out var fpAddReference, out var fpRelease);
-                vtable[0] = (void*)fpQueryInterface;
-                vtable[1] = (void*)fpAddReference;
-                vtable[2] = (void*)fpRelease;
-                vtable[3] = (delegate* unmanaged<void*, int*, int>)&ImplementingObject.ABI.GetData;
-                vtable[4] = (delegate* unmanaged<void*, int, int>)&ImplementingObject.ABI.SetData;
-                _s_comInterface1VTable = vtable;
-                return _s_comInterface1VTable;
-            }
-        }
-        protected override ComInterfaceEntry* ComputeVtables(object obj, CreateComInterfaceFlags flags, out int count)
-        {
-            if (obj is ImplementingObject)
-            {
-                ComInterfaceEntry* comInterfaceEntry = (ComInterfaceEntry*)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(ImplementingObject), sizeof(ComInterfaceEntry));
-                comInterfaceEntry->IID = IGetAndSetInt.IID;
-                comInterfaceEntry->Vtable = (nint)s_comInterface1VTable;
-                count = 1;
-                return comInterfaceEntry;
-            }
-            count = 0;
-            return null;
-        }
-    }
-
-    class ImplementingObject : IGetAndSetInt
-    {
-        int _data = 0;
-
-        int IGetAndSetInt.GetData()
-        {
-            return _data;
-        }
-        void IGetAndSetInt.SetData(int x)
-        {
-            _data = x;
-        }
-
-        // Provides function pointers in the COM format to use in COM VTables
-        public static class ABI
-        {
-
-            [UnmanagedCallersOnly]
-            public static int GetData(void* @this, int* value)
-            {
-                try
-                {
-                    *value = ComInterfaceDispatch.GetInstance<IGetAndSetInt>((ComInterfaceDispatch*)@this).GetData();
-                    return 0;
-                }
-                catch (Exception e)
-                {
-                    return e.HResult;
                 }
             }
-
-            [UnmanagedCallersOnly]
-            public static int SetData(void* @this, int newValue)
+            protected override ComInterfaceEntry* ComputeVtables(object obj, CreateComInterfaceFlags flags, out int count)
             {
-                try
+                if (obj is ImplementingObject)
                 {
-                    ComInterfaceDispatch.GetInstance<IGetAndSetInt>((ComInterfaceDispatch*)@this).SetData(newValue);
-                    return 0;
+                    ComInterfaceEntry* comInterfaceEntry = (ComInterfaceEntry*)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(ImplementingObject), sizeof(ComInterfaceEntry));
+                    comInterfaceEntry->IID = IGetAndSetInt.IID;
+                    comInterfaceEntry->Vtable = (nint)s_comInterface1VTable;
+                    count = 1;
+                    return comInterfaceEntry;
                 }
-                catch (Exception e)
+                count = 0;
+                return null;
+            }
+        }
+
+        class ImplementingObject : IGetAndSetInt
+        {
+            int _data = 0;
+
+            int IGetAndSetInt.GetData()
+            {
+                return _data;
+            }
+            void IGetAndSetInt.SetData(int x)
+            {
+                _data = x;
+            }
+
+            // Provides function pointers in the COM format to use in COM VTables
+            public static class ABI
+            {
+
+                [UnmanagedCallersOnly]
+                public static int GetData(void* @this, int* value)
                 {
-                    return e.HResult;
+                    try
+                    {
+                        *value = ComInterfaceDispatch.GetInstance<IGetAndSetInt>((ComInterfaceDispatch*)@this).GetData();
+                        return 0;
+                    }
+                    catch (Exception e)
+                    {
+                        return e.HResult;
+                    }
+                }
+
+                [UnmanagedCallersOnly]
+                public static int SetData(void* @this, int newValue)
+                {
+                    try
+                    {
+                        ComInterfaceDispatch.GetInstance<IGetAndSetInt>((ComInterfaceDispatch*)@this).SetData(newValue);
+                        return 0;
+                    }
+                    catch (Exception e)
+                    {
+                        return e.HResult;
+                    }
                 }
             }
         }
