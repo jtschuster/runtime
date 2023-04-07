@@ -4,6 +4,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
+using SharedTypes.ComInterfaces;
 using Xunit;
 
 namespace ComInterfaceGenerator.Tests
@@ -21,8 +22,8 @@ namespace ComInterfaceGenerator.Tests
     partial class ManagedObjectExposedToCom : IGetAndSetInt
     {
         public int Data { get; set; }
-        int IGetAndSetInt.GetData() => Data;
-        void IGetAndSetInt.SetData(int n) => Data = n;
+        int IGetAndSetInt.GetInt() => Data;
+        void IGetAndSetInt.SetInt(int n) => Data = n;
     }
 
     [GeneratedComClass]

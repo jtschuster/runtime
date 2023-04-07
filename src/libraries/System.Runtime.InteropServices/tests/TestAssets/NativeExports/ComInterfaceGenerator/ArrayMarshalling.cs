@@ -12,20 +12,13 @@ using System.Threading.Tasks;
 using SharedTypes.ComInterfaces;
 using static System.Runtime.InteropServices.ComWrappers;
 
-namespace SharedTypes.ComInterfaces
-{
-    partial interface IGetIntArray
-    {
-        static Guid IID = new Guid(_guid);
-    }
-}
 namespace NativeExports.ComInterfaceGenerator
 {
 
     public static unsafe class ArrayMarshalling
     {
 
-        [UnmanagedCallersOnly(EntryPoint = "new_")]
+        [UnmanagedCallersOnly(EntryPoint = "new_get_and_set_int_array")]
         public static void* CreateComObject()
         {
             MyComWrapper cw = new();
@@ -38,18 +31,18 @@ namespace NativeExports.ComInterfaceGenerator
         class MyComWrapper : NonGeneratedStrategyBasedComWrappers
         {
             static void* _s_comInterface1VTable = null;
-            static void* s_comInterface1VTable
+            static void* GetIntArrayVTable
             {
                 get
                 {
                     if (MyComWrapper._s_comInterface1VTable != null)
                         return _s_comInterface1VTable;
-                    void** vtable = (void**)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(GetAndSetInt), sizeof(void*) * 4);
+                    void** vtable = (void**)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(ImplementingObject), sizeof(void*) * 4);
                     GetIUnknownImpl(out var fpQueryInterface, out var fpAddReference, out var fpRelease);
                     vtable[0] = (void*)fpQueryInterface;
                     vtable[1] = (void*)fpAddReference;
                     vtable[2] = (void*)fpRelease;
-                    vtable[3] = (delegate* unmanaged<void*, int*, int>)&ImplementingObject.ABI.GetInts;
+                    vtable[3] = (delegate* unmanaged<void*, int**, int>)&ImplementingObject.ABI.GetInts;
                     _s_comInterface1VTable = vtable;
                     return _s_comInterface1VTable;
                 }
@@ -59,8 +52,8 @@ namespace NativeExports.ComInterfaceGenerator
                 if (obj is ImplementingObject)
                 {
                     ComInterfaceEntry* comInterfaceEntry = (ComInterfaceEntry*)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(ImplementingObject), sizeof(ComInterfaceEntry));
-                    comInterfaceEntry->IID = IGetIntArray.IID;
-                    comInterfaceEntry->Vtable = (nint)s_comInterface1VTable;
+                    comInterfaceEntry->IID = new Guid(IGetIntArray._guid);
+                    comInterfaceEntry->Vtable = (nint)GetIntArrayVTable;
                     count = 1;
                     return comInterfaceEntry;
                 }
@@ -70,23 +63,23 @@ namespace NativeExports.ComInterfaceGenerator
         }
         class ImplementingObject : IGetIntArray
         {
-            int[] _data;
+            int[] _data = new int[10] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
 
             public int[] GetInts() => _data;
 
             public static class ABI
             {
                 [UnmanagedCallersOnly]
-                public static int GetInts(void* @this, int* values)
+                public static int GetInts(void* @this, int** values)
                 {
 
                     try
                     {
                         int[] arr = ComInterfaceDispatch.GetInstance<IGetIntArray>((ComInterfaceDispatch*)@this).GetInts();
-                        values = (int*)Marshal.AllocCoTaskMem(sizeof(int) * arr.Length);
+                        *values = (int*)Marshal.AllocCoTaskMem(sizeof(int) * arr.Length);
                         for (int i = 0; i < arr.Length; i++)
                         {
-                            values[i] = arr[i];
+                            (*values)[i] = arr[i];
                         }
                         return 0;
                     }

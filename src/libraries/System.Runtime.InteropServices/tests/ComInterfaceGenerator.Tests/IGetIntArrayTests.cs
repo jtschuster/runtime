@@ -12,40 +12,22 @@ using SharedTypes.ComInterfaces;
 using Xunit;
 using Xunit.Sdk;
 
-namespace SharedTypes.ComInterfaces
-{
-    [GeneratedComInterface]
-    partial interface IGetAndSetInt;
-}
 namespace ComInterfaceGenerator.Tests
 {
-    [GeneratedComClass]
-    public class Impl : IGetAndSetInt
+    public unsafe partial class IGetIntArrayTests
     {
-        public int GetData() => throw new System.NotImplementedException();
-        public void SetData(int x) => throw new System.NotImplementedException();
-    }
-
-    internal unsafe partial class NativeExportsNE
-    {
-        [LibraryImport(NativeExportsNE_Binary, EntryPoint = "get_com_object")]
+        [LibraryImport(NativeExportsNE.NativeExportsNE_Binary, EntryPoint = "new_get_and_set_int_array")]
         public static partial void* NewNativeObject();
-    }
 
-
-    public class RcwTests
-    {
         [Fact]
         public unsafe void CallRcwFromGeneratedComInterface()
         {
-            var ptr = NativeExportsNE.NewNativeObject(); // new_native_object
+            var ptr = NewNativeObject(); // new_native_object
             var cw = new StrategyBasedComWrappers();
             var obj = cw.GetOrCreateObjectForComInstance((nint)ptr, CreateObjectFlags.None);
 
-            var intObj = (IGetAndSetInt)obj;
-            Assert.Equal(0, intObj.GetData());
-            intObj.SetData(2);
-            Assert.Equal(2, intObj.GetData());
+            var intObj = (IGetIntArray)obj;
+            Assert.Equal<int>(new int[] { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 }, intObj.GetInts());
         }
     }
 }

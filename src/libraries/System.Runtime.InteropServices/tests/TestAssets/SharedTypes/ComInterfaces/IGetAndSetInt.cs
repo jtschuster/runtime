@@ -5,17 +5,20 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.Marshalling;
 using System.Text;
 using System.Threading.Tasks;
 
 namespace SharedTypes.ComInterfaces
 {
+    [GeneratedComInterface]
+    [Guid(_guid)]
     partial interface IGetAndSetInt
     {
-        public int GetData();
+        int GetInt();
 
-        public void SetData(int x);
+        public void SetInt(int x);
 
-        private const string _guid = "2c3f9903-b586-46b1-881b-adfce9af47b1";
+        public const string _guid = "2c3f9903-b586-46b1-881b-adfce9af47b1";
     }
 }

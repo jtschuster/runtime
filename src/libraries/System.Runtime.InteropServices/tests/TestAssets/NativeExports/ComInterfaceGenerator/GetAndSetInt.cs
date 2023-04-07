@@ -15,13 +15,6 @@ using System.Threading.Tasks;
 using SharedTypes.ComInterfaces;
 using static System.Runtime.InteropServices.ComWrappers;
 
-namespace SharedTypes.ComInterfaces
-{
-    partial interface IGetAndSetInt
-    {
-        public static Guid IID => new Guid(_guid);
-    }
-}
 namespace NativeExports.ComInterfaceGenerator
 {
     public static unsafe class GetAndSetInt
@@ -51,8 +44,8 @@ namespace NativeExports.ComInterfaceGenerator
                     vtable[0] = (void*)fpQueryInterface;
                     vtable[1] = (void*)fpAddReference;
                     vtable[2] = (void*)fpRelease;
-                    vtable[3] = (delegate* unmanaged<void*, int*, int>)&ImplementingObject.ABI.GetData;
-                    vtable[4] = (delegate* unmanaged<void*, int, int>)&ImplementingObject.ABI.SetData;
+                    vtable[3] = (delegate* unmanaged<void*, int*, int>)&ImplementingObject.ABI.GetInt;
+                    vtable[4] = (delegate* unmanaged<void*, int, int>)&ImplementingObject.ABI.SetInt;
                     _s_comInterface1VTable = vtable;
                     return _s_comInterface1VTable;
                 }
@@ -62,7 +55,7 @@ namespace NativeExports.ComInterfaceGenerator
                 if (obj is ImplementingObject)
                 {
                     ComInterfaceEntry* comInterfaceEntry = (ComInterfaceEntry*)RuntimeHelpers.AllocateTypeAssociatedMemory(typeof(ImplementingObject), sizeof(ComInterfaceEntry));
-                    comInterfaceEntry->IID = IGetAndSetInt.IID;
+                    comInterfaceEntry->IID = new Guid(IGetAndSetInt._guid);
                     comInterfaceEntry->Vtable = (nint)s_comInterface1VTable;
                     count = 1;
                     return comInterfaceEntry;
@@ -76,11 +69,11 @@ namespace NativeExports.ComInterfaceGenerator
         {
             int _data = 0;
 
-            int IGetAndSetInt.GetData()
+            int IGetAndSetInt.GetInt()
             {
                 return _data;
             }
-            void IGetAndSetInt.SetData(int x)
+            void IGetAndSetInt.SetInt(int x)
             {
                 _data = x;
             }
@@ -90,11 +83,11 @@ namespace NativeExports.ComInterfaceGenerator
             {
 
                 [UnmanagedCallersOnly]
-                public static int GetData(void* @this, int* value)
+                public static int GetInt(void* @this, int* value)
                 {
                     try
                     {
-                        *value = ComInterfaceDispatch.GetInstance<IGetAndSetInt>((ComInterfaceDispatch*)@this).GetData();
+                        *value = ComInterfaceDispatch.GetInstance<IGetAndSetInt>((ComInterfaceDispatch*)@this).GetInt();
                         return 0;
                     }
                     catch (Exception e)
@@ -104,11 +97,11 @@ namespace NativeExports.ComInterfaceGenerator
                 }
 
                 [UnmanagedCallersOnly]
-                public static int SetData(void* @this, int newValue)
+                public static int SetInt(void* @this, int newValue)
                 {
                     try
                     {
-                        ComInterfaceDispatch.GetInstance<IGetAndSetInt>((ComInterfaceDispatch*)@this).SetData(newValue);
+                        ComInterfaceDispatch.GetInstance<IGetAndSetInt>((ComInterfaceDispatch*)@this).SetInt(newValue);
                         return 0;
                     }
                     catch (Exception e)
