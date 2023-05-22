@@ -35,7 +35,7 @@ namespace ComInterfaceGenerator.Tests
             Assert.True(expected.SequenceEqual(actual));
         }
         [Fact]
-        public unsafe void CallBaseInterfaceMethod_EnsureQiCalledOnce()
+        public void CallBaseInterfaceMethod_EnsureQiCalledOnce()
         {
             var cw = new SingleQIComWrapper();
             var derivedImpl = new DerivedImpl();
@@ -52,7 +52,7 @@ namespace ComInterfaceGenerator.Tests
             //iface.SetName("updated");
             //Assert.Equal("updated", iface.GetName());
 
-            var qiCallCountObj = obj.GetType().GetRuntimeProperties().Where(p => p.Name == "IUnknownStrategy").Single().GetValue(obj);
+            var qiCallCountObj = typeof(ComObject).GetProperty("IUnknownStrategy", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(obj);
             var countQi = (SingleQIComWrapper.CountQI)qiCallCountObj;
             Assert.Equal(1, countQi.QiCallCount);
         }
@@ -62,7 +62,6 @@ namespace ComInterfaceGenerator.Tests
         {
             int data = 3;
             string myName = "myName";
-            public void DoThingWithString([MarshalUsing(typeof(Utf16StringMarshaller))] string name) => throw new NotImplementedException();
 
             public int GetInt() => data;
 
