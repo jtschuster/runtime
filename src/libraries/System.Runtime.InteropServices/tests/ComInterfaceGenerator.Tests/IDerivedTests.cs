@@ -35,7 +35,7 @@ namespace ComInterfaceGenerator.Tests
             Assert.True(expected.SequenceEqual(actual));
         }
         [Fact]
-        public void CallBaseInterfaceMethod_EnsureQiCalledOnce()
+        public unsafe void CallBaseInterfaceMethod_EnsureQiCalledOnce()
         {
             var cw = new SingleQIComWrapper();
             var derivedImpl = new DerivedImpl();
@@ -47,12 +47,15 @@ namespace ComInterfaceGenerator.Tests
             iface.SetInt(5);
             Assert.Equal(5, iface.GetInt());
 
-            // https://github.com/dotnet/runtime/issues/85795
-            //Assert.Equal("myName", iface.GetName());
-            //iface.SetName("updated");
-            //Assert.Equal("updated", iface.GetName());
+            Assert.Equal("myName", iface.GetName());
+            iface.SetName("updated");
+            Assert.Equal("updated", iface.GetName());
 
-            var qiCallCountObj = typeof(ComObject).GetProperty("IUnknownStrategy", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(obj);
+            var iUnknownStrategyProperty = typeof(ComObject).GetProperty("IUnknownStrategy", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            Assert.NotNull(iUnknownStrategyProperty);
+
+            var qiCallCountObj = iUnknownStrategyProperty!.GetValue(obj);
             var countQi = (SingleQIComWrapper.CountQI)qiCallCountObj;
             Assert.Equal(1, countQi.QiCallCount);
         }
