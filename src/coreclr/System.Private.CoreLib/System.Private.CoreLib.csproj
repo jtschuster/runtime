@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <CompilerGeneratedFilesOutputPath>$(OutputPath)\Generated</CompilerGeneratedFilesOutputPath>
     <EnableDefaultItems>false</EnableDefaultItems>
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
     <GenerateResxSourceOmitGetResourceString>true</GenerateResxSourceOmitGetResourceString>
@@ -24,6 +26,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <EnabledGenerators Include="ComInterfaceGenerator" />
     <ILLinkSubstitutionsXmls Include="$(ILLinkDirectory)ILLink.Substitutions.xml" />
     <ILLinkSubstitutionsXmls Condition="'$(TargetsWindows)' == 'true'" Include="$(ILLinkDirectory)ILLink.Substitutions.Windows.xml" />
   </ItemGroup>
@@ -242,7 +245,7 @@
     <Compile Include="$(BclSourcesRoot)\System\ValueType.cs" />
     <Compile Include="$(CommonPath)System\Collections\Generic\ArrayBuilder.cs">
       <Link>Common\System\Collections\Generic\ArrayBuilder.cs</Link>
-    </Compile>    
+    </Compile>
   </ItemGroup>
   <ItemGroup Condition="'$(FeatureComWrappers)' == 'true'">
     <Compile Include="$(BclSourcesRoot)\System\Runtime\InteropServices\ComWrappers.cs" />

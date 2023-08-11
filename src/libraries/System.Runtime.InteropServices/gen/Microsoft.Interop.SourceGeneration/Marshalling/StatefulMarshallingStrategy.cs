@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
+using static Microsoft.Interop.SyntaxFactoryExtensions;
 
 namespace Microsoft.Interop
 {
@@ -158,7 +159,7 @@ namespace Microsoft.Interop
         public IEnumerable<StatementSyntax> GenerateSetupStatements(TypePositionInfo info, StubCodeContext context)
         {
             // <marshaller> = new();
-            LocalDeclarationStatementSyntax declaration = MarshallerHelpers.Declare(
+            LocalDeclarationStatementSyntax declaration = Declare(
                 _marshallerType.Syntax,
                 context.GetAdditionalIdentifier(info, MarshallerIdentifier),
                 ImplicitObjectCreationExpression(ArgumentList(), initializer: null));
@@ -438,7 +439,7 @@ namespace Microsoft.Interop
             {
                 // If the parameter is marshalled by-value [Out], then we don't marshal the contents of the collection.
                 // We do clear the span, so that if the invoke target doesn't fill it, we aren't left with undefined content.
-                yield return _elementsMarshalling.GenerateClearManagedSource(info, context);
+                yield return _elementsMarshalling.GenerateClearUnmanagedValuesDestination(info, context);
                 yield break;
             }
             if (context.Direction == MarshalDirection.UnmanagedToManaged && !info.IsByRef && info.ByValueContentsMarshalKind.HasFlag(ByValueContentsMarshalKind.Out))
