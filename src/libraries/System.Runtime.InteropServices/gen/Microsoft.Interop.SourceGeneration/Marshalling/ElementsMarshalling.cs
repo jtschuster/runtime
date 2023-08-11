@@ -283,7 +283,7 @@ namespace Microsoft.Interop
                     nativeSpanIdentifier,
                     CollectionSource.GetUnmanagedValuesSource(info, context)),
                 Declare(
-                    ReadOnlySpanOf(_elementInfo.ManagedType.Syntax),
+                    SpanOf(_elementInfo.ManagedType.Syntax),
                     managedSpanIdentifier,
                     CollectionSource.GetManagedValuesDestination(info, context)),
                 GenerateContentsMarshallingStatement(
@@ -315,7 +315,7 @@ namespace Microsoft.Interop
                     MethodInvocation(
                         TypeSyntaxes.System_Runtime_CompilerServices_Unsafe,
                         IdentifierName("AsRef"),
-                        RefArgument(
+                        InArgument(
                             MethodInvocation(
                                 CollectionSource.GetManagedValuesSource(info, context),
                                 IdentifierName("GetPinnableReference"))))),
@@ -395,20 +395,22 @@ namespace Microsoft.Interop
 
             var setNumElements = CollectionSource.GetNumElementsAssignmentFromManagedValuesDestination(info, context);
 
-            // Span<TUnmanagedElement> <nativeSpan> = MemoryMarshal.CreateSpan(ref Unsafe.AsRef(in <GetUnmanagedValuesSource>.GetPinnableReference(), <numElements>));
+            // Span<TUnmanagedElement> <nativeSpan> = MemoryMarshal.CreateSpan(ref Unsafe.AsRef(in <GetUnmanagedValuesSource>.GetPinnableReference()), <numElements>);
             LocalDeclarationStatementSyntax unmanagedValuesSource = Declare(
                 SpanOf(_unmanagedElementType),
                 nativeSpanIdentifier,
                 MethodInvocation(
                     TypeSyntaxes.System_Runtime_InteropServices_MemoryMarshal,
                     IdentifierName("CreateSpan"),
-                    RefArgument(MethodInvocation(
-                        TypeSyntaxes.System_Runtime_CompilerServices_Unsafe,
-                        IdentifierName("AsRef"),
-                        InArgument(MethodInvocation(
-                            CollectionSource.GetUnmanagedValuesSource(info, context),
-                            IdentifierName("GetPinnableReference"))),
-                        Argument(IdentifierName(numElementsIdentifier))))));
+                    RefArgument(
+                        MethodInvocation(
+                            TypeSyntaxes.System_Runtime_CompilerServices_Unsafe,
+                            IdentifierName("AsRef"),
+                            InArgument(
+                                MethodInvocation(
+                                    CollectionSource.GetUnmanagedValuesSource(info, context),
+                                    IdentifierName("GetPinnableReference"))))),
+                    Argument(IdentifierName(numElementsIdentifier))));
 
             // Span<TElement> <managedSpan> = <GetManagedValuesDestination>
             LocalDeclarationStatementSyntax managedValuesDestination = LocalDeclarationStatement(VariableDeclaration(

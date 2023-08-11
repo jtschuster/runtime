@@ -1,9 +1,6 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -47,6 +44,14 @@ namespace Microsoft.Interop
                     SingletonSeparatedList(decl)));
         }
 
+        public static InvocationExpressionSyntax MethodInvocation(ExpressionSyntax objectOrClass, SimpleNameSyntax methodName)
+            => InvocationExpression(
+                    MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        objectOrClass,
+                        methodName),
+                    ArgumentList(SeparatedList<ArgumentSyntax>()));
+
         public static InvocationExpressionSyntax MethodInvocation(ExpressionSyntax objectOrClass, SimpleNameSyntax methodName, params ArgumentSyntax[] arguments)
             => InvocationExpression(
                     MemberAccessExpression(
@@ -69,11 +74,24 @@ namespace Microsoft.Interop
         public static ArgumentSyntax InArgument(ExpressionSyntax expression)
             => Argument(null, Token(SyntaxKind.InKeyword), expression);
 
-        private static readonly SyntaxToken _span = Identifier(TypeNames.GlobalPrefix + TypeNames.System_Span);
+        private static readonly SyntaxToken _span = Identifier(TypeNames.System_Span);
         public static GenericNameSyntax SpanOf(TypeSyntax type) => GenericName(_span, TypeArgumentList(SingletonSeparatedList(type)));
 
-        private static readonly SyntaxToken _readonlySpan = Identifier(TypeNames.GlobalPrefix + TypeNames.System_ReadOnlySpan);
+        private static readonly SyntaxToken _readonlySpan = Identifier(TypeNames.System_ReadOnlySpan);
         public static GenericNameSyntax ReadOnlySpanOf(TypeSyntax type) => GenericName(_readonlySpan, TypeArgumentList(SingletonSeparatedList(type)));
+
+        public static MemberAccessExpressionSyntax Dot(this ExpressionSyntax expression, SimpleNameSyntax member) =>
+                    MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        expression,
+                        member);
+
+        public static ElementAccessExpressionSyntax IndexExpression(ExpressionSyntax indexed, ArgumentSyntax argument)
+            => ElementAccessExpression(
+                indexed,
+                BracketedArgumentList(SingletonSeparatedList(argument)));
+
+        public static LiteralExpressionSyntax IntLiteral(int number) => LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(number));
 
         /// <summary>
         /// <code>

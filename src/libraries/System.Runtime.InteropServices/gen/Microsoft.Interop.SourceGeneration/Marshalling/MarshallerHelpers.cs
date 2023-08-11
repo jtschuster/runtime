@@ -251,7 +251,7 @@ namespace Microsoft.Interop
                 // Use the Unsafe.SkipInit<T> API when available and
                 // managed type is usable as a generic parameter.
                 return ExpressionStatement(
-                    MethodInvocation(NameSyntaxes.System_Runtime_CompilerServices_Unsafe, IdentifierName("SkipInit"),
+                    MethodInvocation(TypeSyntaxes.System_Runtime_CompilerServices_Unsafe, IdentifierName("SkipInit"),
                                 Argument(IdentifierName(info.InstanceIdentifier))
                                 .WithRefOrOutKeyword(Token(SyntaxKind.OutKeyword))));
             }
