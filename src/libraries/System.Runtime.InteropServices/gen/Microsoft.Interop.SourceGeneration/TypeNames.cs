@@ -2,127 +2,144 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using Microsoft.CodeAnalysis;
+using System;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using static Microsoft.Interop.TypeNames;
 
 namespace Microsoft.Interop
 {
     public static class NameSyntaxes
     {
         private static NameSyntax? _DllImportAttribute;
-        public static NameSyntax DllImportAttribute => _DllImportAttribute ??= ParseName(GlobalPrefix + TypeNames.DllImportAttribute);
+        public static NameSyntax DllImportAttribute => _DllImportAttribute ??= ParseName(TypeNames.GlobalAlias + TypeNames.DllImportAttribute);
 
         private static NameSyntax? _LibraryImportAttribute;
-        public static NameSyntax LibraryImportAttribute => _LibraryImportAttribute ??= ParseName(GlobalPrefix + TypeNames.LibraryImportAttribute);
-
-        private static NameSyntax? _System_Runtime_CompilerServices_Unsafe;
-        public static NameSyntax System_Runtime_CompilerServices_Unsafe => _System_Runtime_CompilerServices_Unsafe ??= ParseName(GlobalPrefix + TypeNames.System_Runtime_CompilerServices_Unsafe);
+        public static NameSyntax LibraryImportAttribute => _LibraryImportAttribute ??= ParseName(TypeNames.GlobalAlias + TypeNames.LibraryImportAttribute);
 
         private static NameSyntax? _System_Runtime_InteropServices_DynamicInterfaceCastableImplementationAttribute;
-        public static NameSyntax System_Runtime_InteropServices_DynamicInterfaceCastableImplementationAttribute => _System_Runtime_InteropServices_DynamicInterfaceCastableImplementationAttribute ??= ParseName(GlobalPrefix + TypeNames.System_Runtime_InteropServices_DynamicInterfaceCastableImplementationAttribute);
+        public static NameSyntax System_Runtime_InteropServices_DynamicInterfaceCastableImplementationAttribute => _System_Runtime_InteropServices_DynamicInterfaceCastableImplementationAttribute ??= ParseName(TypeNames.GlobalAlias + TypeNames.System_Runtime_InteropServices_DynamicInterfaceCastableImplementationAttribute);
 
         private static NameSyntax? _System_Runtime_InteropServices_MarshalAsAttribute;
-        public static NameSyntax System_Runtime_InteropServices_MarshalAsAttribute => _System_Runtime_InteropServices_MarshalAsAttribute ??= ParseName(GlobalPrefix + TypeNames.System_Runtime_InteropServices_MarshalAsAttribute);
+        public static NameSyntax System_Runtime_InteropServices_MarshalAsAttribute => _System_Runtime_InteropServices_MarshalAsAttribute ??= ParseName(TypeNames.GlobalAlias + TypeNames.System_Runtime_InteropServices_MarshalAsAttribute);
 
         private static NameSyntax? _DefaultDllImportSearchPathsAttribute;
-        public static NameSyntax DefaultDllImportSearchPathsAttribute => _DefaultDllImportSearchPathsAttribute ??= ParseName(GlobalPrefix + TypeNames.DefaultDllImportSearchPathsAttribute);
+        public static NameSyntax DefaultDllImportSearchPathsAttribute => _DefaultDllImportSearchPathsAttribute ??= ParseName(TypeNames.GlobalAlias + TypeNames.DefaultDllImportSearchPathsAttribute);
 
         private static NameSyntax? _SuppressGCTransitionAttribute;
-        public static NameSyntax SuppressGCTransitionAttribute => _SuppressGCTransitionAttribute ??= ParseName(GlobalPrefix + TypeNames.SuppressGCTransitionAttribute);
+        public static NameSyntax SuppressGCTransitionAttribute => _SuppressGCTransitionAttribute ??= ParseName(TypeNames.GlobalAlias + TypeNames.SuppressGCTransitionAttribute);
 
         private static NameSyntax? _UnmanagedCallConvAttribute;
-        public static NameSyntax UnmanagedCallConvAttribute => _UnmanagedCallConvAttribute ??= ParseName(GlobalPrefix + TypeNames.UnmanagedCallConvAttribute);
+        public static NameSyntax UnmanagedCallConvAttribute => _UnmanagedCallConvAttribute ??= ParseName(TypeNames.GlobalAlias + TypeNames.UnmanagedCallConvAttribute);
 
         private static NameSyntax? _System_Runtime_CompilerServices_SkipLocalsInitAttribute;
-        public static NameSyntax System_Runtime_CompilerServices_SkipLocalsInitAttribute => _System_Runtime_CompilerServices_SkipLocalsInitAttribute ??= ParseName(GlobalPrefix + TypeNames.System_Runtime_CompilerServices_SkipLocalsInitAttribute);
+        public static NameSyntax System_Runtime_CompilerServices_SkipLocalsInitAttribute => _System_Runtime_CompilerServices_SkipLocalsInitAttribute ??= ParseName(TypeNames.GlobalAlias + TypeNames.System_Runtime_CompilerServices_SkipLocalsInitAttribute);
 
         private static NameSyntax? _System_CodeDom_Compiler_GeneratedCodeAttribute;
-        public static NameSyntax System_CodeDom_Compiler_GeneratedCodeAttribute => _System_CodeDom_Compiler_GeneratedCodeAttribute ??= ParseName(GlobalPrefix + TypeNames.System_CodeDom_Compiler_GeneratedCodeAttribute);
+        public static NameSyntax System_CodeDom_Compiler_GeneratedCodeAttribute => _System_CodeDom_Compiler_GeneratedCodeAttribute ??= ParseName(TypeNames.GlobalAlias + TypeNames.System_CodeDom_Compiler_GeneratedCodeAttribute);
 
         private static NameSyntax? _UnmanagedCallersOnlyAttribute;
-        public static NameSyntax UnmanagedCallersOnlyAttribute => _UnmanagedCallersOnlyAttribute ??= ParseName(GlobalPrefix + TypeNames.UnmanagedCallersOnlyAttribute);
-
+        public static NameSyntax UnmanagedCallersOnlyAttribute => _UnmanagedCallersOnlyAttribute ??= ParseName(TypeNames.GlobalAlias + TypeNames.UnmanagedCallersOnlyAttribute);
     }
 
     public static class TypeSyntaxes
     {
         private static TypeSyntax? _StringMarshalling;
-        public static TypeSyntax StringMarshalling => _StringMarshalling ??= ParseTypeName(GlobalPrefix + TypeNames.StringMarshalling);
+        public static TypeSyntax StringMarshalling => _StringMarshalling ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.StringMarshalling);
 
         private static TypeSyntax? _System_Runtime_InteropServices_ComWrappers_ComInterfaceEntry;
-        public static TypeSyntax System_Runtime_InteropServices_ComWrappers_ComInterfaceEntry => _System_Runtime_InteropServices_ComWrappers_ComInterfaceEntry ??= ParseTypeName(GlobalPrefix + TypeNames.System_Runtime_InteropServices_ComWrappers_ComInterfaceEntry);
+        public static TypeSyntax System_Runtime_InteropServices_ComWrappers_ComInterfaceEntry => _System_Runtime_InteropServices_ComWrappers_ComInterfaceEntry ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.System_Runtime_InteropServices_ComWrappers_ComInterfaceEntry);
 
         private static TypeSyntax? _System_Runtime_InteropServices_NativeMemory;
-        public static TypeSyntax System_Runtime_InteropServices_NativeMemory => _System_Runtime_InteropServices_NativeMemory ??= ParseTypeName(GlobalPrefix + TypeNames.System_Runtime_InteropServices_NativeMemory);
+        public static TypeSyntax System_Runtime_InteropServices_NativeMemory => _System_Runtime_InteropServices_NativeMemory ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.System_Runtime_InteropServices_NativeMemory);
 
         private static TypeSyntax? _StrategyBasedComWrappers;
-        public static TypeSyntax StrategyBasedComWrappers => _StrategyBasedComWrappers ??= ParseTypeName(GlobalPrefix + TypeNames.StrategyBasedComWrappers);
+        public static TypeSyntax StrategyBasedComWrappers => _StrategyBasedComWrappers ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.StrategyBasedComWrappers);
 
         private static TypeSyntax? _IUnmanagedVirtualMethodTableProvider;
-        public static TypeSyntax IUnmanagedVirtualMethodTableProvider => _IUnmanagedVirtualMethodTableProvider ??= ParseTypeName(GlobalPrefix + TypeNames.IUnmanagedVirtualMethodTableProvider);
+        public static TypeSyntax IUnmanagedVirtualMethodTableProvider => _IUnmanagedVirtualMethodTableProvider ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.IUnmanagedVirtualMethodTableProvider);
 
         private static TypeSyntax? _IIUnknownInterfaceType;
-        public static TypeSyntax IIUnknownInterfaceType => _IIUnknownInterfaceType ??= ParseTypeName(GlobalPrefix + TypeNames.IIUnknownInterfaceType);
+        public static TypeSyntax IIUnknownInterfaceType => _IIUnknownInterfaceType ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.IIUnknownInterfaceType);
 
         private static TypeSyntax? _IIUnknownDerivedDetails;
-        public static TypeSyntax IIUnknownDerivedDetails => _IIUnknownDerivedDetails ??= ParseTypeName(GlobalPrefix + TypeNames.IIUnknownDerivedDetails);
+        public static TypeSyntax IIUnknownDerivedDetails => _IIUnknownDerivedDetails ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.IIUnknownDerivedDetails);
 
         private static TypeSyntax? _UnmanagedObjectUnwrapper;
-        public static TypeSyntax UnmanagedObjectUnwrapper => _UnmanagedObjectUnwrapper ??= ParseTypeName(GlobalPrefix + TypeNames.UnmanagedObjectUnwrapper);
+        public static TypeSyntax UnmanagedObjectUnwrapper => _UnmanagedObjectUnwrapper ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.UnmanagedObjectUnwrapper);
 
         private static TypeSyntax? _IComExposedClass;
-        public static TypeSyntax IComExposedClass => _IComExposedClass ??= ParseTypeName(GlobalPrefix + TypeNames.IComExposedClass);
+        public static TypeSyntax IComExposedClass => _IComExposedClass ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.IComExposedClass);
 
         private static TypeSyntax? _UnreachableException;
-        public static TypeSyntax UnreachableException => _UnreachableException ??= ParseTypeName(GlobalPrefix + TypeNames.UnreachableException);
+        public static TypeSyntax UnreachableException => _UnreachableException ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.UnreachableException);
 
         private static TypeSyntax? _System_Runtime_CompilerServices_RuntimeHelpers;
-        public static TypeSyntax System_Runtime_CompilerServices_RuntimeHelpers => _System_Runtime_CompilerServices_RuntimeHelpers ??= ParseTypeName(GlobalPrefix + TypeNames.System_Runtime_CompilerServices_RuntimeHelpers);
+        public static TypeSyntax System_Runtime_CompilerServices_RuntimeHelpers => _System_Runtime_CompilerServices_RuntimeHelpers ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.System_Runtime_CompilerServices_RuntimeHelpers);
 
         private static TypeSyntax? _System_Runtime_InteropServices_ComWrappers;
-        public static TypeSyntax System_Runtime_InteropServices_ComWrappers => _System_Runtime_InteropServices_ComWrappers ??= ParseTypeName(GlobalPrefix + TypeNames.System_Runtime_InteropServices_ComWrappers);
+        public static TypeSyntax System_Runtime_InteropServices_ComWrappers => _System_Runtime_InteropServices_ComWrappers ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.System_Runtime_InteropServices_ComWrappers);
 
         private static TypeSyntax? _System_IntPtr;
-        public static TypeSyntax System_IntPtr => _System_IntPtr ??= ParseTypeName(GlobalPrefix + TypeNames.System_IntPtr);
+        public static TypeSyntax System_IntPtr => _System_IntPtr ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.System_IntPtr);
 
         private static TypeSyntax? _System_Guid;
-        public static TypeSyntax System_Guid => _System_Guid ??= ParseTypeName(GlobalPrefix + TypeNames.System_Guid);
+        public static TypeSyntax System_Guid => _System_Guid ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.System_Guid);
 
         private static TypeSyntax? _DllImportSearchPath;
-        public static TypeSyntax DllImportSearchPath => _DllImportSearchPath ??= ParseTypeName(GlobalPrefix + TypeNames.DllImportSearchPath);
+        public static TypeSyntax DllImportSearchPath => _DllImportSearchPath ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.DllImportSearchPath);
 
         private static TypeSyntax? _System_Type;
-        public static TypeSyntax System_Type => _System_Type ??= ParseTypeName(GlobalPrefix + TypeNames.System_Type);
+        public static TypeSyntax System_Type => _System_Type ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.System_Type);
 
         private static TypeSyntax? _System_Activator;
-        public static TypeSyntax System_Activator => _System_Activator ??= ParseTypeName(GlobalPrefix + TypeNames.System_Activator);
+        public static TypeSyntax System_Activator => _System_Activator ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.System_Activator);
 
         private static TypeSyntax? _System_Runtime_InteropServices_Marshal;
-        public static TypeSyntax System_Runtime_InteropServices_Marshal => _System_Runtime_InteropServices_Marshal ??= ParseTypeName(GlobalPrefix + TypeNames.System_Runtime_InteropServices_Marshal);
+        public static TypeSyntax System_Runtime_InteropServices_Marshal => _System_Runtime_InteropServices_Marshal ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.System_Runtime_InteropServices_Marshal);
 
         private static TypeSyntax? _System_Runtime_InteropServices_UnmanagedType;
-        public static TypeSyntax System_Runtime_InteropServices_UnmanagedType => _System_Runtime_InteropServices_UnmanagedType ??= ParseTypeName(GlobalPrefix + TypeNames.System_Runtime_InteropServices_UnmanagedType);
+        public static TypeSyntax System_Runtime_InteropServices_UnmanagedType => _System_Runtime_InteropServices_UnmanagedType ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.System_Runtime_InteropServices_UnmanagedType);
 
         private static TypeSyntax? _System_Runtime_InteropServices_MemoryMarshal;
-        public static TypeSyntax System_Runtime_InteropServices_MemoryMarshal => _System_Runtime_InteropServices_MemoryMarshal ??= ParseTypeName(GlobalPrefix + TypeNames.System_Runtime_InteropServices_MemoryMarshal);
+        public static TypeSyntax System_Runtime_InteropServices_MemoryMarshal => _System_Runtime_InteropServices_MemoryMarshal ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.System_Runtime_InteropServices_MemoryMarshal);
 
         private static TypeSyntax? _System_Exception;
-        public static TypeSyntax System_Exception => _System_Exception ??= ParseTypeName(GlobalPrefix + TypeNames.System_Exception);
+        public static TypeSyntax System_Exception => _System_Exception ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.System_Exception);
 
         private static TypeSyntax? _System_GC;
-        public static TypeSyntax System_GC => _System_GC ??= ParseTypeName(GlobalPrefix + TypeNames.System_GC);
+        public static TypeSyntax System_GC => _System_GC ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.System_GC);
 
         private static TypeSyntax? _System_Runtime_InteropServices_ComWrappers_ComInterfaceDispatch;
-        public static TypeSyntax System_Runtime_InteropServices_ComWrappers_ComInterfaceDispatch => _System_Runtime_InteropServices_ComWrappers_ComInterfaceDispatch ??= ParseTypeName(GlobalPrefix + TypeNames.System_Runtime_InteropServices_ComWrappers_ComInterfaceDispatch);
+        public static TypeSyntax System_Runtime_InteropServices_ComWrappers_ComInterfaceDispatch => _System_Runtime_InteropServices_ComWrappers_ComInterfaceDispatch ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.System_Runtime_InteropServices_ComWrappers_ComInterfaceDispatch);
 
-        private static TypeSyntax? _System_Span;
-        public static TypeSyntax System_Span => _System_Span ??= ParseTypeName(GlobalPrefix + TypeNames.System_Span);
+        private static TypeSyntax? _System_Runtime_CompilerServices_Unsafe;
+        public static TypeSyntax System_Runtime_CompilerServices_Unsafe => _System_Runtime_CompilerServices_Unsafe ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.System_Runtime_CompilerServices_Unsafe);
+
+        private static TypeSyntax? _CallConvCdecl;
+        private static TypeSyntax? _CallConvFastcall;
+        private static TypeSyntax? _CallConvMemberFunction;
+        private static TypeSyntax? _CallConvStdcall;
+        private static TypeSyntax? _CallConvSuppressGCTransition;
+        private static TypeSyntax? _CallConvThiscall;
+        public static TypeSyntax CallConv(string callConv)
+        {
+            return callConv switch
+            {
+                "Cdecl" => _CallConvCdecl ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.CallConvCdeclName),
+                "Fastcall" => _CallConvFastcall ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.CallConvFastcallName),
+                "MemberFunction" => _CallConvMemberFunction ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.CallConvMemberFunctionName),
+                "Stdcall" => _CallConvStdcall ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.CallConvStdcallName),
+                "SuppressGCTransition" => _CallConvSuppressGCTransition ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.CallConvSuppressGCTransitionName),
+                "Thiscall" => _CallConvThiscall ??= ParseTypeName(TypeNames.GlobalAlias + TypeNames.CallConvThiscallName),
+                _ => throw new ArgumentException($"Unexpected CallConv: {callConv}")
+            };
+        }
     }
 
     public static class TypeNames
     {
-        public const string GlobalPrefix = "global::";
+        public const string GlobalAlias = "global::";
+
         public const string DllImportAttribute = "System.Runtime.InteropServices.DllImportAttribute";
         public const string LibraryImportAttribute = "System.Runtime.InteropServices.LibraryImportAttribute";
         public const string LibraryImportAttribute_ShortName = "LibraryImportAttribute";
@@ -164,9 +181,9 @@ namespace Microsoft.Interop
         public const string IUnmanagedInterfaceType_Metadata = "System.Runtime.InteropServices.Marshalling.IUnmanagedInterfaceType";
 
         public const string System_Span_Metadata = "System.Span`1";
-        public const string System_Span = "System.Span";
+        public const string System_Span = GlobalAlias + "System.Span";
         public const string System_ReadOnlySpan_Metadata = "System.ReadOnlySpan`1";
-        public const string System_ReadOnlySpan = "System.ReadOnlySpan";
+        public const string System_ReadOnlySpan = GlobalAlias + "System.ReadOnlySpan";
 
         public const string System_IntPtr = "System.IntPtr";
 
@@ -278,5 +295,12 @@ namespace Microsoft.Interop
         public const string System_Runtime_InteropServices_CULong = "System.Runtime.InteropServices.CULong";
 
         public const string System_Runtime_InteropServices_NFloat = "System.Runtime.InteropServices.NFloat";
+
+        public const string CallConvCdeclName = "System.Runtime.CompilerServices.CallConvCdecl";
+        public const string CallConvFastcallName = "System.Runtime.CompilerServices.CallConvFastcall";
+        public const string CallConvStdcallName = "System.Runtime.CompilerServices.CallConvStdcall";
+        public const string CallConvThiscallName = "System.Runtime.CompilerServices.CallConvThiscall";
+        public const string CallConvSuppressGCTransitionName = "System.Runtime.CompilerServices.CallConvSuppressGCTransition";
+        public const string CallConvMemberFunctionName = "System.Runtime.CompilerServices.CallConvMemberFunction";
     }
 }

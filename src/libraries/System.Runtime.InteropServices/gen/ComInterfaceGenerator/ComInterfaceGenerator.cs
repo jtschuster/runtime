@@ -193,13 +193,13 @@ namespace Microsoft.Interop
 
             context.RegisterSourceOutput(filesToGenerate, (context, data) =>
             {
-                context.AddSource(data.TypeName.Replace("global::", ""), data.Source);
+                context.AddSource(data.TypeName.Replace(TypeNames.GlobalAlias, ""), data.Source);
             });
         }
 
         private static readonly AttributeSyntax s_iUnknownDerivedAttributeTemplate =
             Attribute(
-                GenericName(TypeNames.IUnknownDerivedAttribute)
+                GenericName(TypeNames.GlobalAlias + TypeNames.IUnknownDerivedAttribute)
                     .AddTypeArgumentListArguments(
                         IdentifierName("InterfaceInformation"),
                         IdentifierName("InterfaceImplementation")));

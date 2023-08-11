@@ -313,7 +313,7 @@ namespace Microsoft.Interop
                 IdentifierName("CreateSpan"),
                 RefArgument(
                     MethodInvocation(
-                        NameSyntaxes.System_Runtime_CompilerServices_Unsafe,
+                        TypeSyntaxes.System_Runtime_CompilerServices_Unsafe,
                         IdentifierName("AsRef"),
                         RefArgument(
                             MethodInvocation(
@@ -403,7 +403,7 @@ namespace Microsoft.Interop
                     TypeSyntaxes.System_Runtime_InteropServices_MemoryMarshal,
                     IdentifierName("CreateSpan"),
                     RefArgument(MethodInvocation(
-                        NameSyntaxes.System_Runtime_CompilerServices_Unsafe,
+                        TypeSyntaxes.System_Runtime_CompilerServices_Unsafe,
                         IdentifierName("AsRef"),
                         InArgument(MethodInvocation(
                             CollectionSource.GetUnmanagedValuesSource(info, context),
