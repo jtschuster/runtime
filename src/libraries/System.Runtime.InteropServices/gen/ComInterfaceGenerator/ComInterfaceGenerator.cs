@@ -515,60 +515,30 @@ namespace Microsoft.Interop
                                 VariableDeclarator("v2")
                             )),
                         // ComWrappers.GetIUnknownImpl(out v0, out v1, out v2);
-                        ExpressionStatement(
-                            InvocationExpression(
-                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
-                                    TypeSyntaxes.System_Runtime_InteropServices_ComWrappers,
-                                    IdentifierName("GetIUnknownImpl")))
-                            .AddArgumentListArguments(
-                                Argument(IdentifierName("v0"))
-                                        .WithRefKindKeyword(Token(SyntaxKind.OutKeyword)),
-                                Argument(IdentifierName("v1"))
-                                    .WithRefKindKeyword(Token(SyntaxKind.OutKeyword)),
-                                Argument(IdentifierName("v2"))
-                                    .WithRefKindKeyword(Token(SyntaxKind.OutKeyword)))),
+                        MethodInvocationStatement(
+                            TypeSyntaxes.System_Runtime_InteropServices_ComWrappers,
+                            IdentifierName("GetIUnknownImpl"),
+                            OutArgument(IdentifierName("v0")),
+                            OutArgument(IdentifierName("v1")),
+                            OutArgument(IdentifierName("v2"))),
                         // m_vtable[0] = (void*)v0;
-                        ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
-                                ElementAccessExpression(
-                                    IdentifierName(vtableLocalName),
-                                    BracketedArgumentList(
-                                        SingletonSeparatedList(
-                                            Argument(
-                                                LiteralExpression(
-                                                    SyntaxKind.NumericLiteralExpression,
-                                                    Literal(0)))))),
-                                CastExpression(
-                                    PointerType(
-                                        PredefinedType(Token(SyntaxKind.VoidKeyword))),
-                                    IdentifierName("v0")))),
+                        AssignmentStatement(
+                            IndexExpression(
+                                IdentifierName(vtableLocalName),
+                                Argument(IntLiteral(0))),
+                            CastExpression(TypeSyntaxes.VoidStar, IdentifierName("v0"))),
                         // m_vtable[1] = (void*)v1;
-                        ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
-                                ElementAccessExpression(
-                                    IdentifierName(vtableLocalName),
-                                    BracketedArgumentList(
-                                        SingletonSeparatedList(
-                                            Argument(
-                                                LiteralExpression(
-                                                    SyntaxKind.NumericLiteralExpression,
-                                                    Literal(1)))))),
-                                CastExpression(
-                                    PointerType(
-                                        PredefinedType(Token(SyntaxKind.VoidKeyword))),
-                                    IdentifierName("v1")))),
+                        AssignmentStatement(
+                            IndexExpression(
+                                IdentifierName(vtableLocalName),
+                                Argument(IntLiteral(1))),
+                            CastExpression(TypeSyntaxes.VoidStar, IdentifierName("v1"))),
                         // m_vtable[2] = (void*)v2;
-                        ExpressionStatement(AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
-                                ElementAccessExpression(
-                                    IdentifierName(vtableLocalName),
-                                    BracketedArgumentList(
-                                        SingletonSeparatedList(
-                                            Argument(
-                                                LiteralExpression(
-                                                    SyntaxKind.NumericLiteralExpression,
-                                                    Literal(2)))))),
-                                CastExpression(
-                                    PointerType(
-                                        PredefinedType(Token(SyntaxKind.VoidKeyword))),
-                                    IdentifierName("v2")))));
+                        AssignmentStatement(
+                            IndexExpression(
+                                IdentifierName(vtableLocalName),
+                                Argument(IntLiteral(2))),
+                            CastExpression(TypeSyntaxes.VoidStar, IdentifierName("v2"))),
             }
             else
             {
@@ -652,10 +622,9 @@ namespace Microsoft.Interop
                                         ParenthesizedExpression(
                                             AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
                                                 IdentifierName(vtableFieldName),
-                                                InvocationExpression(
-                                                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
-                                                        IdentifierName("InterfaceImplementation"),
-                                                        IdentifierName(CreateManagedVirtualFunctionTableMethodName))))))))
+                                                MethodInvocation(
+                                                    IdentifierName("InterfaceImplementation"),
+                                                    IdentifierName(CreateManagedVirtualFunctionTableMethodName)))))))
                             .WithSemicolonToken(Token(SyntaxKind.SemicolonToken)));
             }
 

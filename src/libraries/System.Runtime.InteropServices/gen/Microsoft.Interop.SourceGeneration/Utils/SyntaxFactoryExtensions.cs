@@ -74,6 +74,9 @@ namespace Microsoft.Interop
         public static ArgumentSyntax InArgument(ExpressionSyntax expression)
             => Argument(null, Token(SyntaxKind.InKeyword), expression);
 
+        public static ArgumentSyntax OutArgument(ExpressionSyntax expression)
+            => Argument(null, Token(SyntaxKind.OutKeyword), expression);
+
         private static readonly SyntaxToken _span = Identifier(TypeNames.System_Span);
         public static GenericNameSyntax SpanOf(TypeSyntax type) => GenericName(_span, TypeArgumentList(SingletonSeparatedList(type)));
 

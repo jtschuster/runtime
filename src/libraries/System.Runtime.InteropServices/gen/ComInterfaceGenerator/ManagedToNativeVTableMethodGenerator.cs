@@ -99,9 +99,7 @@ namespace Microsoft.Interop
             var setupStatements = new List<StatementSyntax>
             {
                 // var (<thisParameter>, <virtualMethodTable>) = ((IUnmanagedVirtualMethodTableProvider)this).GetVirtualMethodTableInfoForKey(typeof(<containingTypeName>));
-                ExpressionStatement(
-                    AssignmentExpression(
-                        SyntaxKind.SimpleAssignmentExpression,
+                AssignmentStatement(
                         DeclarationExpression(
                             IdentifierName("var"),
                             ParenthesizedVariableDesignation(
@@ -111,16 +109,13 @@ namespace Microsoft.Interop
                                             Identifier(NativeThisParameterIdentifier)),
                                         SingleVariableDesignation(
                                             Identifier(VirtualMethodTableIdentifier))}))),
-                        InvocationExpression(
-                            MemberAccessExpression(
-                                SyntaxKind.SimpleMemberAccessExpression,
+                        MethodInvocation(
                                 ParenthesizedExpression(
                                     CastExpression(
                                         TypeSyntaxes.IUnmanagedVirtualMethodTableProvider,
                                         ThisExpression())),
-                                IdentifierName("GetVirtualMethodTableInfoForKey") ))
-                        .WithArgumentList(
-                            ArgumentList(SeparatedList(new[]{ Argument(TypeOfExpression(containingTypeName)) })))))
+                                IdentifierName("GetVirtualMethodTableInfoForKey"),
+                                Argument(TypeOfExpression(containingTypeName))))
             };
 
             GeneratedStatements statements = GeneratedStatements.Create(
@@ -128,9 +123,7 @@ namespace Microsoft.Interop
                 _context,
                 CreateFunctionPointerExpression(
                     // <vtableDeclaration>[<index>]
-                    ElementAccessExpression(IdentifierName(VirtualMethodTableIdentifier),
-                        BracketedArgumentList(SingletonSeparatedList(
-                            Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(index)))))),
+                    IndexExpression(IdentifierName(VirtualMethodTableIdentifier), Argument(IntLiteral(index))),
                     callConv));
             bool shouldInitializeVariables = !statements.GuaranteedUnmarshal.IsEmpty || !statements.CleanupCallerAllocated.IsEmpty || !statements.CleanupCalleeAllocated.IsEmpty;
             VariableDeclarations declarations = VariableDeclarations.GenerateDeclarationsForManagedToUnmanaged(_marshallers, _context, shouldInitializeVariables);
@@ -187,12 +180,10 @@ namespace Microsoft.Interop
             // If we ever move the "this" object handling out of this type, we'll move the handling to be emitted in that phase.
             // GC.KeepAlive(this);
             tryStatements.Add(
-                ExpressionStatement(
-                    InvocationExpression(
-                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
-                            TypeSyntaxes.System_GC,
-                            IdentifierName("KeepAlive")),
-                        ArgumentList(SingletonSeparatedList(Argument(ThisExpression()))))));
+                MethodInvocationStatement(
+                    TypeSyntaxes.System_GC,
+                    IdentifierName("KeepAlive"),
+                    Argument(ThisExpression())));
 
             tryStatements.AddRange(statements.Unmarshal);
 
