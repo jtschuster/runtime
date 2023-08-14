@@ -426,8 +426,8 @@ namespace Microsoft.Interop
             // int <numElements>;
             yield return Declare(
                     PredefinedType(Token(SyntaxKind.IntKeyword)),
-                        numElementsIdentifier,
-                        initializeToDefault: false);
+                    numElementsIdentifier,
+                    initializeToDefault: false);
 
             var elementsSetup = _elementsMarshalling.GenerateSetupStatement(info, context);
             if (elementsSetup is not EmptyStatementSyntax)
