@@ -40,12 +40,9 @@ namespace Microsoft.Interop
                 yield break;
 
             // <marshaller>.Free();
-            yield return ExpressionStatement(
-                InvocationExpression(
-                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
+            yield return MethodInvocationStatement(
                         IdentifierName(context.GetAdditionalIdentifier(info, MarshallerIdentifier)),
-                        IdentifierName(ShapeMemberNames.Free)),
-                    ArgumentList()));
+                        IdentifierName(ShapeMemberNames.Free));
         }
 
         public IEnumerable<StatementSyntax> GenerateCleanupCalleeAllocatedResourcesStatements(TypePositionInfo info, StubCodeContext context)
@@ -57,12 +54,9 @@ namespace Microsoft.Interop
                 yield break;
 
             // <marshaller>.Free();
-            yield return ExpressionStatement(
-                InvocationExpression(
-                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
+            yield return MethodInvocationStatement(
                         IdentifierName(context.GetAdditionalIdentifier(info, MarshallerIdentifier)),
-                        IdentifierName(ShapeMemberNames.Free)),
-                    ArgumentList()));
+                        IdentifierName(ShapeMemberNames.Free));
         }
 
         public IEnumerable<StatementSyntax> GenerateGuaranteedUnmarshalStatements(TypePositionInfo info, StubCodeContext context)
@@ -73,15 +67,11 @@ namespace Microsoft.Interop
             (string managedIdentifier, _) = context.GetIdentifiers(info);
 
             // <managedIdentifier> = <marshaller>.ToManagedFinally();
-            yield return ExpressionStatement(
-                AssignmentExpression(
-                    SyntaxKind.SimpleAssignmentExpression,
-                    IdentifierName(managedIdentifier),
-                    InvocationExpression(
-                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
-                            IdentifierName(context.GetAdditionalIdentifier(info, MarshallerIdentifier)),
-                            IdentifierName(ShapeMemberNames.Value.Stateful.ToManagedFinally)),
-                        ArgumentList())));
+            yield return AssignmentStatement(
+                            IdentifierName(managedIdentifier),
+                            MethodInvocation(
+                                IdentifierName(context.GetAdditionalIdentifier(info, MarshallerIdentifier)),
+                                IdentifierName(ShapeMemberNames.Value.Stateful.ToManagedFinally));
         }
 
         public IEnumerable<StatementSyntax> GenerateMarshalStatements(TypePositionInfo info, StubCodeContext context)
@@ -92,13 +82,10 @@ namespace Microsoft.Interop
             (string managedIdentifier, _) = context.GetIdentifiers(info);
 
             // <marshaller>.FromManaged(<managedIdentifier>);
-            yield return ExpressionStatement(
-                InvocationExpression(
-                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
+            yield return MethodInvocationStatement(
                         IdentifierName(context.GetAdditionalIdentifier(info, MarshallerIdentifier)),
-                        IdentifierName(ShapeMemberNames.Value.Stateful.FromManaged)),
-                    ArgumentList(SingletonSeparatedList(
-                        Argument(IdentifierName(managedIdentifier))))));
+                        IdentifierName(ShapeMemberNames.Value.Stateful.FromManaged),
+                        Argument(IdentifierName(managedIdentifier)));
         }
 
         public IEnumerable<StatementSyntax> GeneratePinnedMarshalStatements(TypePositionInfo info, StubCodeContext context)
@@ -109,15 +96,11 @@ namespace Microsoft.Interop
             (_, string nativeIdentifier) = context.GetIdentifiers(info);
 
             // <nativeIdentifier> = <marshaller>.ToUnmanaged();
-            yield return ExpressionStatement(
-                AssignmentExpression(
-                    SyntaxKind.SimpleAssignmentExpression,
-                    IdentifierName(nativeIdentifier),
-                    InvocationExpression(
-                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
-                            IdentifierName(context.GetAdditionalIdentifier(info, MarshallerIdentifier)),
-                            IdentifierName(ShapeMemberNames.Value.Stateful.ToUnmanaged)),
-                        ArgumentList())));
+            yield return AssignmentStatement(
+                            IdentifierName(nativeIdentifier),
+                            MethodInvocation(
+                                IdentifierName(context.GetAdditionalIdentifier(info, MarshallerIdentifier)),
+                                IdentifierName(ShapeMemberNames.Value.Stateful.ToUnmanaged));
         }
 
         public IEnumerable<StatementSyntax> GenerateUnmarshalStatements(TypePositionInfo info, StubCodeContext context)
@@ -128,15 +111,11 @@ namespace Microsoft.Interop
             (string managedIdentifier, _) = context.GetIdentifiers(info);
 
             // <managedIdentifier> = <marshaller>.ToManaged();
-            yield return ExpressionStatement(
-                AssignmentExpression(
-                    SyntaxKind.SimpleAssignmentExpression,
-                    IdentifierName(managedIdentifier),
-                    InvocationExpression(
-                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
-                            IdentifierName(context.GetAdditionalIdentifier(info, MarshallerIdentifier)),
-                            IdentifierName(ShapeMemberNames.Value.Stateful.ToManaged)),
-                        ArgumentList())));
+            yield return AssignmentStatement(
+                            IdentifierName(managedIdentifier),
+                            MethodInvocation(
+                                IdentifierName(context.GetAdditionalIdentifier(info, MarshallerIdentifier)),
+                                IdentifierName(ShapeMemberNames.Value.Stateful.ToManaged)));
         }
 
         public IEnumerable<StatementSyntax> GenerateUnmarshalCaptureStatements(TypePositionInfo info, StubCodeContext context)
@@ -147,13 +126,10 @@ namespace Microsoft.Interop
             (_, string nativeIdentifier) = context.GetIdentifiers(info);
 
             // <marshaller>.FromUnmanaged(<nativeIdentifier>);
-            yield return ExpressionStatement(
-                InvocationExpression(
-                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
+            yield return MethodInvocationStatement(
                         IdentifierName(context.GetAdditionalIdentifier(info, MarshallerIdentifier)),
-                        IdentifierName(ShapeMemberNames.Value.Stateful.FromUnmanaged)),
-                    ArgumentList(SingletonSeparatedList(
-                        Argument(IdentifierName(nativeIdentifier))))));
+                        IdentifierName(ShapeMemberNames.Value.Stateful.FromUnmanaged),
+                        Argument(IdentifierName(nativeIdentifier)));
         }
 
         public IEnumerable<StatementSyntax> GenerateSetupStatements(TypePositionInfo info, StubCodeContext context)
@@ -184,9 +160,10 @@ namespace Microsoft.Interop
                 yield break;
 
             string unusedIdentifier = context.GetAdditionalIdentifier(info, "unused");
+            // fixed(void* <unused> = <marshaller>) ;
             yield return FixedStatement(
                 VariableDeclaration(
-                    PointerType(PredefinedType(Token(SyntaxKind.VoidKeyword))),
+                    TypeSyntaxes.VoidStar,
                     SingletonSeparatedList(
                         VariableDeclarator(unusedIdentifier)
                             .WithInitializer(EqualsValueClause(IdentifierName(context.GetAdditionalIdentifier(info, MarshallerIdentifier)))))),
@@ -199,12 +176,9 @@ namespace Microsoft.Interop
                 yield break;
 
             // <marshaller>.OnInvoked();
-            yield return ExpressionStatement(
-                InvocationExpression(
-                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
+            yield return MethodInvocationStatement(
                         IdentifierName(context.GetAdditionalIdentifier(info, MarshallerIdentifier)),
-                        IdentifierName(ShapeMemberNames.Value.Stateful.OnInvoked)),
-                    ArgumentList()));
+                        IdentifierName(ShapeMemberNames.Value.Stateful.OnInvoked));
         }
 
         public static string GetMarshallerIdentifier(TypePositionInfo info, StubCodeContext context)
@@ -258,23 +232,17 @@ namespace Microsoft.Interop
                 (string managedIdentifier, _) = context.GetIdentifiers(info);
 
                 // <marshaller>.FromManaged(<managedIdentifier>, stackalloc <bufferElementType>[<marshallerType>.BufferSize]);
-                yield return ExpressionStatement(
-                    InvocationExpression(
-                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
-                            IdentifierName(context.GetAdditionalIdentifier(info, StatefulValueMarshalling.MarshallerIdentifier)),
-                            IdentifierName(ShapeMemberNames.Value.Stateful.FromManaged)),
-                        ArgumentList(SeparatedList(
-                            new[]
-                            {
+                yield return MethodInvocationStatement(
+                                IdentifierName(context.GetAdditionalIdentifier(info, StatefulValueMarshalling.MarshallerIdentifier)),
+                                IdentifierName(ShapeMemberNames.Value.Stateful.FromManaged),
                                 Argument(IdentifierName(managedIdentifier)),
                                 Argument(StackAllocArrayCreationExpression(
-                                        ArrayType(
-                                            _bufferElementType,
-                                            SingletonList(ArrayRankSpecifier(SingletonSeparatedList<ExpressionSyntax>(
-                                                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
-                                                    _marshallerType,
-                                                    IdentifierName(ShapeMemberNames.BufferSize))))))))
-                            }))));
+                                    ArrayType(
+                                        _bufferElementType,
+                                        SingletonList(ArrayRankSpecifier(SingletonSeparatedList<ExpressionSyntax>(
+                                            MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
+                                                _marshallerType,
+                                                IdentifierName(ShapeMemberNames.BufferSize)))))))))
             }
         }
 
@@ -319,12 +287,9 @@ namespace Microsoft.Interop
             string marshaller = StatefulValueMarshalling.GetMarshallerIdentifier(info, context);
 
             // <marshaller>.GetUnmanagedValuesDestination()
-            return InvocationExpression(
-                MemberAccessExpression(
-                    SyntaxKind.SimpleMemberAccessExpression,
+            return MethodInvocation(
                     IdentifierName(marshaller),
-                    IdentifierName(ShapeMemberNames.LinearCollection.Stateful.GetUnmanagedValuesDestination)),
-                ArgumentList());
+                    IdentifierName(ShapeMemberNames.LinearCollection.Stateful.GetUnmanagedValuesDestination));
         }
 
         public InvocationExpressionSyntax GetManagedValuesSource(TypePositionInfo info, StubCodeContext context)
@@ -332,12 +297,9 @@ namespace Microsoft.Interop
             string marshaller = StatefulValueMarshalling.GetMarshallerIdentifier(info, context);
 
             // <marshaller>.GetManagedValuesSource()
-            return InvocationExpression(
-                MemberAccessExpression(
-                    SyntaxKind.SimpleMemberAccessExpression,
+            return MethodInvocation(
                     IdentifierName(marshaller),
-                    IdentifierName(ShapeMemberNames.LinearCollection.Stateful.GetManagedValuesSource)),
-                ArgumentList());
+                    IdentifierName(ShapeMemberNames.LinearCollection.Stateful.GetManagedValuesSource));
         }
 
         public InvocationExpressionSyntax GetUnmanagedValuesSource(TypePositionInfo info, StubCodeContext context)
@@ -346,13 +308,10 @@ namespace Microsoft.Interop
             string numElementsIdentifier = MarshallerHelpers.GetNumElementsIdentifier(info, context);
 
             // <marshaller>.GetUnmanagedValuesSource(<numElements>)
-            return InvocationExpression(
-                MemberAccessExpression(
-                    SyntaxKind.SimpleMemberAccessExpression,
+            return MethodInvocation(
                     IdentifierName(marshaller),
-                    IdentifierName(ShapeMemberNames.LinearCollection.Stateful.GetUnmanagedValuesSource)),
-                ArgumentList(SingletonSeparatedList(
-                    Argument(IdentifierName(numElementsIdentifier)))));
+                    IdentifierName(ShapeMemberNames.LinearCollection.Stateful.GetUnmanagedValuesSource),
+                    Argument(IdentifierName(numElementsIdentifier)));
         }
 
         public InvocationExpressionSyntax GetManagedValuesDestination(TypePositionInfo info, StubCodeContext context)
@@ -361,13 +320,10 @@ namespace Microsoft.Interop
             string numElementsIdentifier = MarshallerHelpers.GetNumElementsIdentifier(info, context);
 
             // <marshaller>.GetManagedValuesDestination(<numElements>)
-            return InvocationExpression(
-                MemberAccessExpression(
-                    SyntaxKind.SimpleMemberAccessExpression,
+            return MethodInvocation(
                     IdentifierName(marshaller),
-                    IdentifierName(ShapeMemberNames.LinearCollection.Stateful.GetManagedValuesDestination)),
-                ArgumentList(SingletonSeparatedList(
-                    Argument(IdentifierName(numElementsIdentifier)))));
+                    IdentifierName(ShapeMemberNames.LinearCollection.Stateful.GetManagedValuesDestination),
+                    Argument(IdentifierName(numElementsIdentifier)));
         }
     }
 
@@ -467,11 +423,11 @@ namespace Microsoft.Interop
             }
 
             string numElementsIdentifier = MarshallerHelpers.GetNumElementsIdentifier(info, context);
-            yield return LocalDeclarationStatement(
-                VariableDeclaration(
+            // int <numElements>;
+            yield return Declare(
                     PredefinedType(Token(SyntaxKind.IntKeyword)),
-                    SingletonSeparatedList(
-                        VariableDeclarator(numElementsIdentifier))));
+                        numElementsIdentifier,
+                        initializeToDefault: false);
 
             var elementsSetup = _elementsMarshalling.GenerateSetupStatement(info, context);
             if (elementsSetup is not EmptyStatementSyntax)
@@ -513,10 +469,7 @@ namespace Microsoft.Interop
             string numElementsIdentifier = MarshallerHelpers.GetNumElementsIdentifier(info, context);
 
             // <numElements> = <numElementsExpression>;
-            yield return ExpressionStatement(
-                AssignmentExpression(SyntaxKind.SimpleAssignmentExpression,
-                    IdentifierName(numElementsIdentifier),
-                    _numElementsExpression));
+            yield return AssignmentStatement(IdentifierName(numElementsIdentifier), _numElementsExpression);
 
             yield return _elementsMarshalling.GenerateUnmarshalStatement(info, context);
 
@@ -557,12 +510,9 @@ namespace Microsoft.Interop
 
             string marshaller = StatefulValueMarshalling.GetMarshallerIdentifier(info, context);
             // <marshaller>.Free();
-            yield return ExpressionStatement(
-                InvocationExpression(
-                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
+            yield return MethodInvocationStatement(
                         IdentifierName(marshaller),
-                        IdentifierName(ShapeMemberNames.Free)),
-                    ArgumentList()));
+                        IdentifierName(ShapeMemberNames.Free));
         }
 
         public IEnumerable<StatementSyntax> GenerateCleanupCalleeAllocatedResourcesStatements(TypePositionInfo info, StubCodeContext context)
@@ -577,12 +527,9 @@ namespace Microsoft.Interop
 
             string marshaller = StatefulValueMarshalling.GetMarshallerIdentifier(info, context);
             // <marshaller>.Free();
-            yield return ExpressionStatement(
-                InvocationExpression(
-                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
+            yield return MethodInvocationStatement(
                         IdentifierName(marshaller),
-                        IdentifierName(ShapeMemberNames.Free)),
-                    ArgumentList()));
+                        IdentifierName(ShapeMemberNames.Free));
         }
         public IEnumerable<StatementSyntax> GenerateGuaranteedUnmarshalStatements(TypePositionInfo info, StubCodeContext context) => _innerMarshaller.GenerateGuaranteedUnmarshalStatements(info, context);
 

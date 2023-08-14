@@ -538,7 +538,7 @@ namespace Microsoft.Interop
                             IndexExpression(
                                 IdentifierName(vtableLocalName),
                                 Argument(IntLiteral(2))),
-                            CastExpression(TypeSyntaxes.VoidStar, IdentifierName("v2"))),
+                            CastExpression(TypeSyntaxes.VoidStar, IdentifierName("v2"))));
             }
             else
             {

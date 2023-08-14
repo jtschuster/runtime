@@ -47,17 +47,17 @@ namespace Microsoft.Interop
                         {
                             // unmanaged = Unsafe.BitCast<managedType, int>(managed);
                             yield return AssignmentStatement(
-                            IdentifierName(unmanaged),
-                            MethodInvocation(
-                                ParseTypeName(TypeNames.System_Runtime_CompilerServices_Unsafe),
-                                GenericName(Identifier("BitCast"),
-                                    TypeArgumentList(
-                                        SeparatedList(new[]
-                                            {
-                                                info.ManagedType.Syntax,
-                                                AsNativeType(info).Syntax
-                                            }))),
-                                Argument(IdentifierName(managed))));
+                                IdentifierName(unmanaged),
+                                MethodInvocation(
+                                    ParseTypeName(TypeNames.System_Runtime_CompilerServices_Unsafe),
+                                    GenericName(Identifier("BitCast"),
+                                        TypeArgumentList(
+                                            SeparatedList(new[]
+                                                {
+                                                    info.ManagedType.Syntax,
+                                                    AsNativeType(info).Syntax
+                                                }))),
+                                    Argument(IdentifierName(managed))));
                         }
                         break;
                     case StubCodeContext.Stage.Unmarshal:
@@ -72,8 +72,8 @@ namespace Microsoft.Interop
                                     TypeArgumentList(
                                         SeparatedList(new[]
                                             {
-                                                info.ManagedType.Syntax,
-                                                AsNativeType(info).Syntax
+                                                AsNativeType(info).Syntax,
+                                                info.ManagedType.Syntax
                                             }))),
                                 Argument(IdentifierName(unmanaged))));
                         }
