@@ -124,7 +124,7 @@ namespace Microsoft.Interop
                                     IdentifierName(nameof(SafeHandle.DangerousGetHandle))));
                         if (info.IsByRef && info.RefKind != RefKind.In)
                         {
-                            yield return AssignmentStatement(IdentifierName(handleValueBackupIdentifier), assignHandleToNativeExpression));
+                            yield return AssignmentStatement(IdentifierName(handleValueBackupIdentifier), assignHandleToNativeExpression);
                         }
                         else
                         {

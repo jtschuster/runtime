@@ -71,7 +71,7 @@ namespace Microsoft.Interop
                             IdentifierName(managedIdentifier),
                             MethodInvocation(
                                 IdentifierName(context.GetAdditionalIdentifier(info, MarshallerIdentifier)),
-                                IdentifierName(ShapeMemberNames.Value.Stateful.ToManagedFinally));
+                                IdentifierName(ShapeMemberNames.Value.Stateful.ToManagedFinally)));
         }
 
         public IEnumerable<StatementSyntax> GenerateMarshalStatements(TypePositionInfo info, StubCodeContext context)
@@ -100,7 +100,7 @@ namespace Microsoft.Interop
                             IdentifierName(nativeIdentifier),
                             MethodInvocation(
                                 IdentifierName(context.GetAdditionalIdentifier(info, MarshallerIdentifier)),
-                                IdentifierName(ShapeMemberNames.Value.Stateful.ToUnmanaged));
+                                IdentifierName(ShapeMemberNames.Value.Stateful.ToUnmanaged)));
         }
 
         public IEnumerable<StatementSyntax> GenerateUnmarshalStatements(TypePositionInfo info, StubCodeContext context)
@@ -242,7 +242,7 @@ namespace Microsoft.Interop
                                         SingletonList(ArrayRankSpecifier(SingletonSeparatedList<ExpressionSyntax>(
                                             MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression,
                                                 _marshallerType,
-                                                IdentifierName(ShapeMemberNames.BufferSize)))))))))
+                                                IdentifierName(ShapeMemberNames.BufferSize)))))))));
             }
         }
 
