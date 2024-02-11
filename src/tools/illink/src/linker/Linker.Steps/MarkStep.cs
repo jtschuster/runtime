@@ -701,7 +701,7 @@ namespace Mono.Linker.Steps
 				var defaultImplementations = Annotations.GetDefaultInterfaceImplementations (method);
 				if (defaultImplementations is not null) {
 					foreach (var dimInfo in defaultImplementations) {
-						ProcessDefaultImplementation (dimInfo.InterfaceImplementor!.Implementor, dimInfo.InterfaceImplementor!.InterfaceImplementation, dimInfo.Override);
+						ProcessDefaultImplementation (dimInfo);
 
 						if (IsInterfaceImplementationMethodNeededByTypeDueToInterface (dimInfo))
 							MarkMethod (dimInfo.Override, new DependencyInfo (DependencyKind.Override, dimInfo.Base), ScopeStack.CurrentScope.Origin);
@@ -818,14 +818,14 @@ namespace Mono.Linker.Steps
 			return false;
 		}
 
-		//TODO: replace with InterfaceImplementor
-		void ProcessDefaultImplementation (TypeDefinition typeWithDefaultImplementedInterfaceMethod, InterfaceImplementation implementation, MethodDefinition implementationMethod)
+		void ProcessDefaultImplementation (OverrideInformation ov)
 		{
-			if ((!implementationMethod.IsStatic && !Annotations.IsInstantiated (typeWithDefaultImplementedInterfaceMethod))
-				|| implementationMethod.IsStatic && !Annotations.IsRelevantToVariantCasting (typeWithDefaultImplementedInterfaceMethod))
+			Debug.Assert (ov.IsOverrideOfInterfaceMember);
+			if ((!ov.Override.IsStatic && !Annotations.IsInstantiated (ov.InterfaceImplementor!.Implementor))
+				|| ov.Override.IsStatic && !Annotations.IsRelevantToVariantCasting (ov.InterfaceImplementor!.Implementor))
 				return;
 
-			MarkInterfaceImplementation (implementation);
+			MarkInterfaceImplementation (ov.InterfaceImplementor!.InterfaceImplementation);
 		}
 
 		void MarkMarshalSpec (IMarshalInfoProvider spec, in DependencyInfo reason)
