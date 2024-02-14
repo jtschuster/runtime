@@ -13,6 +13,7 @@ namespace Mono.Linker.Tests.Cases.Inheritance.Interfaces.DefaultInterfaceMethods
 			NotUsedInGeneric.Keep ();
 			GenericType<UsedAsIBase2>.M ();
 			GenericType2<UsedInUnconstrainedGeneric>.Keep ();
+			Test();
 #endif
 		}
 
@@ -38,13 +39,9 @@ namespace Mono.Linker.Tests.Cases.Inheritance.Interfaces.DefaultInterfaceMethods
 			}
 		}
 
-		[Kept]
-		[KeptInterface (typeof (IBase))]
 		interface IMiddle : IBase
 		{
-			[Kept]
 			static int IBase.Value {
-				[Kept]
 				get => 1;
 			}
 
@@ -55,7 +52,6 @@ namespace Mono.Linker.Tests.Cases.Inheritance.Interfaces.DefaultInterfaceMethods
 
 		[Kept]
 		[KeptInterface (typeof (IBase))]
-		[KeptInterface (typeof (IMiddle))]
 		interface IDerived : IMiddle
 		{
 			[Kept]
@@ -71,7 +67,6 @@ namespace Mono.Linker.Tests.Cases.Inheritance.Interfaces.DefaultInterfaceMethods
 
 		[Kept]
 		[KeptInterface (typeof (IBase))]
-		[KeptInterface (typeof (IMiddle))]
 		interface IDerived2 : IMiddle
 		{
 			// https://github.com/dotnet/runtime/issues/97798
@@ -88,7 +83,6 @@ namespace Mono.Linker.Tests.Cases.Inheritance.Interfaces.DefaultInterfaceMethods
 
 		[Kept]
 		[KeptInterface (typeof (IDerived))]
-		[KeptInterface (typeof (IMiddle))]
 		[KeptInterface (typeof (IBase))]
 		class UsedAsIBase : IDerived, INotReferenced
 		{
@@ -124,7 +118,6 @@ namespace Mono.Linker.Tests.Cases.Inheritance.Interfaces.DefaultInterfaceMethods
 
 		[Kept]
 		[KeptInterface (typeof (IBase))]
-		[KeptInterface (typeof (IMiddle))]
 		[KeptInterface (typeof (IDerived2))]
 		class UsedInUnconstrainedGeneric : IDerived2, INotReferenced, IDerivedUnused
 		{
@@ -147,11 +140,56 @@ namespace Mono.Linker.Tests.Cases.Inheritance.Interfaces.DefaultInterfaceMethods
 
 		[Kept]
 		[KeptInterface (typeof (IDerived))]
-		[KeptInterface (typeof (IMiddle))]
 		[KeptInterface (typeof (IBase))]
 		class UsedAsIBase2 : IDerived
 		{
 		}
+
+		[Kept]
+		public static void Test()
+		{
+			UseLevel0<MyImpl> ();
+			UseLevel0<MyImpl2> ();
+		}
+
+		[Kept]
+		static void UseLevel0<T> () where T : ILevel0 { T.Method(); }
+
+		[Kept]
+		interface ILevel0 { [Kept] static abstract void Method(); }
+		interface ILevel1 : ILevel0 { static void ILevel0.Method() { } }
+		[Kept]
+		[KeptInterface(typeof(ILevel0))]
+		interface ILevel1b : ILevel0 { [Kept] static void ILevel0.Method() { } }
+		interface ILevel2 : ILevel1 { static void ILevel0.Method() { } }
+		interface ILevel2b : ILevel1b { }
+		[Kept]
+		[KeptInterface(typeof(ILevel0))]
+		interface ILevel3 : ILevel2 { [Kept] static void ILevel0.Method() { } }
+		interface ILevel3b : ILevel2 { static void ILevel0.Method() { } }
+		interface ILevel3c : ILevel2b {}
+		// interface ILevel4: ILevel3 { [Kept] static void ILevel0.Method() { } }
+		// interface ILevel4b: ILevel3 { [Kept] static void ILevel0.Method() { } }
+
+		// Relies on ILevel3 DIM, nothing else
+		[Kept]
+		[KeptInterface(typeof(ILevel0))]
+		[KeptInterface(typeof(ILevel3))]
+		class MyImpl : ILevel3 { }
+
+		// Relies on the ILevel1 DIM as the most derived
+		[Kept]
+		[KeptInterface(typeof(ILevel0))]
+		[KeptInterface(typeof(ILevel1b))]
+		class MyImpl2 : ILevel3c { }
+
+		// Could use ILevel4 or ILevel4b DIM
+		// [Kept]
+		// [KeptInterface(typeof(ILevel0))]
+		// [KeptInterface(typeof(ILevel4))]
+		// [KeptInterface(typeof(ILevel4b))]
+		// class MyImpl3 : ILevel4, ILevel4b { }
+
 #endif
 	}
 }

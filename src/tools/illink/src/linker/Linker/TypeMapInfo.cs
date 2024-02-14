@@ -289,16 +289,25 @@ namespace Mono.Linker
 			// Go over all interfaces, trying to find a method that is an explicit MethodImpl of the
 			// interface method in question.
 
-			foreach (var interfaceImpl in type.Interfaces) {
-				var potentialImplInterface = context.TryResolve (interfaceImpl.InterfaceType);
+			Queue<InterfaceImplementation> interfaceTypesToCheck = new Queue<InterfaceImplementation> ();
+			HashSet<TypeDefinition> interfacesWithAMoreSpecificImpl = new HashSet<TypeDefinition> ();
+
+			foreach (var baseInterface in type.Interfaces) {
+				interfaceTypesToCheck.Enqueue (baseInterface);
+			}
+			while (interfaceTypesToCheck.Count > 0) {
+				bool foundImpl = false;
+				var interfaceImpl = interfaceTypesToCheck.Dequeue ();
+				var potentialImplInterface = context.TryResolve(interfaceImpl.InterfaceType);
 				if (potentialImplInterface == null)
+					continue;
+				// Skip interfaces if we know we already have a more specific implementation on a more derived interface
+				if (interfacesWithAMoreSpecificImpl.Contains (potentialImplInterface))
 					continue;
 
 				// If the interface doesn't implement the interface with the method we're looking for, exit early
 				if (!potentialImplInterface.Interfaces.Any(i => context.TryResolve(i.InterfaceType) == interfaceMethod.DeclaringType))
 					continue;
-
-				bool foundImpl = false;
 
 				foreach (var potentialImplMethod in potentialImplInterface.Methods) {
 					if (potentialImplMethod == interfaceMethod &&
@@ -308,6 +317,7 @@ namespace Mono.Linker
 						break;
 					}
 
+					// DIMs always have an override of the base interface method, so skip if the method doesn't override anything
 					if (!potentialImplMethod.HasOverrides)
 						continue;
 
@@ -319,16 +329,34 @@ namespace Mono.Linker
 							break;
 						}
 					}
-
 					if (foundImpl) {
 						break;
 					}
 				}
 
-				// We haven't found a MethodImpl on the current interface, but one of the interfaces
-				// this interface requires could still provide it.
-				if (!foundImpl) {
-					FindAndAddDefaultInterfaceImplementations (potentialImplInterface, interfaceMethod);
+				if (foundImpl) {
+					// We found a default implementation on the current interface
+					// Add all the base interfaces to the list of interfaces that have a more specific implementation
+					// We don't need to check them later
+					Stack<TypeDefinition> basesOfFoundDIM = new Stack<TypeDefinition> ();
+					basesOfFoundDIM.Push (potentialImplInterface);
+					while(basesOfFoundDIM.Count > 0) {
+						var current = basesOfFoundDIM.Pop ();
+						interfacesWithAMoreSpecificImpl.Add (current);
+						foreach (var baseInterface in current.Interfaces) {
+							var baseInterfaceType = context.TryResolve (baseInterface.InterfaceType);
+							if (baseInterfaceType == null)
+								continue;
+
+							basesOfFoundDIM.Push (baseInterfaceType);
+						}
+					}
+
+				}
+
+				// If we don't find a DIM on this type, we need to check the interfaces that this interface requires
+				foreach (var baseInterface in potentialImplInterface.Interfaces) {
+					interfaceTypesToCheck.Enqueue (baseInterface);
 				}
 			}
 		}
