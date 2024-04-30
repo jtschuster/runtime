@@ -1,22 +1,25 @@
 ﻿// Copyright (c) .NET Foundation and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
+using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using ILCompiler.DependencyAnalysisFramework;
 using Mono.Cecil;
 
 namespace Mono.Linker.Steps
 {
-
 	public partial class MarkStep
 	{
-		internal sealed class TypeDefinitionNode : DependencyNodeCore<NodeFactory>
+		internal sealed class PropertyDefinitionNode : DependencyNodeCore<NodeFactory>, ILegacyTracingNode
 		{
-			readonly TypeDefinition type;
+			readonly PropertyDefinition property;
 
-			public TypeDefinitionNode (TypeDefinition type)
+			public PropertyDefinitionNode (PropertyDefinition property)
 			{
-				this.type = type;
+				this.property = property;
 			}
 
 			public override bool InterestingForDynamicDependencyAnalysis => false;
@@ -29,13 +32,17 @@ namespace Mono.Linker.Steps
 
 			public override IEnumerable<DependencyListEntry>? GetStaticDependencies (NodeFactory context)
 			{
-				context.MarkStep.ProcessType (type);
+				context.MarkStep.MarkProperty (property, default);
 				return null;
 			}
 
 			public override IEnumerable<CombinedDependencyListEntry>? GetConditionalStaticDependencies (NodeFactory context) => null;
+
 			public override IEnumerable<CombinedDependencyListEntry>? SearchDynamicDependencies (List<DependencyNodeCore<NodeFactory>> markedNodes, int firstNode, NodeFactory context) => null;
-			protected override string GetName (NodeFactory context) => type.GetDisplayName();
+
+			protected override string GetName (NodeFactory context) => property.GetDisplayName();
+
+			object ILegacyTracingNode.DependencyObject => property;
 		}
 	}
 }

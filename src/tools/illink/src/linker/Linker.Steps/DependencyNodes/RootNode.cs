@@ -3,22 +3,26 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using ILCompiler.DependencyAnalysisFramework;
-using Mono.Cecil;
 
 namespace Mono.Linker.Steps
 {
 	public partial class MarkStep
 	{
-		internal sealed class MethodDefinitionNode : DependencyNodeCore<NodeFactory>
+		internal sealed class RootNode : DependencyNodeCore<NodeFactory>, ILegacyTracingNode
 		{
-			readonly MethodDefinition method;
-			readonly DependencyInfo reason;
+			readonly DependencyNodeCore<NodeFactory> dependee;
+			readonly string reason;
+			readonly object? depender;
 
-			public MethodDefinitionNode (MethodDefinition method, DependencyInfo reason)
+			public RootNode (DependencyNodeCore<NodeFactory> dep, string reason, object? depender)
 			{
-				this.method = method;
+				this.dependee = dep;
 				this.reason = reason;
+				this.depender = depender;
 			}
 
 			public override bool InterestingForDynamicDependencyAnalysis => false;
@@ -31,13 +35,13 @@ namespace Mono.Linker.Steps
 
 			public override IEnumerable<DependencyListEntry>? GetStaticDependencies (NodeFactory context)
 			{
-				context.MarkStep.ProcessMethod (method, reason);
-				return null;
+				return [new DependencyListEntry (dependee, reason)];
 			}
 
 			public override IEnumerable<CombinedDependencyListEntry>? GetConditionalStaticDependencies (NodeFactory context) => null;
 			public override IEnumerable<CombinedDependencyListEntry>? SearchDynamicDependencies (List<DependencyNodeCore<NodeFactory>> markedNodes, int firstNode, NodeFactory context) => null;
-			protected override string GetName (NodeFactory context) => method.GetDisplayName();
+			protected override string GetName (NodeFactory context) => depender?.ToString() ?? "Unknown";
+			object? ILegacyTracingNode.DependencyObject => depender;
 		}
 	}
 }

@@ -4,6 +4,8 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
 using Mono.Cecil;
 
 namespace Mono.Linker.Steps
@@ -13,6 +15,7 @@ namespace Mono.Linker.Steps
 		internal sealed class NodeFactory (MarkStep markStep)
 		{
 			public MarkStep MarkStep { get; } = markStep;
+			public static readonly ImmutableDictionary<string, DependencyKind> DependencyKinds = Enum.GetValues<DependencyKind> ().ToImmutableDictionary (v => v.ToString ());
 			readonly NodeCache<TypeDefinition, TypeDefinitionNode> _typeNodes = new (static t => new TypeDefinitionNode(t));
 			readonly NodeCache<MethodDefinition, MethodDefinitionNode> _methodNodes = new (static _ => throw new InvalidOperationException ("Creation of node requires more than the key."));
 			readonly NodeCache<TypeDefinition, TypeIsRelevantToVariantCastingNode> _typeIsRelevantToVariantCastingNodes = new (static (t) => new TypeIsRelevantToVariantCastingNode (t));
