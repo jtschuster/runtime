@@ -805,7 +805,7 @@ namespace Mono.Linker.Steps
 			MarkInterfaceImplementation (ov.InterfaceImplementor.InterfaceImplementation);
 		}
 
-		void MarkMarshalSpec (IMarshalInfoProvider spec, in DependencyInfo reason)
+		internal void MarkMarshalSpec (IMarshalInfoProvider spec, in DependencyInfo reason)
 		{
 			if (!spec.HasMarshalInfo)
 				return;
@@ -2379,7 +2379,7 @@ namespace Mono.Linker.Steps
 			return IsFullyPreserved (type);
 		}
 
-		void MarkGenericParameterProvider (IGenericParameterProvider provider)
+		internal void MarkGenericParameterProvider (IGenericParameterProvider provider)
 		{
 			if (!provider.HasGenericParameters)
 				return;
@@ -3097,117 +3097,6 @@ namespace Mono.Linker.Steps
 			}
 
 			return (method, reason);
-		}
-
-		protected virtual void ProcessMethod (MethodDefinition method, in DependencyInfo reason)
-		{
-			ScopeStack.AssertIsEmpty ();
-			using var methodScope = ScopeStack.PushLocalScope (new MessageOrigin (method));
-
-			bool markedForCall =
-				reason.Kind == DependencyKind.DirectCall ||
-				reason.Kind == DependencyKind.VirtualCall ||
-				reason.Kind == DependencyKind.Newobj;
-
-			foreach (Action<MethodDefinition> handleMarkMethod in MarkContext.MarkMethodActions)
-				handleMarkMethod (method);
-
-			if (!markedForCall)
-				MarkType (method.DeclaringType, new DependencyInfo (DependencyKind.DeclaringType, method));
-			MarkCustomAttributes (method, new DependencyInfo (DependencyKind.CustomAttribute, method));
-			MarkSecurityDeclarations (method, new DependencyInfo (DependencyKind.CustomAttribute, method));
-
-			MarkGenericParameterProvider (method);
-
-			if (method.IsInstanceConstructor ()) {
-				MarkRequirementsForInstantiatedTypes (method.DeclaringType);
-				Tracer.AddDirectDependency (method.DeclaringType, new DependencyInfo (DependencyKind.InstantiatedByCtor, method), marked: false);
-			} else if (method.IsStaticConstructor () && Annotations.HasLinkerAttribute<RequiresUnreferencedCodeAttribute> (method))
-				Context.LogWarning (ScopeStack.CurrentScope.Origin, DiagnosticId.RequiresUnreferencedCodeOnStaticConstructor, method.GetDisplayName ());
-
-			if (method.IsConstructor) {
-				if (!Annotations.ProcessSatelliteAssemblies && KnownMembers.IsSatelliteAssemblyMarker (method))
-					Annotations.ProcessSatelliteAssemblies = true;
-			} else if (method.TryGetProperty (out PropertyDefinition? property))
-				MarkProperty (property, new DependencyInfo (PropagateDependencyKindToAccessors (reason.Kind, DependencyKind.PropertyOfPropertyMethod), method));
-			else if (method.TryGetEvent (out EventDefinition? @event)) {
-				MarkEvent (@event, new DependencyInfo (PropagateDependencyKindToAccessors (reason.Kind, DependencyKind.EventOfEventMethod), method));
-			}
-
-			if (method.HasMetadataParameters ()) {
-#pragma warning disable RS0030 // MethodReference.Parameters is banned. It's easiest to leave the code as is for now
-				foreach (ParameterDefinition pd in method.Parameters) {
-					MarkType (pd.ParameterType, new DependencyInfo (DependencyKind.ParameterType, method));
-					MarkCustomAttributes (pd, new DependencyInfo (DependencyKind.ParameterAttribute, method));
-					MarkMarshalSpec (pd, new DependencyInfo (DependencyKind.ParameterMarshalSpec, method));
-				}
-#pragma warning restore RS0030
-			}
-
-			if (method.HasOverrides) {
-				var assembly = Context.Resolve (method.DeclaringType.Scope);
-				// If this method is in a Copy, CopyUsed, or Save assembly, .overrides won't get swept and we need to keep all of them
-				bool markAllOverrides = assembly != null && Annotations.GetAction (assembly) is AssemblyAction.Copy or AssemblyAction.CopyUsed or AssemblyAction.Save;
-				foreach (MethodReference @base in method.Overrides) {
-					// Method implementing a static interface method will have an override to it - note instance methods usually don't unless they're explicit.
-					// Calling the implementation method directly has no impact on the interface, and as such it should not mark the interface or its method.
-					// Only if the interface method is referenced, then all the methods which implemented must be kept, but not the other way round.
-					if (!markAllOverrides &&
-						Context.Resolve (@base) is MethodDefinition baseDefinition
-						&& baseDefinition.DeclaringType.IsInterface && baseDefinition.IsStatic && method.IsStatic)
-						continue;
-					MarkMethod (@base, new DependencyInfo (DependencyKind.MethodImplOverride, method), ScopeStack.CurrentScope.Origin);
-					MarkExplicitInterfaceImplementation (method, @base);
-				}
-			}
-
-			MarkMethodSpecialCustomAttributes (method);
-
-			if (method.IsVirtual)
-				MarkMethodAsVirtual (method, ScopeStack.CurrentScope);
-
-			MarkNewCodeDependencies (method);
-
-			MarkBaseMethods (method);
-
-			if (Annotations.GetOverrides (method) is IEnumerable<OverrideInformation> overrides) {
-				foreach (var @override in overrides.Where (ov => Annotations.IsMarked (ov.Base) || IgnoreScope (ov.Base.DeclaringType.Scope))) {
-					if (ShouldMarkOverrideForBase (@override))
-						MarkOverrideForBaseMethod (@override);
-				}
-			}
-
-			MarkType (method.ReturnType, new DependencyInfo (DependencyKind.ReturnType, method));
-			MarkCustomAttributes (method.MethodReturnType, new DependencyInfo (DependencyKind.ReturnTypeAttribute, method));
-			MarkMarshalSpec (method.MethodReturnType, new DependencyInfo (DependencyKind.ReturnTypeMarshalSpec, method));
-
-			if (method.IsPInvokeImpl || method.IsInternalCall) {
-				ProcessInteropMethod (method);
-			}
-
-			if (!method.HasBody || method.Body.CodeSize == 0) {
-				ProcessUnsafeAccessorMethod (method);
-			}
-
-			if (ShouldParseMethodBody (method))
-				MarkMethodBody (method.Body);
-
-			if (method.DeclaringType.IsMulticastDelegate ()) {
-				string? methodPair = null;
-				if (method.Name == "BeginInvoke")
-					methodPair = "EndInvoke";
-				else if (method.Name == "EndInvoke")
-					methodPair = "BeginInvoke";
-
-				if (methodPair != null) {
-					TypeDefinition declaringType = method.DeclaringType;
-					MarkMethodIf (declaringType.Methods, m => m.Name == methodPair, new DependencyInfo (DependencyKind.MethodForSpecialType, declaringType), ScopeStack.CurrentScope.Origin);
-				}
-			}
-
-			DoAdditionalMethodProcessing (method);
-
-			ApplyPreserveMethods (method);
 		}
 
 		// Allow subclassers to mark additional things when marking a method
