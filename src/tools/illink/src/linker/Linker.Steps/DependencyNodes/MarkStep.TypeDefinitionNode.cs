@@ -42,9 +42,9 @@ namespace Mono.Linker.Steps
 				foreach (Action<TypeDefinition> handleMarkType in MarkStep.MarkContext.MarkTypeActions)
 					handleMarkType (type);
 
-				var baseDefinition = MarkStep.PreprocessMarkedType(type.BaseType, new DependencyInfo (DependencyKind.BaseType, type), ScopeStack.CurrentScope.Origin);
+				var baseDefinition = MarkStep.PreprocessMarkedType (type.BaseType, new DependencyInfo (DependencyKind.BaseType, type), ScopeStack.CurrentScope.Origin);
 				if (baseDefinition != null) {
-					yield return new (context.GetTypeNode (baseDefinition), Enum.GetName(DependencyKind.DeclaringType));
+					yield return new (context.GetTypeNode (baseDefinition), Enum.GetName (DependencyKind.DeclaringType));
 				}
 
 				// The DynamicallyAccessedMembers hierarchy processing must be done after the base type was marked
@@ -55,7 +55,7 @@ namespace Mono.Linker.Steps
 				if (type.DeclaringType != null) {
 					var declaringDefinition = MarkStep.PreprocessMarkedType (type.DeclaringType, new DependencyInfo (DependencyKind.DeclaringType, type), ScopeStack.CurrentScope.Origin);
 					Debug.Assert (declaringDefinition is not null);
-					yield return new (context.GetTypeNode (declaringDefinition), Enum.GetName(DependencyKind.DeclaringType));
+					yield return new (context.GetTypeNode (declaringDefinition), Enum.GetName (DependencyKind.DeclaringType));
 				}
 
 				MarkStep.MarkCustomAttributes (type, new DependencyInfo (DependencyKind.CustomAttribute, type));

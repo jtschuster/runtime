@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using ILCompiler.DependencyAnalysisFramework;
 using Mono.Cecil;
 
 namespace Mono.Linker.Steps
@@ -18,6 +19,7 @@ namespace Mono.Linker.Steps
 			public static readonly ImmutableDictionary<string, DependencyKind> DependencyKinds = Enum.GetValues<DependencyKind> ().ToImmutableDictionary (v => v.ToString ());
 			readonly NodeCache<TypeDefinition, TypeDefinitionNode> _typeNodes = new (static t => new TypeDefinitionNode(t));
 			readonly NodeCache<MethodDefinition, MethodDefinitionNode> _methodNodes = new (static _ => throw new InvalidOperationException ("Creation of node requires more than the key."));
+			readonly NodeCache<PropertyDefinition, PropertyDefinitionNode> _propertyNodes = new (static p => new PropertyDefinitionNode(p));
 			readonly NodeCache<TypeDefinition, TypeIsRelevantToVariantCastingNode> _typeIsRelevantToVariantCastingNodes = new (static (t) => new TypeIsRelevantToVariantCastingNode (t));
 
 			internal TypeDefinitionNode GetTypeNode (TypeDefinition definition)
@@ -33,6 +35,11 @@ namespace Mono.Linker.Steps
 			internal TypeIsRelevantToVariantCastingNode GetTypeIsRelevantToVariantCastingNode (TypeDefinition type)
 			{
 				return _typeIsRelevantToVariantCastingNodes.GetOrAdd (type);
+			}
+
+			internal PropertyDefinitionNode GetPropertyDefinitionNode (PropertyDefinition prop)
+			{
+				return _propertyNodes.GetOrAdd (prop);
 			}
 
 			struct NodeCache<TKey, TValue> where TKey : notnull

@@ -15,11 +15,11 @@ namespace Mono.Linker.Steps
 	{
 		internal sealed class PropertyDefinitionNode : DependencyNodeCore<NodeFactory>, ILegacyTracingNode
 		{
-			readonly PropertyDefinition property;
+			readonly PropertyDefinition _property;
 
 			public PropertyDefinitionNode (PropertyDefinition property)
 			{
-				this.property = property;
+				this._property = property;
 			}
 
 			public override bool InterestingForDynamicDependencyAnalysis => false;
@@ -32,7 +32,11 @@ namespace Mono.Linker.Steps
 
 			public override IEnumerable<DependencyListEntry>? GetStaticDependencies (NodeFactory context)
 			{
-				context.MarkStep.MarkProperty (property, default);
+				using var propertyScope = context.MarkStep.ScopeStack.PushLocalScope (new MessageOrigin (_property));
+
+				// Consider making this more similar to MarkEvent method?
+				context.MarkStep.MarkCustomAttributes (_property, new DependencyInfo (DependencyKind.CustomAttribute, _property));
+				context.MarkStep.DoAdditionalPropertyProcessing (_property);
 				return null;
 			}
 
@@ -40,9 +44,9 @@ namespace Mono.Linker.Steps
 
 			public override IEnumerable<CombinedDependencyListEntry>? SearchDynamicDependencies (List<DependencyNodeCore<NodeFactory>> markedNodes, int firstNode, NodeFactory context) => null;
 
-			protected override string GetName (NodeFactory context) => property.GetDisplayName();
+			protected override string GetName (NodeFactory context) => _property.GetDisplayName();
 
-			object ILegacyTracingNode.DependencyObject => property;
+			object ILegacyTracingNode.DependencyObject => _property;
 		}
 	}
 }

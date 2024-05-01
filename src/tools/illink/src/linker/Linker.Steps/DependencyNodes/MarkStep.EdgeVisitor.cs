@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -33,12 +34,14 @@ namespace Mono.Linker.Steps
 			{
 				if (!(ShouldBeLogged (nodeDependedOn, out var dependee) && ShouldBeLogged (nodeDepender, out var depender)))
 					return;
+				Debug.Assert (nodeDependedOn is not RootNode);
 				DependencyInfo depInfo = new (NodeFactory.DependencyKinds[reason], depender);
 				_markStep.Context.Tracer.AddDirectDependency (dependee!, depInfo, true);
 			}
 
 			public void VisitEdge (string root, DependencyNodeCore<NodeFactory> dependedOn)
 			{
+				Debug.Assert (dependedOn is RootNode || dependedOn is not ILegacyTracingNode);
 				//if (!ShouldBeLogged (dependedOn))
 				//return;
 				//DependencyInfo depInfo = new (NodeFactory.DependencyKinds[root], null);

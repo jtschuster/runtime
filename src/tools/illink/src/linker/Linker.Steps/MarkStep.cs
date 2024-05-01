@@ -48,6 +48,8 @@ using Mono.Cecil.Cil;
 using Mono.Collections.Generic;
 using Mono.Linker.Dataflow;
 
+using DependencyAnalyzer = ILCompiler.DependencyAnalysisFramework.DependencyAnalyzer<ILCompiler.DependencyAnalysisFramework.FullGraphLogStrategy<Mono.Linker.Steps.MarkStep.NodeFactory>, Mono.Linker.Steps.MarkStep.NodeFactory>;
+
 namespace Mono.Linker.Steps
 {
 	public partial class MarkStep : IStep
@@ -75,7 +77,7 @@ namespace Mono.Linker.Steps
 		// method body scanner.
 		readonly Dictionary<MethodBody, bool> _compilerGeneratedMethodRequiresScanner;
 		private readonly NodeFactory _nodeFactory;
-		private readonly DependencyAnalyzer<FullGraphLogStrategy<NodeFactory>, NodeFactory> _analyzer;
+		private readonly DependencyAnalyzer _analyzer;
 
 		MarkStepContext? _markContext;
 		MarkStepContext MarkContext {
@@ -233,7 +235,7 @@ namespace Mono.Linker.Steps
 			_entireTypesMarked = new HashSet<TypeDefinition> ();
 			_compilerGeneratedMethodRequiresScanner = new Dictionary<MethodBody, bool> ();
 			_nodeFactory = new NodeFactory (this);
-			_analyzer = new DependencyAnalyzer<FullGraphLogStrategy<NodeFactory>, NodeFactory> (_nodeFactory, null);
+			_analyzer = new DependencyAnalyzer (_nodeFactory, null);
 		}
 
 		public AnnotationStore Annotations => Context.Annotations;
@@ -3355,14 +3357,10 @@ namespace Mono.Linker.Steps
 
 		protected internal void MarkProperty (PropertyDefinition prop, in DependencyInfo reason)
 		{
-			if (!Annotations.MarkProcessed (prop, reason))
+			if (!Annotations.MarkProcessed ((IMetadataTokenProvider) prop, reason))
 				return;
 
-			using var propertyScope = ScopeStack.PushLocalScope (new MessageOrigin (prop));
-
-			// Consider making this more similar to MarkEvent method?
-			MarkCustomAttributes (prop, new DependencyInfo (DependencyKind.CustomAttribute, prop));
-			DoAdditionalPropertyProcessing (prop);
+			_analyzer.AddRoot (new RootNode (_nodeFactory.GetPropertyDefinitionNode ((PropertyDefinition) prop), reason.Kind.ToString (), reason.Source), "MarkProperty");
 		}
 
 		protected internal virtual void MarkEvent (EventDefinition evt, in DependencyInfo reason)

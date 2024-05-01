@@ -15,13 +15,13 @@ namespace Mono.Linker.Steps
 	{
 		internal sealed class MethodDefinitionNode : DependencyNodeCore<NodeFactory>, ILegacyTracingNode
 		{
-			readonly MethodDefinition method;
-			readonly DependencyInfo reason;
+			readonly MethodDefinition _method;
+			readonly DependencyInfo _reason;
 
 			public MethodDefinitionNode (MethodDefinition method, DependencyInfo reason)
 			{
-				this.method = method;
-				this.reason = reason;
+				this._method = method;
+				this._reason = reason;
 			}
 
 			public override bool InterestingForDynamicDependencyAnalysis => false;
@@ -39,126 +39,126 @@ namespace Mono.Linker.Steps
 				var MarkContext = context.MarkStep.MarkContext;
 
 				ScopeStack.AssertIsEmpty ();
-				using var methodScope = ScopeStack.PushLocalScope (new MessageOrigin (method));
+				using var methodScope = ScopeStack.PushLocalScope (new MessageOrigin (_method));
 
 				bool markedForCall =
-					reason.Kind == DependencyKind.DirectCall ||
-					reason.Kind == DependencyKind.VirtualCall ||
-					reason.Kind == DependencyKind.Newobj;
+					_reason.Kind == DependencyKind.DirectCall ||
+					_reason.Kind == DependencyKind.VirtualCall ||
+					_reason.Kind == DependencyKind.Newobj;
 
 				foreach (Action<MethodDefinition> handleMarkMethod in MarkContext.MarkMethodActions)
-					handleMarkMethod (method);
+					handleMarkMethod (_method);
 
 				if (!markedForCall) {
 
-					markStep.PreprocessMarkedType (method.DeclaringType, new DependencyInfo (DependencyKind.DeclaringType, method), ScopeStack.CurrentScope.Origin);
-					yield return new (context.GetTypeNode (method.DeclaringType), nameof(DependencyKind.DeclaringType));
+					markStep.PreprocessMarkedType (_method.DeclaringType, new DependencyInfo (DependencyKind.DeclaringType, _method), ScopeStack.CurrentScope.Origin);
+					yield return new (context.GetTypeNode (_method.DeclaringType), nameof(DependencyKind.DeclaringType));
 					//markStep.MarkType (method.DeclaringType, new DependencyInfo (DependencyKind.DeclaringType, method));
 				}
 
-				markStep.MarkCustomAttributes (method, new DependencyInfo (DependencyKind.CustomAttribute, method));
-				markStep.MarkSecurityDeclarations (method, new DependencyInfo (DependencyKind.CustomAttribute, method));
+				markStep.MarkCustomAttributes (_method, new DependencyInfo (DependencyKind.CustomAttribute, _method));
+				markStep.MarkSecurityDeclarations (_method, new DependencyInfo (DependencyKind.CustomAttribute, _method));
 
-				markStep.MarkGenericParameterProvider (method);
+				markStep.MarkGenericParameterProvider (_method);
 
-				if (method.IsInstanceConstructor ()) {
-					markStep.MarkRequirementsForInstantiatedTypes (method.DeclaringType);
-					markStep.Tracer.AddDirectDependency (method.DeclaringType, new DependencyInfo (DependencyKind.InstantiatedByCtor, method), marked: false);
-				} else if (method.IsStaticConstructor () && markStep.Annotations.HasLinkerAttribute<RequiresUnreferencedCodeAttribute> (method))
-					markStep.Context.LogWarning (ScopeStack.CurrentScope.Origin, DiagnosticId.RequiresUnreferencedCodeOnStaticConstructor, method.GetDisplayName ());
+				if (_method.IsInstanceConstructor ()) {
+					markStep.MarkRequirementsForInstantiatedTypes (_method.DeclaringType);
+					markStep.Tracer.AddDirectDependency (_method.DeclaringType, new DependencyInfo (DependencyKind.InstantiatedByCtor, _method), marked: false);
+				} else if (_method.IsStaticConstructor () && markStep.Annotations.HasLinkerAttribute<RequiresUnreferencedCodeAttribute> (_method))
+					markStep.Context.LogWarning (ScopeStack.CurrentScope.Origin, DiagnosticId.RequiresUnreferencedCodeOnStaticConstructor, _method.GetDisplayName ());
 
-				if (method.IsConstructor) {
-					if (!markStep.Annotations.ProcessSatelliteAssemblies && KnownMembers.IsSatelliteAssemblyMarker (method))
+				if (_method.IsConstructor) {
+					if (!markStep.Annotations.ProcessSatelliteAssemblies && KnownMembers.IsSatelliteAssemblyMarker (_method))
 						markStep.Annotations.ProcessSatelliteAssemblies = true;
-				} else if (method.TryGetProperty (out PropertyDefinition? property))
-					markStep.MarkProperty (property, new DependencyInfo (PropagateDependencyKindToAccessors (reason.Kind, DependencyKind.PropertyOfPropertyMethod), method));
-				else if (method.TryGetEvent (out EventDefinition? @event)) {
-					markStep.MarkEvent (@event, new DependencyInfo (PropagateDependencyKindToAccessors (reason.Kind, DependencyKind.EventOfEventMethod), method));
+				} else if (_method.TryGetProperty (out PropertyDefinition? property))
+					markStep.MarkProperty (property, new DependencyInfo (PropagateDependencyKindToAccessors (_reason.Kind, DependencyKind.PropertyOfPropertyMethod), _method));
+				else if (_method.TryGetEvent (out EventDefinition? @event)) {
+					markStep.MarkEvent (@event, new DependencyInfo (PropagateDependencyKindToAccessors (_reason.Kind, DependencyKind.EventOfEventMethod), _method));
 				}
 
-				if (method.HasMetadataParameters ()) {
+				if (_method.HasMetadataParameters ()) {
 #pragma warning disable RS0030 // MethodReference.Parameters is banned. It's easiest to leave the code as is for now
-					foreach (ParameterDefinition pd in method.Parameters) {
-						markStep.MarkType (pd.ParameterType, new DependencyInfo (DependencyKind.ParameterType, method));
-						markStep.MarkCustomAttributes (pd, new DependencyInfo (DependencyKind.ParameterAttribute, method));
-						markStep.MarkMarshalSpec (pd, new DependencyInfo (DependencyKind.ParameterMarshalSpec, method));
+					foreach (ParameterDefinition pd in _method.Parameters) {
+						markStep.MarkType (pd.ParameterType, new DependencyInfo (DependencyKind.ParameterType, _method));
+						markStep.MarkCustomAttributes (pd, new DependencyInfo (DependencyKind.ParameterAttribute, _method));
+						markStep.MarkMarshalSpec (pd, new DependencyInfo (DependencyKind.ParameterMarshalSpec, _method));
 					}
 #pragma warning restore RS0030
 				}
 
-				if (method.HasOverrides) {
-					var assembly = markStep.Context.Resolve (method.DeclaringType.Scope);
+				if (_method.HasOverrides) {
+					var assembly = markStep.Context.Resolve (_method.DeclaringType.Scope);
 					// If this method is in a Copy, CopyUsed, or Save assembly, .overrides won't get swept and we need to keep all of them
 					bool markAllOverrides = assembly != null && markStep.Annotations.GetAction (assembly) is AssemblyAction.Copy or AssemblyAction.CopyUsed or AssemblyAction.Save;
-					foreach (MethodReference @base in method.Overrides) {
+					foreach (MethodReference @base in _method.Overrides) {
 						// Method implementing a static interface method will have an override to it - note instance methods usually don't unless they're explicit.
 						// Calling the implementation method directly has no impact on the interface, and as such it should not mark the interface or its method.
 						// Only if the interface method is referenced, then all the methods which implemented must be kept, but not the other way round.
 						if (!markAllOverrides &&
 							markStep.Context.Resolve (@base) is MethodDefinition baseDefinition
-							&& baseDefinition.DeclaringType.IsInterface && baseDefinition.IsStatic && method.IsStatic)
+							&& baseDefinition.DeclaringType.IsInterface && baseDefinition.IsStatic && _method.IsStatic)
 							continue;
-						markStep.MarkMethod (@base, new DependencyInfo (DependencyKind.MethodImplOverride, method), ScopeStack.CurrentScope.Origin);
-						markStep.MarkExplicitInterfaceImplementation (method, @base);
+						markStep.MarkMethod (@base, new DependencyInfo (DependencyKind.MethodImplOverride, _method), ScopeStack.CurrentScope.Origin);
+						markStep.MarkExplicitInterfaceImplementation (_method, @base);
 					}
 				}
 
-				markStep.MarkMethodSpecialCustomAttributes (method);
+				markStep.MarkMethodSpecialCustomAttributes (_method);
 
-				if (method.IsVirtual)
-					markStep.MarkMethodAsVirtual (method, ScopeStack.CurrentScope);
+				if (_method.IsVirtual)
+					markStep.MarkMethodAsVirtual (_method, ScopeStack.CurrentScope);
 
-				markStep.MarkNewCodeDependencies (method);
+				markStep.MarkNewCodeDependencies (_method);
 
-				markStep.MarkBaseMethods (method);
+				markStep.MarkBaseMethods (_method);
 
-				if (markStep.Annotations.GetOverrides (method) is IEnumerable<OverrideInformation> overrides) {
+				if (markStep.Annotations.GetOverrides (_method) is IEnumerable<OverrideInformation> overrides) {
 					foreach (var @override in overrides.Where (ov => markStep.Annotations.IsMarked (ov.Base) || markStep.IgnoreScope (ov.Base.DeclaringType.Scope))) {
 						if (markStep.ShouldMarkOverrideForBase (@override))
 							markStep.MarkOverrideForBaseMethod (@override);
 					}
 				}
 
-				markStep.MarkType (method.ReturnType, new DependencyInfo (DependencyKind.ReturnType, method));
-				markStep.MarkCustomAttributes (method.MethodReturnType, new DependencyInfo (DependencyKind.ReturnTypeAttribute, method));
-				markStep.MarkMarshalSpec (method.MethodReturnType, new DependencyInfo (DependencyKind.ReturnTypeMarshalSpec, method));
+				markStep.MarkType (_method.ReturnType, new DependencyInfo (DependencyKind.ReturnType, _method));
+				markStep.MarkCustomAttributes (_method.MethodReturnType, new DependencyInfo (DependencyKind.ReturnTypeAttribute, _method));
+				markStep.MarkMarshalSpec (_method.MethodReturnType, new DependencyInfo (DependencyKind.ReturnTypeMarshalSpec, _method));
 
-				if (method.IsPInvokeImpl || method.IsInternalCall) {
-					markStep.ProcessInteropMethod (method);
+				if (_method.IsPInvokeImpl || _method.IsInternalCall) {
+					markStep.ProcessInteropMethod (_method);
 				}
 
-				if (!method.HasBody || method.Body.CodeSize == 0) {
-					markStep.ProcessUnsafeAccessorMethod (method);
+				if (!_method.HasBody || _method.Body.CodeSize == 0) {
+					markStep.ProcessUnsafeAccessorMethod (_method);
 				}
 
-				if (markStep.ShouldParseMethodBody (method))
-					markStep.MarkMethodBody (method.Body);
+				if (markStep.ShouldParseMethodBody (_method))
+					markStep.MarkMethodBody (_method.Body);
 
-				if (method.DeclaringType.IsMulticastDelegate ()) {
+				if (_method.DeclaringType.IsMulticastDelegate ()) {
 					string? methodPair = null;
-					if (method.Name == "BeginInvoke")
+					if (_method.Name == "BeginInvoke")
 						methodPair = "EndInvoke";
-					else if (method.Name == "EndInvoke")
+					else if (_method.Name == "EndInvoke")
 						methodPair = "BeginInvoke";
 
 					if (methodPair != null) {
-						TypeDefinition declaringType = method.DeclaringType;
+						TypeDefinition declaringType = _method.DeclaringType;
 						markStep.MarkMethodIf (declaringType.Methods, m => m.Name == methodPair, new DependencyInfo (DependencyKind.MethodForSpecialType, declaringType), ScopeStack.CurrentScope.Origin);
 					}
 				}
 
-				markStep.DoAdditionalMethodProcessing (method);
+				markStep.DoAdditionalMethodProcessing (_method);
 
-				markStep.ApplyPreserveMethods (method);
+				markStep.ApplyPreserveMethods (_method);
 			}
 
 			public override IEnumerable<CombinedDependencyListEntry>? GetConditionalStaticDependencies (NodeFactory context) => null;
 
 			public override IEnumerable<CombinedDependencyListEntry>? SearchDynamicDependencies (List<DependencyNodeCore<NodeFactory>> markedNodes, int firstNode, NodeFactory context) => null;
 
-			protected override string GetName (NodeFactory context) => method.GetDisplayName ();
+			protected override string GetName (NodeFactory context) => _method.GetDisplayName ();
 
-			object ILegacyTracingNode.DependencyObject => method;
+			object ILegacyTracingNode.DependencyObject => _method;
 		}
 	}
 }
