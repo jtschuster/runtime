@@ -2007,10 +2007,6 @@ namespace Mono.Linker.Steps
 				break;
 			}
 
-			// Treat cctors triggered by a called method specially and mark this case up-front.
-			if (type.HasMethods && ShouldMarkTypeStaticConstructor (type) && reason.Kind == DependencyKind.DeclaringTypeOfCalledMethod)
-				MarkStaticConstructor (type, new DependencyInfo (DependencyKind.TriggersCctorForCalledMethod, reason.Source), ScopeStack.CurrentScope.Origin);
-
 			if (Annotations.HasLinkerAttribute<RemoveAttributeInstancesAttribute> (type)) {
 				// Don't warn about references from the removed attribute itself (for example the .ctor on the attribute
 				// will call MarkType on the attribute type itself).
@@ -2021,18 +2017,6 @@ namespace Mono.Linker.Steps
 					reason.Kind is not DependencyKind.TypeInAssembly)
 					Context.LogWarning (ScopeStack.CurrentScope.Origin, DiagnosticId.AttributeIsReferencedButTrimmerRemoveAllInstances, type.GetDisplayName ());
 			}
-
-			if (CheckProcessed (type))
-				return type;
-
-			if (type.HasMethods) {
-				if (ShouldMarkTypeStaticConstructor (type) && reason.Kind != DependencyKind.TriggersCctorForCalledMethod) {
-					MarkStaticConstructor (type, new DependencyInfo (DependencyKind.CctorForType, type), ScopeStack.CurrentScope.Origin);
-				}
-			}
-
-			if (type.Scope is ModuleDefinition module)
-				MarkModule (module, new DependencyInfo (DependencyKind.ScopeOfType, type));
 
 			return type;
 		}
@@ -2047,7 +2031,9 @@ namespace Mono.Linker.Steps
 			TypeDefinition? type = PreprocessMarkedType (reference, reason, origin);
 			if (type == null)
 				return null;
-			_analyzer.AddRoot (new RootNode (_nodeFactory.GetTypeNode (type), Enum.GetName (reason.Kind)!, reason.Source), "MarkType");
+			if (Annotations.IsProcessed (type))
+				return type;
+			_analyzer.AddRoot (new RootNode (_nodeFactory.GetTypeNode (type), reason.Kind.GetName(), reason.Source), "MarkType");
 			return type;
 		}
 
@@ -2964,7 +2950,13 @@ namespace Mono.Linker.Steps
 				// Temporarily switch to the original source for marking this method
 				// this is for the same reason as for tracking, but this time so that we report potential
 				// warnings from a better place.
-				MarkType (method.DeclaringType, new DependencyInfo (DependencyKind.DeclaringTypeOfCalledMethod, method), new MessageOrigin (reason.Source as IMemberDefinition ?? method));
+
+				// Treat cctors triggered by a called method specially and mark this case up-front.
+				var type = method.DeclaringType;
+				if (type.HasMethods && ShouldMarkTypeStaticConstructor (type) && reason.Kind == DependencyKind.DeclaringTypeOfCalledMethod)
+					MarkStaticConstructor (type, new DependencyInfo (DependencyKind.TriggersCctorForCalledMethod, reason.Source), ScopeStack.CurrentScope.Origin);
+
+				MarkType (type, new DependencyInfo (DependencyKind.DeclaringTypeOfCalledMethod, method), new MessageOrigin (reason.Source as IMemberDefinition ?? method));
 			}
 
 			// We will only enqueue a method to be processed if it hasn't been processed yet.

@@ -41,11 +41,7 @@ namespace Mono.Linker.Steps
 
 			public void VisitEdge (string root, DependencyNodeCore<NodeFactory> dependedOn)
 			{
-				Debug.Assert (dependedOn is RootNode || dependedOn is not ILegacyTracingNode);
-				//if (!ShouldBeLogged (dependedOn))
-				//return;
-				//DependencyInfo depInfo = new (NodeFactory.DependencyKinds[root], null);
-				//_markStep.Context.Tracer.AddDirectDependency (dependedOn, depInfo, true);
+				Debug.Assert (dependedOn is RootNode or not ILegacyTracingNode);
 			}
 
 			public void VisitEdge (DependencyNodeCore<NodeFactory> nodeDepender, DependencyNodeCore<NodeFactory> nodeDependerOther, DependencyNodeCore<NodeFactory> nodeDependedOn, string reason)

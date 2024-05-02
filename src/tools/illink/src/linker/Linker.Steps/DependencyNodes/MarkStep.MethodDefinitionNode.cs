@@ -41,20 +41,11 @@ namespace Mono.Linker.Steps
 				ScopeStack.AssertIsEmpty ();
 				using var methodScope = ScopeStack.PushLocalScope (new MessageOrigin (_method));
 
-				bool markedForCall =
-					_reason.Kind == DependencyKind.DirectCall ||
-					_reason.Kind == DependencyKind.VirtualCall ||
-					_reason.Kind == DependencyKind.Newobj;
-
 				foreach (Action<MethodDefinition> handleMarkMethod in MarkContext.MarkMethodActions)
 					handleMarkMethod (_method);
 
-				if (!markedForCall) {
-
-					markStep.PreprocessMarkedType (_method.DeclaringType, new DependencyInfo (DependencyKind.DeclaringType, _method), ScopeStack.CurrentScope.Origin);
-					yield return new (context.GetTypeNode (_method.DeclaringType), nameof(DependencyKind.DeclaringType));
-					//markStep.MarkType (method.DeclaringType, new DependencyInfo (DependencyKind.DeclaringType, method));
-				}
+				markStep.PreprocessMarkedType (_method.DeclaringType, new DependencyInfo (DependencyKind.DeclaringType, _method), ScopeStack.CurrentScope.Origin);
+				yield return new (context.GetTypeNode (_method.DeclaringType), nameof (DependencyKind.DeclaringType));
 
 				markStep.MarkCustomAttributes (_method, new DependencyInfo (DependencyKind.CustomAttribute, _method));
 				markStep.MarkSecurityDeclarations (_method, new DependencyInfo (DependencyKind.CustomAttribute, _method));
@@ -70,10 +61,12 @@ namespace Mono.Linker.Steps
 				if (_method.IsConstructor) {
 					if (!markStep.Annotations.ProcessSatelliteAssemblies && KnownMembers.IsSatelliteAssemblyMarker (_method))
 						markStep.Annotations.ProcessSatelliteAssemblies = true;
-				} else if (_method.TryGetProperty (out PropertyDefinition? property))
-					markStep.MarkProperty (property, new DependencyInfo (PropagateDependencyKindToAccessors (_reason.Kind, DependencyKind.PropertyOfPropertyMethod), _method));
-				else if (_method.TryGetEvent (out EventDefinition? @event)) {
-					markStep.MarkEvent (@event, new DependencyInfo (PropagateDependencyKindToAccessors (_reason.Kind, DependencyKind.EventOfEventMethod), _method));
+				} else if (_method.TryGetProperty (out PropertyDefinition? property)) {
+					if (markStep.Annotations.MarkProcessed (property)) {
+						yield return new (context.GetPropertyDefinitionNode (property), nameof(DependencyKind.PropertyOfPropertyMethod));
+					}
+				} else if (_method.TryGetEvent (out EventDefinition? @event)) {
+					markStep.MarkEvent (@event, new DependencyInfo (DependencyKind.EventOfEventMethod, _method));
 				}
 
 				if (_method.HasMetadataParameters ()) {

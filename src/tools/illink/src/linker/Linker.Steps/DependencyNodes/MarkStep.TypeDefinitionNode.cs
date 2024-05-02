@@ -37,7 +37,18 @@ namespace Mono.Linker.Steps
 				var ScopeStack = context.MarkStep.ScopeStack;
 				var Context = context.MarkStep.Context;
 
+				MarkStep.Annotations.SetProcessed (type);
+
 				using var typeScope = ScopeStack.PushLocalScope (new MessageOrigin (type));
+
+				if (type.HasMethods) {
+					if (MarkStep.ShouldMarkTypeStaticConstructor (type)) {
+						MarkStep.MarkStaticConstructor (type, new DependencyInfo (DependencyKind.CctorForType, type), ScopeStack.CurrentScope.Origin);
+					}
+				}
+
+				if (type.Scope is ModuleDefinition module)
+					MarkStep.MarkModule (module, new DependencyInfo (DependencyKind.ScopeOfType, type));
 
 				foreach (Action<TypeDefinition> handleMarkType in MarkStep.MarkContext.MarkTypeActions)
 					handleMarkType (type);

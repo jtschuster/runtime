@@ -3,6 +3,8 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace Mono.Linker
 {
@@ -146,6 +148,107 @@ namespace Mono.Linker
 		DynamicallyAccessedMemberOnType = 88, // type with DynamicallyAccessedMembers annotations (including those inherited from base types and interfaces)
 
 		UnsafeAccessorTarget = 89, // the member is referenced via UnsafeAccessor attribute
+	}
+	public static class DependencyKindExtensions
+	{
+		/// <summary>
+		/// Replaces Enum.GetName with an implementation that doesn't allocate a new string for each call.
+		/// </summary>
+		public static string GetName (this DependencyKind kind) =>
+			kind switch {
+				DependencyKind.Custom => nameof (DependencyKind.Custom),
+				DependencyKind.Unspecified => nameof (DependencyKind.Unspecified),
+				DependencyKind.AssemblyAction => nameof (DependencyKind.AssemblyAction),
+				DependencyKind.RootAssembly => nameof (DependencyKind.RootAssembly),
+				DependencyKind.XmlDescriptor => nameof (DependencyKind.XmlDescriptor),
+				DependencyKind.AssemblyOrModuleAttribute => nameof (DependencyKind.AssemblyOrModuleAttribute),
+				DependencyKind.NestedType => nameof (DependencyKind.NestedType),
+				DependencyKind.MemberOfType => nameof (DependencyKind.MemberOfType),
+				DependencyKind.DeclaringType => nameof (DependencyKind.DeclaringType),
+				DependencyKind.FieldOnGenericInstance => nameof (DependencyKind.FieldOnGenericInstance),
+				DependencyKind.MethodOnGenericInstance => nameof (DependencyKind.MethodOnGenericInstance),
+				DependencyKind.BaseType => nameof (DependencyKind.BaseType),
+				DependencyKind.FieldType => nameof (DependencyKind.FieldType),
+				DependencyKind.ParameterType => nameof (DependencyKind.ParameterType),
+				DependencyKind.ReturnType => nameof (DependencyKind.ReturnType),
+				DependencyKind.VariableType => nameof (DependencyKind.VariableType),
+				DependencyKind.CatchType => nameof (DependencyKind.CatchType),
+				DependencyKind.BaseMethod => nameof (DependencyKind.BaseMethod),
+				DependencyKind.Override => nameof (DependencyKind.Override),
+				DependencyKind.MethodImplOverride => nameof (DependencyKind.MethodImplOverride),
+				DependencyKind.VirtualNeededDueToPreservedScope => nameof (DependencyKind.VirtualNeededDueToPreservedScope),
+				DependencyKind.MethodForInstantiatedType => nameof (DependencyKind.MethodForInstantiatedType),
+				DependencyKind.BaseDefaultCtorForStubbedMethod => nameof (DependencyKind.BaseDefaultCtorForStubbedMethod),
+				DependencyKind.GenericArgumentType => nameof (DependencyKind.GenericArgumentType),
+				DependencyKind.GenericParameterConstraintType => nameof (DependencyKind.GenericParameterConstraintType),
+				DependencyKind.DefaultCtorForNewConstrainedGenericArgument => nameof (DependencyKind.DefaultCtorForNewConstrainedGenericArgument),
+				DependencyKind.ElementType => nameof (DependencyKind.ElementType),
+				DependencyKind.ElementMethod => nameof (DependencyKind.ElementMethod),
+				DependencyKind.ModifierType => nameof (DependencyKind.ModifierType),
+				DependencyKind.ScopeOfType => nameof (DependencyKind.ScopeOfType),
+				DependencyKind.AssemblyOfModule => nameof (DependencyKind.AssemblyOfModule),
+				DependencyKind.TypeInAssembly => nameof (DependencyKind.TypeInAssembly),
+				DependencyKind.ModuleOfExportedType => nameof (DependencyKind.ModuleOfExportedType),
+				DependencyKind.ExportedType => nameof (DependencyKind.ExportedType),
+				DependencyKind.PropertyOfPropertyMethod => nameof (DependencyKind.PropertyOfPropertyMethod),
+				DependencyKind.EventOfEventMethod => nameof (DependencyKind.EventOfEventMethod),
+				DependencyKind.EventMethod => nameof (DependencyKind.EventMethod),
+				DependencyKind.InterfaceImplementationInterfaceType => nameof (DependencyKind.InterfaceImplementationInterfaceType),
+				DependencyKind.InterfaceImplementationOnType => nameof (DependencyKind.InterfaceImplementationOnType),
+				DependencyKind.ReturnTypeMarshalSpec => nameof (DependencyKind.ReturnTypeMarshalSpec),
+				DependencyKind.ParameterMarshalSpec => nameof (DependencyKind.ParameterMarshalSpec),
+				DependencyKind.FieldMarshalSpec => nameof (DependencyKind.FieldMarshalSpec),
+				DependencyKind.InteropMethodDependency => nameof (DependencyKind.InteropMethodDependency),
+				DependencyKind.DirectCall => nameof (DependencyKind.DirectCall),
+				DependencyKind.VirtualCall => nameof (DependencyKind.VirtualCall),
+				DependencyKind.Ldvirtftn => nameof (DependencyKind.Ldvirtftn),
+				DependencyKind.Ldftn => nameof (DependencyKind.Ldftn),
+				DependencyKind.Newobj => nameof (DependencyKind.Newobj),
+				DependencyKind.Ldtoken => nameof (DependencyKind.Ldtoken),
+				DependencyKind.FieldAccess => nameof (DependencyKind.FieldAccess),
+				DependencyKind.InstructionTypeRef => nameof (DependencyKind.InstructionTypeRef),
+				DependencyKind.CustomAttribute => nameof (DependencyKind.CustomAttribute),
+				DependencyKind.ParameterAttribute => nameof (DependencyKind.ParameterAttribute),
+				DependencyKind.ReturnTypeAttribute => nameof (DependencyKind.ReturnTypeAttribute),
+				DependencyKind.GenericParameterCustomAttribute => nameof (DependencyKind.GenericParameterCustomAttribute),
+				DependencyKind.GenericParameterConstraintCustomAttribute => nameof (DependencyKind.GenericParameterConstraintCustomAttribute),
+				DependencyKind.AttributeConstructor => nameof (DependencyKind.AttributeConstructor),
+				DependencyKind.AttributeType => nameof (DependencyKind.AttributeType),
+				DependencyKind.AttributeProperty => nameof (DependencyKind.AttributeProperty),
+				DependencyKind.CustomAttributeArgumentType => nameof (DependencyKind.CustomAttributeArgumentType),
+				DependencyKind.CustomAttributeArgumentValue => nameof (DependencyKind.CustomAttributeArgumentValue),
+				DependencyKind.CustomAttributeField => nameof (DependencyKind.CustomAttributeField),
+				DependencyKind.TriggersCctorThroughFieldAccess => nameof (DependencyKind.TriggersCctorThroughFieldAccess),
+				DependencyKind.TriggersCctorForCalledMethod => nameof (DependencyKind.TriggersCctorForCalledMethod),
+				DependencyKind.DeclaringTypeOfCalledMethod => nameof (DependencyKind.DeclaringTypeOfCalledMethod),
+				DependencyKind.CctorForType => nameof (DependencyKind.CctorForType),
+				DependencyKind.CctorForField => nameof (DependencyKind.CctorForField),
+				DependencyKind.InstantiatedByCtor => nameof (DependencyKind.InstantiatedByCtor),
+				DependencyKind.OverrideOnInstantiatedType => nameof (DependencyKind.OverrideOnInstantiatedType),
+				DependencyKind.PreservedDependency or DependencyKind.DynamicDependency => nameof (DependencyKind.DynamicDependency),
+				DependencyKind.AccessedViaReflection => nameof (DependencyKind.AccessedViaReflection),
+				DependencyKind.PreservedMethod => nameof (DependencyKind.PreservedMethod),
+				DependencyKind.TypePreserve => nameof (DependencyKind.TypePreserve),
+				DependencyKind.DisablePrivateReflection => nameof (DependencyKind.DisablePrivateReflection),
+				DependencyKind.DynamicallyAccessedMember => nameof (DependencyKind.DynamicallyAccessedMember),
+				DependencyKind.ReferencedBySpecialAttribute => nameof (DependencyKind.ReferencedBySpecialAttribute),
+				DependencyKind.KeptForSpecialAttribute => nameof (DependencyKind.KeptForSpecialAttribute),
+				DependencyKind.SerializationMethodForType => nameof (DependencyKind.SerializationMethodForType),
+				DependencyKind.EventSourceProviderField => nameof (DependencyKind.EventSourceProviderField),
+				DependencyKind.MethodForSpecialType => nameof (DependencyKind.MethodForSpecialType),
+				DependencyKind.UnreachableBodyRequirement => nameof (DependencyKind.UnreachableBodyRequirement),
+				DependencyKind.DisablePrivateReflectionRequirement => nameof (DependencyKind.DisablePrivateReflectionRequirement),
+				DependencyKind.DynamicInterfaceCastableImplementation => nameof (DependencyKind.DynamicInterfaceCastableImplementation),
+				DependencyKind.AlreadyMarked => nameof (DependencyKind.AlreadyMarked),
+				DependencyKind.DataContractSerialized => nameof (DependencyKind.DataContractSerialized),
+				DependencyKind.XmlSerialized => nameof (DependencyKind.XmlSerialized),
+				DependencyKind.SerializedRecursiveType => nameof (DependencyKind.SerializedRecursiveType),
+				DependencyKind.SerializedMember => nameof (DependencyKind.SerializedMember),
+				DependencyKind.PreservedOperator => nameof (DependencyKind.PreservedOperator),
+				DependencyKind.DynamicallyAccessedMemberOnType => nameof (DependencyKind.DynamicallyAccessedMemberOnType),
+				DependencyKind.UnsafeAccessorTarget => nameof (DependencyKind.UnsafeAccessorTarget),
+				_ => throw new InvalidOperationException ("Unknown DependencyKind value: " + kind)
+			};
 	}
 
 	public readonly struct DependencyInfo : IEquatable<DependencyInfo>
