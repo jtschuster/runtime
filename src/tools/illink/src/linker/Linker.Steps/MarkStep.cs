@@ -3175,8 +3175,6 @@ namespace Mono.Linker.Steps
 			return (method, reason);
 		}
 
-		internal void ProcessMethodNode (MethodDefinition method, in DependencyInfo reason) => ProcessMethod (method, reason);
-
 		protected virtual void ProcessMethod (MethodDefinition method, in DependencyInfo reason)
 		{
 #if DEBUG
