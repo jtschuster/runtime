@@ -958,22 +958,27 @@ namespace Mono.Linker.Tests.Cases.DataFlow
 			[RequiresUnreferencedCode("--AnnotatedType--")]
 			public class AnnotatedType
 			{
-				[ExpectedWarning("IL2112", nameof(AnnotatedType), "requires unreferenced code", "--AnnotatedType--")]
+				[ExpectedWarning("IL2112", [nameof(AnnotatedType), "requires unreferenced code", "--AnnotatedType--"], Tool.Trimmer | Tool.NativeAot, "https://github.com/dotnet/runtime/issues/102002")]
 				public AnnotatedType () { }
 			}
 
-			[ExpectedWarning("IL2114", nameof(MethodWithDataflow), nameof(DynamicallyAccessedMembersAttribute))]
+			[ExpectedWarning("IL2114", nameof(MethodWithDataflow), nameof(DynamicallyAccessedMembersAttribute), Tool.Trimmer | Tool.NativeAot, "https://github.com/dotnet/runtime/issues/102002")]
 			public void MethodWithDataflow ([DynamicallyAccessedMembers (DynamicallyAccessedMemberTypes.PublicMethods)] Type type) { }
 
 			[RequiresDynamicCode ("--MethodWithRequires--")]
 			[RequiresUnreferencedCode("--MethodWithRequires--")]
 			[RequiresAssemblyFiles("--MethodWithRequires--")]
-			[ExpectedWarning("IL2112", "requires unreferenced code", "--MethodWithRequires--")]
+			[ExpectedWarning("IL2112", "requires unreferenced code", "--MethodWithRequires--", Tool.Trimmer | Tool.NativeAot, "https://github.com/dotnet/runtime/issues/102002")]
 			public void MethodWithRequires () { }
 
 			public static void Test ()
 			{
-				new DamOnTypeAccessesMembers ().GetType ().RequiresAll();
+				var o = new DamOnTypeAccessesMembers ();
+				var t = o.GetType ();
+				t.RequiresAll();
+				t.ToString ();
+				// This triggers the warnings in the analyzer, but not Object.GetType() on DamOnTypeAccessesMembers
+				//typeof(DamOnTypeAccessesMembers).RequiresAll();
 			}
 		}
 
