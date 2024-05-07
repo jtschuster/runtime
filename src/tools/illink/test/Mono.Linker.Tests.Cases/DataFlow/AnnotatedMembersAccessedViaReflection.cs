@@ -30,6 +30,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
 			AnnotationOnGenerics.Test ();
 			AnnotationOnInteropMethod.Test ();
 			DelegateCreation.Test ();
+			DamOnTypeAccessesMembers.Test ();
 		}
 
 		class AnnotatedField
@@ -332,8 +333,8 @@ namespace Mono.Linker.Tests.Cases.DataFlow
 			[ExpectedWarning ("IL2111", nameof (MethodWithSingleAnnotatedParameter))]
 			[ExpectedWarning ("IL2111", nameof (IWithAnnotatedMethod.AnnotatedMethod))]
 			[ExpectedWarning ("IL2111", nameof (IWithAnnotatedMethod.AnnotatedMethod))]
-			[ExpectedWarning ("IL2118", nameof (LdftnOnLambdaTriggersLamdaAnalysis), Tool.Trimmer, "https://github.com/dotnet/runtime/issues/85042")]
-			[ExpectedWarning ("IL2118", nameof (LdftnOnLocalMethodTriggersLocalMethodAnalysis), Tool.Trimmer, "https://github.com/dotnet/runtime/issues/85042")]
+			[UnexpectedWarning ("IL2118", nameof (LdftnOnLambdaTriggersLamdaAnalysis), Tool.Trimmer, "https://github.com/dotnet/runtime/issues/85042")]
+			[UnexpectedWarning ("IL2118", nameof (LdftnOnLocalMethodTriggersLocalMethodAnalysis), Tool.Trimmer, "https://github.com/dotnet/runtime/issues/85042")]
 			static void DynamicallyAccessedMembersAll1 ()
 			{
 				typeof (AnnotatedMethodParameters).RequiresAll ();
@@ -346,8 +347,8 @@ namespace Mono.Linker.Tests.Cases.DataFlow
 			[ExpectedWarning ("IL2111", nameof (MethodWithSingleAnnotatedParameter))]
 			[ExpectedWarning ("IL2111", nameof (IWithAnnotatedMethod.AnnotatedMethod))]
 			[ExpectedWarning ("IL2111", nameof (IWithAnnotatedMethod.AnnotatedMethod))]
-			[ExpectedWarning ("IL2118", nameof (LdftnOnLambdaTriggersLamdaAnalysis), Tool.Trimmer, "https://github.com/dotnet/runtime/issues/85042")]
-			[ExpectedWarning ("IL2118", nameof (LdftnOnLocalMethodTriggersLocalMethodAnalysis), Tool.Trimmer, "https://github.com/dotnet/runtime/issues/85042")]
+			[UnexpectedWarning ("IL2118", nameof (LdftnOnLambdaTriggersLamdaAnalysis), Tool.Trimmer, "https://github.com/dotnet/runtime/issues/85042")]
+			[UnexpectedWarning ("IL2118", nameof (LdftnOnLocalMethodTriggersLocalMethodAnalysis), Tool.Trimmer, "https://github.com/dotnet/runtime/issues/85042")]
 			static void DynamicallyAccessedMembersAll2 ()
 			{
 				typeof (AnnotatedMethodParameters).RequiresAll ();
@@ -868,7 +869,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
 			static extern ValueWithAnnotatedField GetValueWithAnnotatedField ();
 
 			// Analyzer doesn't take into account interop attributes
-			[ExpectedWarning ("IL2110", nameof (ValueWithAnnotatedField._typeField),  Tool.Trimmer, "https://github.com/dotnet/linker/issues/2562")]
+			[ExpectedWarning ("IL2110", nameof (ValueWithAnnotatedField._typeField), Tool.Trimmer, "https://github.com/dotnet/linker/issues/2562")]
 			[DllImport ("nonexistent")]
 			static extern void AcceptValueWithAnnotatedField (ValueWithAnnotatedField value);
 
@@ -945,6 +946,34 @@ namespace Mono.Linker.Tests.Cases.DataFlow
 				TestLocalMethod ();
 				TestMethodReturnValue ();
 				TestEvent ();
+			}
+		}
+
+		[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.All)]
+		public class DamOnTypeAccessesMembers
+		{
+			public DamOnTypeAccessesMembers() { }
+
+			[RequiresDynamicCode ("--AnnotatedType--")]
+			[RequiresUnreferencedCode("--AnnotatedType--")]
+			public class AnnotatedType
+			{
+				[ExpectedWarning("IL2112", nameof(AnnotatedType), "requires unreferenced code", "--AnnotatedType--")]
+				public AnnotatedType () { }
+			}
+
+			[ExpectedWarning("IL2114", nameof(MethodWithDataflow), nameof(DynamicallyAccessedMembersAttribute))]
+			public void MethodWithDataflow ([DynamicallyAccessedMembers (DynamicallyAccessedMemberTypes.PublicMethods)] Type type) { }
+
+			[RequiresDynamicCode ("--MethodWithRequires--")]
+			[RequiresUnreferencedCode("--MethodWithRequires--")]
+			[RequiresAssemblyFiles("--MethodWithRequires--")]
+			[ExpectedWarning("IL2112", "requires unreferenced code", "--MethodWithRequires--")]
+			public void MethodWithRequires () { }
+
+			public static void Test ()
+			{
+				new DamOnTypeAccessesMembers ().GetType ().RequiresAll();
 			}
 		}
 
