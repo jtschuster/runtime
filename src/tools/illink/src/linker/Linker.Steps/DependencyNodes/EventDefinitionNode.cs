@@ -12,7 +12,7 @@ namespace Mono.Linker.Steps
 		internal sealed class EventDefinitionNode : DependencyNodeCore<NodeFactory>
 		{
 			EventDefinition _event;
-			public EventDefinitionNode(EventDefinition @event) => _event = @event;
+			public EventDefinitionNode (EventDefinition @event) => _event = @event;
 
 			public override bool InterestingForDynamicDependencyAnalysis => false;
 
@@ -24,15 +24,17 @@ namespace Mono.Linker.Steps
 
 			public override IEnumerable<CombinedDependencyListEntry>? GetConditionalStaticDependencies (NodeFactory context) => null;
 
-			public override IEnumerable<DependencyListEntry> GetStaticDependencies (NodeFactory context)
+			public override IEnumerable<DependencyListEntry>? GetStaticDependencies (NodeFactory context)
 			{
-				context.MarkStep.ProcessEvent (_event);
-				yield break;
+				var eventOrigin = new MessageOrigin (_event);
+				context.MarkStep.MarkCustomAttributes (_event, new DependencyInfo (DependencyKind.CustomAttribute, _event), eventOrigin);
+				context.MarkStep.DoAdditionalEventProcessing (_event);
+				return null;
 			}
 
 			public override IEnumerable<CombinedDependencyListEntry>? SearchDynamicDependencies (List<DependencyNodeCore<NodeFactory>> markedNodes, int firstNode, NodeFactory context) => null;
 
-			protected override string GetName (NodeFactory context) => _event.GetDisplayName();
+			protected override string GetName (NodeFactory context) => _event.GetDisplayName ();
 		}
 	}
 }

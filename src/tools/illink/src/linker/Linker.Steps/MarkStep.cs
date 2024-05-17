@@ -3515,13 +3515,6 @@ namespace Mono.Linker.Steps
 			_dependencyGraph.AddRoot(_nodeFactory.GetEventDefinitionNode (evt), Enum.GetName (reason.Kind));
 		}
 
-		internal void ProcessEvent(EventDefinition evt)
-		{
-			var eventOrigin = new MessageOrigin (evt);
-			MarkCustomAttributes (evt, new DependencyInfo (DependencyKind.CustomAttribute, evt), eventOrigin);
-			DoAdditionalEventProcessing (evt);
-		}
-
 		internal void MarkMethodIfNotNull (MethodReference method, in DependencyInfo reason, in MessageOrigin origin)
 		{
 			if (method == null)
