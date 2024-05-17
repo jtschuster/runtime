@@ -9,7 +9,7 @@ namespace Mono.Linker.Steps
 {
 	public partial class MarkStep
 	{
-		internal class EventDefinitionNode : DependencyNodeCore<NodeFactory>
+		internal sealed class EventDefinitionNode : DependencyNodeCore<NodeFactory>
 		{
 			EventDefinition _event;
 			public EventDefinitionNode(EventDefinition @event) => _event = @event;

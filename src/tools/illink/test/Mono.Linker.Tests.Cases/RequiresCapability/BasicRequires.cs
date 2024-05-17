@@ -167,6 +167,24 @@ namespace Mono.Linker.Tests.Cases.RequiresCapability
 				EventToTestRemove -= (sender, e) => { };
 				EventToTestAdd += (sender, e) => { };
 				var evt = AnnotatedEvent;
+				Test2 ();
+			}
+
+			static event EventHandler AddCalledRemoveKept {
+				[UnexpectedWarning ("IL2026", "--AddCalledRemoveKept.remove--", Tool.Trimmer, "")]
+				add { }
+				[RequiresUnreferencedCode ("Message for --AddCalledRemoveKept.remove--")]
+				[RequiresAssemblyFiles ("Message for --AddCalledRemoveKept.remove--")]
+				[RequiresDynamicCode ("Message for --AddCalledRemoveKept.remove--")]
+				remove { }
+			}
+
+			[ExpectedWarning ("IL2026", "--AddCalledRemoveKept.remove--", Tool.Analyzer | Tool.NativeAot, "")]
+			[ExpectedWarning ("IL3002", "--AddCalledRemoveKept.remove--", Tool.Analyzer | Tool.NativeAot, "")]
+			[ExpectedWarning ("IL3050", "--AddCalledRemoveKept.remove--", Tool.Analyzer | Tool.NativeAot, "")]
+			static void Test2()
+			{
+				AddCalledRemoveKept += (sender, e) => { };
 			}
 		}
 

@@ -16,7 +16,7 @@ namespace Mono.Linker.Steps
 			public MarkStep MarkStep { get; } = markStep;
 			readonly NodeCache<TypeDefinition, TypeDefinitionNode> _typeNodes = new (static t => new TypeDefinitionNode(t));
 			readonly NodeCache<MethodDefinition, MethodDefinitionNode> _methodNodes = new (static _ => throw new InvalidOperationException ("Creation of node requires more than the key."));
-			readonly NodeCache<EventDefinition, EventDefinitionNode> _eventNodes = new (static _ => throw new InvalidOperationException ("Creation of node requires more than the key."));
+			readonly NodeCache<EventDefinition, EventDefinitionNode> _eventNodes = new (static e => new EventDefinitionNode (e));
 			readonly NodeCache<TypeDefinition, TypeIsRelevantToVariantCastingNode> _typeIsRelevantToVariantCastingNodes = new (static (t) => new TypeIsRelevantToVariantCastingNode (t));
 
 			internal TypeDefinitionNode GetTypeNode (TypeDefinition definition)
