@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Mono.Cecil;
@@ -29,26 +28,26 @@ namespace Mono.Linker
 			Implementor = implementor;
 			InterfaceImplementation = interfaceImplementation;
 			InterfaceType = interfaceType;
-			Debug.Assert(resolver.Resolve (interfaceImplementation.InterfaceType) == interfaceType);
+			Debug.Assert (resolver.Resolve (interfaceImplementation.InterfaceType) == interfaceType);
 		}
 
-		public static InterfaceImplementor Create(TypeDefinition implementor, TypeDefinition interfaceType, IMetadataResolver resolver)
+		public static InterfaceImplementor Create (TypeDefinition implementor, TypeDefinition interfaceType, IMetadataResolver resolver)
 		{
-			foreach(InterfaceImplementation iface in implementor.Interfaces) {
-				if (resolver.Resolve(iface.InterfaceType) == interfaceType) {
-					return new InterfaceImplementor(implementor, iface, interfaceType, resolver);
+			foreach (InterfaceImplementation iface in implementor.Interfaces) {
+				if (resolver.Resolve (iface.InterfaceType) == interfaceType) {
+					return new InterfaceImplementor (implementor, iface, interfaceType, resolver);
 				}
 			}
 
 			Queue<TypeDefinition> ifacesToCheck = new ();
-			ifacesToCheck.Enqueue(implementor);
+			ifacesToCheck.Enqueue (implementor);
 			while (ifacesToCheck.Count > 0) {
 				var currentIface = ifacesToCheck.Dequeue ();
 
-				foreach(InterfaceImplementation ifaceImpl in currentIface.Interfaces) {
+				foreach (InterfaceImplementation ifaceImpl in currentIface.Interfaces) {
 					var iface = resolver.Resolve (ifaceImpl.InterfaceType);
 					if (iface == interfaceType) {
-						return new InterfaceImplementor(implementor, ifaceImpl, interfaceType, resolver);
+						return new InterfaceImplementor (implementor, ifaceImpl, interfaceType, resolver);
 					}
 					ifacesToCheck.Enqueue (iface);
 				}

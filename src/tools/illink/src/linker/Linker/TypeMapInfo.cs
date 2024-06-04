@@ -29,7 +29,6 @@
 // WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 //
 
-using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -112,7 +111,7 @@ namespace Mono.Linker
 
 		public void AddDefaultInterfaceImplementation (MethodDefinition @base, InterfaceImplementor interfaceImplementor, MethodDefinition defaultImplementationMethod)
 		{
-			Debug.Assert(@base.DeclaringType.IsInterface);
+			Debug.Assert (@base.DeclaringType.IsInterface);
 			default_interface_implementations.AddToList (@base, new OverrideInformation (@base, defaultImplementationMethod, interfaceImplementor));
 		}
 
@@ -132,7 +131,7 @@ namespace Mono.Linker
 
 		internal List<(TypeReference InterfaceType, List<InterfaceImplementation> ImplementationChain)>? GetRecursiveInterfaces (TypeDefinition type)
 		{
-			EnsureProcessed(type.Module.Assembly);
+			EnsureProcessed (type.Module.Assembly);
 			if (interfaces.TryGetValue (type, out var value))
 				return value;
 			return null;
@@ -245,7 +244,7 @@ namespace Mono.Linker
 			if (@base == null)
 				return;
 
-			Debug.Assert(!@base.DeclaringType.IsInterface);
+			Debug.Assert (!@base.DeclaringType.IsInterface);
 
 			AnnotateMethods (@base, method);
 		}
@@ -333,6 +332,9 @@ namespace Mono.Linker
 		{
 			// Go over all interfaces, trying to find a method that is an explicit MethodImpl of the
 			// interface method in question.
+			if (typeThatImplementsInterface.Name == "MyClass") {
+				;
+			}
 
 			foreach (var interfaceImpl in typeThatMayHaveDIM.Interfaces) {
 				var potentialImplInterface = context.TryResolve (interfaceImpl.InterfaceType);
