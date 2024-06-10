@@ -39,7 +39,7 @@ namespace Mono.Linker.Tests.Cases.Inheritance.Interfaces.RecursiveInterfaces
 		public static void Main ()
 		{
 #if IL_ASSEMBLY_AVAILABLE
-			UseIBase<char, double, float> (new MyClass ());
+			UseIBase<char, double, float> (new MyDerivedClass ());
 		}
 
 		[Kept]
@@ -87,5 +87,8 @@ namespace Mono.Linker.Tests.Cases.Inheritance.Interfaces.RecursiveInterfaces
 		//	char IBase<char, double, int>.GetT () => throw new NotImplementedException ();
 		//	char IBase<char, double, float>.GetT () => throw new NotImplementedException ();
 		//}
+
+		//public class MyDerivedClass : MyClass
+		//{ }
 	}
 }

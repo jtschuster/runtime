@@ -35,9 +35,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
-using System.Reflection.Metadata.Ecma335;
 using System.Reflection.Runtime.TypeParsing;
-using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using ILCompiler.DependencyAnalysisFramework;
 using ILLink.Shared;
@@ -717,49 +715,35 @@ namespace Mono.Linker.Steps
 		/// Returns true if <paramref name="type"/> implements <paramref name="interfaceType"/> and the interface implementation is marked,
 		/// or if any marked interface implementations on <paramref name="type"/> are interfaces that implement <paramref name="interfaceType"/> and that interface implementation is marked
 		/// </summary>
-		bool IsInterfaceImplementationMarkedRecursively (TypeDefinition type, TypeDefinition interfaceType)
+		internal bool IsInterfaceImplementationMarkedRecursively (TypeDefinition type, TypeDefinition interfaceType)
 		{
 			if (type.HasInterfaces) {
 				foreach (var intf in type.Interfaces) {
 					TypeDefinition? resolvedInterface = Context.Resolve (intf.InterfaceType);
 					if (resolvedInterface == null)
 						continue;
-
-					if (Annotations.IsMarked (intf) && RequiresInterfaceRecursively (resolvedInterface, interfaceType))
-						return true;
-				}
-			}
-
-			return false;
-		}
-
-		bool RequiresInterfaceRecursively (TypeDefinition typeToExamine, TypeDefinition interfaceType)
-		{
-			if (typeToExamine == interfaceType)
-				return true;
-
-			if (typeToExamine.HasInterfaces) {
-				foreach (var iface in typeToExamine.Interfaces) {
-					var resolved = Context.TryResolve (iface.InterfaceType);
-					if (resolved == null)
+					if (!Context.Annotations.IsMarked (intf))
 						continue;
 
-					if (RequiresInterfaceRecursively (resolved, interfaceType))
+					if (resolvedInterface == interfaceType)
+						return true;
+					if (IsInterfaceImplementationMarkedRecursively (resolvedInterface, interfaceType))
 						return true;
 				}
 			}
-
+			if (type.BaseType is not null && Context.Resolve (type.BaseType) is { } baseType)
+				return IsInterfaceImplementationMarkedRecursively (baseType, interfaceType);
 			return false;
 		}
 
 		void ProcessDefaultImplementation (OverrideInformation ov, MessageOrigin origin)
 		{
 			Debug.Assert (ov.IsOverrideOfInterfaceMember);
-			if ((!ov.Override.IsStatic && !Annotations.IsInstantiated (ov.InterfaceImplementor.Implementor))
-				|| ov.Override.IsStatic && !Annotations.IsRelevantToVariantCasting (ov.InterfaceImplementor.Implementor))
+			if ((!ov.Override.IsStatic && !Annotations.IsInstantiated (ov.RuntimeInterfaceImplementation.Implementor))
+				|| ov.Override.IsStatic && !Annotations.IsRelevantToVariantCasting (ov.RuntimeInterfaceImplementation.Implementor))
 				return;
 
-			MarkInterfaceImplementation (ov.InterfaceImplementor.InterfaceImplementation, origin);
+			MarkRuntimeInterfaceImplementation (ov.RuntimeInterfaceImplementation, origin);
 		}
 
 		void MarkMarshalSpec (IMarshalInfoProvider spec, in DependencyInfo reason, MessageOrigin origin)
@@ -2408,35 +2392,38 @@ namespace Mono.Linker.Steps
 
 		void MarkInterfaceImplementations (TypeDefinition type)
 		{
-			var ifaces = Annotations.GetRecursiveInterfaces (type);
+			var ifaces = Annotations.GetRuntimeInterfaces (type);
 			if (ifaces is null)
 				return;
-			foreach (var (ifaceType, impls) in ifaces) {
+			foreach (var runtimeInterface in ifaces) {
 				// Only mark interface implementations of interface types that have been marked.
 				// This enables stripping of interfaces that are never used
-				if (ShouldMarkInterfaceImplementationList (type, impls, ifaceType))
-					MarkInterfaceImplementationList (impls, new MessageOrigin (type));
+				if (ShouldMarkRuntimeInterfaceImplementation (runtimeInterface))
+					MarkRuntimeInterfaceImplementation (runtimeInterface, new MessageOrigin (type));
 			}
 		}
 
 
-		protected virtual bool ShouldMarkInterfaceImplementationList (TypeDefinition type, List<InterfaceImplementation> ifaces, TypeReference ifaceType)
+		protected virtual bool ShouldMarkRuntimeInterfaceImplementation (RuntimeInterfaceImplementation runtimeInterfaceImplementation)
 		{
+			var type = runtimeInterfaceImplementation.Implementor;
+			var ifaces = runtimeInterfaceImplementation.InterfaceImplementation;
+			var ifaceType = runtimeInterfaceImplementation.InterfaceTypeDefinition;
 			if (ifaces.All (Annotations.IsMarked))
 				return false;
 
 			if (!Context.IsOptimizationEnabled (CodeOptimizations.UnusedInterfaces, type))
 				return true;
 
-			if (Context.Resolve (ifaceType) is not TypeDefinition resolvedInterfaceType)
+			if (ifaceType is null)
 				return false;
 
-			if (Annotations.IsMarked (resolvedInterfaceType))
+			if (Annotations.IsMarked (ifaceType))
 				return true;
 
 			// It's hard to know if a com or windows runtime interface will be needed from managed code alone,
 			// so as a precaution we will mark these interfaces once the type is instantiated
-			if (Context.KeepComInterfaces && (resolvedInterfaceType.IsImport || resolvedInterfaceType.IsWindowsRuntime))
+			if (Context.KeepComInterfaces && (ifaceType.IsImport || ifaceType.IsWindowsRuntime))
 				return true;
 
 			return IsFullyPreserved (type);
@@ -2521,9 +2508,8 @@ namespace Mono.Linker.Steps
 
 			// If the interface implementation is not marked, do not mark the implementation method
 			// A type that doesn't implement the interface isn't required to have methods that implement the interface.
-			InterfaceImplementation? iface = overrideInformation.InterfaceImplementor.InterfaceImplementation;
-			if (!((iface is not null && Annotations.IsMarked (iface))
-				|| IsInterfaceImplementationMarkedRecursively (method.DeclaringType, @base.DeclaringType)))
+			// We must check all possible ways the interface could be implemented by the type (through all recursive interface implementations, not just the primary one)
+			if (!(IsInterfaceImplementationMarkedRecursively (overrideInformation.RuntimeInterfaceImplementation.Implementor, @base.DeclaringType)))
 				return false;
 
 			// If the interface method is not marked and the interface doesn't come from a preserved scope, do not mark the implementation method
@@ -2539,12 +2525,12 @@ namespace Mono.Linker.Steps
 			// If the method is static and the implementing type is relevant to variant casting, mark the implementation method.
 			// A static method may only be called through a constrained call if the type is relevant to variant casting.
 			if (@base.IsStatic)
-				return Annotations.IsRelevantToVariantCasting (overrideInformation.InterfaceImplementor.Implementor)
+				return Annotations.IsRelevantToVariantCasting (overrideInformation.RuntimeInterfaceImplementation.Implementor)
 					|| IgnoreScope (@base.DeclaringType.Scope);
 
 			// If the implementing type is marked as instantiated, mark the implementation method.
 			// If the type is not instantiated, do not mark the implementation method
-			return Annotations.IsInstantiated (overrideInformation.InterfaceImplementor.Implementor);
+			return Annotations.IsInstantiated (overrideInformation.RuntimeInterfaceImplementation.Implementor);
 		}
 
 		static bool IsSpecialSerializationConstructor (MethodDefinition method)
@@ -3760,9 +3746,9 @@ namespace Mono.Linker.Steps
 			}
 		}
 
-		void MarkInterfaceImplementationList (List<InterfaceImplementation> ifaces, MessageOrigin origin, DependencyInfo? reason = null)
+		void MarkRuntimeInterfaceImplementation (RuntimeInterfaceImplementation runtimeInterface, MessageOrigin origin, DependencyInfo? reason = null)
 		{
-			foreach (var iface in ifaces) {
+			foreach (var iface in runtimeInterface.InterfaceImplementation) {
 				MarkInterfaceImplementation (iface, origin, reason);
 			}
 		}

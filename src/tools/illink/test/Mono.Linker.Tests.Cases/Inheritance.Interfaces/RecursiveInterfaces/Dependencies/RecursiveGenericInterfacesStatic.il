@@ -21,12 +21,12 @@
         )
     // Methods
     .method public hidebysig newslot abstract virtual 
-        instance !T GetT () cil managed 
+        static !T GetT () cil managed 
     {
     } // end of method IBase`3::GetT
 
     .method public hidebysig newslot virtual 
-        instance !U GetU () cil managed 
+        static !U GetU () cil managed 
     {
         // Method begins at RVA 0x2050
         // Code size 10 (0xa)
@@ -42,7 +42,7 @@
     } // end of method IBase`3::GetU
 
     .method public hidebysig newslot virtual 
-        instance !V GetV () cil managed 
+        static !V GetV () cil managed 
     {
         // Method begins at RVA 0x2068
         // Code size 10 (0xa)
@@ -67,10 +67,10 @@
         01 00 02 00 00
     )
     // Methods
-    .method private  hidebysig virtual 
-        instance int32 'IBase<T,U,System.Int32>.GetV' () cil managed 
+    .method private hidebysig
+        static int32 'IBase<T,U,System.Int32>.GetV' () cil managed 
     {
-        .override method instance !2 class IBase`3<!T, !U, int32>::GetV()
+        .override method !2 class IBase`3<!T, !U, int32>::GetV()
         // Method begins at RVA 0x207e
         // Code size 2 (0x2)
         .maxstack 8
@@ -79,10 +79,10 @@
         IL_0001: throw
     } // end of method IMiddle`2::'IBase<T,U,System.Int32>.GetV'
 
-    .method private  hidebysig virtual 
-        instance float32 'IBase<T,U,System.Single>.GetV' () cil managed 
+    .method private hidebysig
+        static float32 'IBase<T,U,System.Single>.GetV' () cil managed 
     {
-        .override method instance !2 class IBase`3<!T, !U, float32>::GetV()
+        .override method !2 class IBase`3<!T, !U, float32>::GetV()
         // Method begins at RVA 0x207e
         // Code size 2 (0x2)
         .maxstack 8
@@ -101,10 +101,10 @@
         01 00 02 00 00
     )
     // Methods
-    .method private  hidebysig virtual 
-        instance int32 'IBase<T,System.Int64,System.Int32>.GetV' () cil managed 
+    .method private hidebysig
+        static int32 'IBase<T,System.Int64,System.Int32>.GetV' () cil managed 
     {
-        .override method instance !2 class IBase`3<!T, int64, int32>::GetV()
+        .override method !2 class IBase`3<!T, int64, int32>::GetV()
         // Method begins at RVA 0x207e
         // Code size 2 (0x2)
         .maxstack 8
@@ -113,10 +113,10 @@
         IL_0001: throw
     } // end of method IDerived`1::'IBase<T,System.Int64,System.Int32>.GetV'
 
-    .method private  hidebysig virtual 
-        instance float32 'IBase<T,System.Int64,System.Single>.GetV' () cil managed 
+    .method private hidebysig
+        static float32 'IBase<T,System.Int64,System.Single>.GetV' () cil managed 
     {
-        .override method instance !2 class IBase`3<!T, int64, float32>::GetV()
+        .override method !2 class IBase`3<!T, int64, float32>::GetV()
         // Method begins at RVA 0x207e
         // Code size 2 (0x2)
         .maxstack 8
@@ -125,10 +125,10 @@
         IL_0001: throw
     } // end of method IDerived`1::'IBase<T,System.Int64,System.Single>.GetV'
 
-    .method private  hidebysig virtual 
-        instance int64 'IBase<T,System.Int64,System.Int32>.GetU' () cil managed 
+    .method private hidebysig
+        static int64 'IBase<T,System.Int64,System.Int32>.GetU' () cil managed 
     {
-        .override method instance !1 class IBase`3<!T, int64, int32>::GetU()
+        .override method !1 class IBase`3<!T, int64, int32>::GetU()
         // Method begins at RVA 0x207e
         // Code size 2 (0x2)
         .maxstack 8
@@ -137,10 +137,10 @@
         IL_0001: throw
     } // end of method IDerived`1::'IBase<T,System.Int64,System.Int32>.GetU'
 
-    .method private  hidebysig virtual 
-        instance int64 'IBase<T,System.Int64,System.Single>.GetU' () cil managed 
+    .method private hidebysig
+        static int64 'IBase<T,System.Int64,System.Single>.GetU' () cil managed 
     {
-        .override method instance !1 class IBase`3<!T, int64, float32>::GetU()
+        .override method !1 class IBase`3<!T, int64, float32>::GetU()
         // Method begins at RVA 0x207e
         // Code size 2 (0x2)
         .maxstack 8
@@ -149,10 +149,10 @@
         IL_0001: throw
     } // end of method IDerived`1::'IBase<T,System.Int64,System.Single>.GetU'
 
-    .method private  hidebysig virtual 
-        instance float64 'IBase<T,System.Double,System.Int32>.GetU' () cil managed 
+    .method private hidebysig
+        static float64 'IBase<T,System.Double,System.Int32>.GetU' () cil managed 
     {
-        .override method instance !1 class IBase`3<!T, float64, int32>::GetU()
+        .override method !1 class IBase`3<!T, float64, int32>::GetU()
         // Method begins at RVA 0x207e
         // Code size 2 (0x2)
         .maxstack 8
@@ -161,10 +161,10 @@
         IL_0001: throw
     } // end of method IDerived`1::'IBase<T,System.Double,System.Int32>.GetU'
 
-    .method private  hidebysig virtual 
-        instance float64 'IBase<T,System.Double,System.Single>.GetU' () cil managed 
+    .method private hidebysig
+        static float64 'IBase<T,System.Double,System.Single>.GetU' () cil managed 
     {
-        .override method instance !1 class IBase`3<!T, float64, float32>::GetU()
+        .override method !1 class IBase`3<!T, float64, float32>::GetU()
         // Method begins at RVA 0x207e
         // Code size 2 (0x2)
         .maxstack 8
@@ -181,13 +181,13 @@
                class IDerived`1<char>
 {
     // Methods
-    .method private  hidebysig newslot virtual 
-        instance string 'IBase<System.String,System.Int64,System.Single>.GetT' () cil managed 
+    .method private hidebysig newslot
+        static string 'IBase<System.String,System.Int64,System.Single>.GetT' () cil managed 
     {
         .custom instance void [mscorlib]System.Runtime.CompilerServices.NullableContextAttribute::.ctor(uint8) = (
             01 00 01 00 00
         )
-        .override method instance !0 class IBase`3<string, int64, float32>::GetT()
+        .override method !0 class IBase`3<string, int64, float32>::GetT()
         // Method begins at RVA 0x207e
         // Code size 2 (0x2)
         .maxstack 8
@@ -196,13 +196,13 @@
         IL_0001: throw
     } // end of method MyClass::'IBase<System.String,System.Int64,System.Single>.GetT'
 
-    .method private  hidebysig newslot virtual 
-        instance string 'IBase<System.String,System.Double,System.Int32>.GetT' () cil managed 
+    .method private  hidebysig newslot
+        static string 'IBase<System.String,System.Double,System.Int32>.GetT' () cil managed 
     {
         .custom instance void [mscorlib]System.Runtime.CompilerServices.NullableContextAttribute::.ctor(uint8) = (
             01 00 01 00 00
         )
-        .override method instance !0 class IBase`3<string, float64, int32>::GetT()
+        .override method !0 class IBase`3<string, float64, int32>::GetT()
         // Method begins at RVA 0x207e
         // Code size 2 (0x2)
         .maxstack 8
@@ -211,13 +211,13 @@
         IL_0001: throw
     } // end of method MyClass::'IBase<System.String,System.Double,System.Int32>.GetT'
 
-    .method private  hidebysig newslot virtual 
-        instance string 'IBase<System.String,System.Double,System.Single>.GetT' () cil managed 
+    .method private hidebysig newslot
+        static string 'IBase<System.String,System.Double,System.Single>.GetT' () cil managed 
     {
         .custom instance void [mscorlib]System.Runtime.CompilerServices.NullableContextAttribute::.ctor(uint8) = (
             01 00 01 00 00
         )
-        .override method instance !0 class IBase`3<string, float64, float32>::GetT()
+        .override method !0 class IBase`3<string, float64, float32>::GetT()
         // Method begins at RVA 0x207e
         // Code size 2 (0x2)
         .maxstack 8
@@ -226,13 +226,13 @@
         IL_0001: throw
     } // end of method MyClass::'IBase<System.String,System.Double,System.Single>.GetT'
 
-    .method private  hidebysig newslot virtual 
-        instance string 'IBase<System.String,System.Int64,System.Int32>.GetT' () cil managed 
+    .method private hidebysig newslot
+        static string 'IBase<System.String,System.Int64,System.Int32>.GetT' () cil managed 
     {
         .custom instance void [mscorlib]System.Runtime.CompilerServices.NullableContextAttribute::.ctor(uint8) = (
             01 00 01 00 00
         )
-        .override method instance !0 class IBase`3<string, int64, int32>::GetT()
+        .override method !0 class IBase`3<string, int64, int32>::GetT()
         // Method begins at RVA 0x207e
         // Code size 2 (0x2)
         .maxstack 8
@@ -241,10 +241,10 @@
         IL_0001: throw
     } // end of method MyClass::'IBase<System.String,System.Int64,System.Int32>.GetT'
 
-    .method private  hidebysig newslot virtual 
-        instance char 'IBase<System.Char,System.Int64,System.Int32>.GetT' () cil managed 
+    .method private hidebysig newslot
+        static char 'IBase<System.Char,System.Int64,System.Int32>.GetT' () cil managed 
     {
-        .override method instance !0 class IBase`3<char, int64, int32>::GetT()
+        .override method !0 class IBase`3<char, int64, int32>::GetT()
         // Method begins at RVA 0x207e
         // Code size 2 (0x2)
         .maxstack 8
@@ -253,10 +253,10 @@
         IL_0001: throw
     } // end of method MyClass::'IBase<System.Char,System.Int64,System.Int32>.GetT'
 
-    .method private  hidebysig newslot virtual 
-        instance char 'IBase<System.Char,System.Int64,System.Single>.GetT' () cil managed 
+    .method private hidebysig newslot
+        static char 'IBase<System.Char,System.Int64,System.Single>.GetT' () cil managed 
     {
-        .override method instance !0 class IBase`3<char, int64, float32>::GetT()
+        .override method !0 class IBase`3<char, int64, float32>::GetT()
         // Method begins at RVA 0x207e
         // Code size 2 (0x2)
         .maxstack 8
@@ -265,10 +265,10 @@
         IL_0001: throw
     } // end of method MyClass::'IBase<System.Char,System.Int64,System.Single>.GetT'
 
-    .method private  hidebysig newslot virtual 
-        instance char 'IBase<System.Char,System.Double,System.Int32>.GetT' () cil managed 
+    .method private hidebysig newslot
+        static char 'IBase<System.Char,System.Double,System.Int32>.GetT' () cil managed 
     {
-        .override method instance !0 class IBase`3<char, float64, int32>::GetT()
+        .override method !0 class IBase`3<char, float64, int32>::GetT()
         // Method begins at RVA 0x207e
         // Code size 2 (0x2)
         .maxstack 8
@@ -277,10 +277,10 @@
         IL_0001: throw
     } // end of method MyClass::'IBase<System.Char,System.Double,System.Int32>.GetT'
 
-    .method private  hidebysig newslot virtual 
-        instance char 'IBase<System.Char,System.Double,System.Single>.GetT' () cil managed 
+    .method private hidebysig newslot
+        static char 'IBase<System.Char,System.Double,System.Single>.GetT' () cil managed 
     {
-        .override method instance !0 class IBase`3<char, float64, float32>::GetT()
+        .override method !0 class IBase`3<char, float64, float32>::GetT()
         // Method begins at RVA 0x207e
         // Code size 2 (0x2)
         .maxstack 8
