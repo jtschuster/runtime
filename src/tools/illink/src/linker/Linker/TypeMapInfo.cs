@@ -42,7 +42,10 @@ namespace Mono.Linker
 	public class TypeMapInfo
 	{
 		readonly HashSet<AssemblyDefinition> assemblies = new HashSet<AssemblyDefinition> ();
-		readonly LinkContext context;
+		readonly IMetadataResolver context;
+
+		ITryResolveMetadata _tryResolveMetadata => (ITryResolveMetadata) context;
+
 		protected readonly Dictionary<MethodDefinition, List<OverrideInformation>> base_methods = new Dictionary<MethodDefinition, List<OverrideInformation>> ();
 		protected readonly Dictionary<MethodDefinition, List<OverrideInformation>> override_methods = new Dictionary<MethodDefinition, List<OverrideInformation>> ();
 		protected readonly Dictionary<MethodDefinition, List<OverrideInformation>> default_interface_implementations = new Dictionary<MethodDefinition, List<OverrideInformation>> ();
@@ -50,6 +53,12 @@ namespace Mono.Linker
 		public TypeMapInfo (LinkContext context)
 		{
 			this.context = context;
+		}
+
+		internal TypeMapInfo (IMetadataResolver resolver)
+		{
+			Debug.Assert (resolver is ITryResolveMetadata);
+			context = resolver;
 		}
 
 		public void EnsureProcessed (AssemblyDefinition assembly)
@@ -112,7 +121,7 @@ namespace Mono.Linker
 
 		public void AddDefaultInterfaceImplementation (MethodDefinition @base, InterfaceImplementor interfaceImplementor, MethodDefinition defaultImplementationMethod)
 		{
-			Debug.Assert(@base.DeclaringType.IsInterface);
+			Debug.Assert (@base.DeclaringType.IsInterface);
 			default_interface_implementations.AddToList (@base, new OverrideInformation (@base, defaultImplementationMethod, interfaceImplementor));
 		}
 
@@ -132,7 +141,7 @@ namespace Mono.Linker
 
 		internal List<(TypeReference InterfaceType, List<InterfaceImplementation> ImplementationChain)>? GetRecursiveInterfaces (TypeDefinition type)
 		{
-			EnsureProcessed(type.Module.Assembly);
+			EnsureProcessed (type.Module.Assembly);
 			if (interfaces.TryGetValue (type, out var value))
 				return value;
 			return null;
@@ -142,12 +151,12 @@ namespace Mono.Linker
 		{
 			List<(TypeReference, List<InterfaceImplementation>)> firstImplementationChain = new ();
 
-			AddRecursiveInterfaces (type, [], firstImplementationChain, context);
+			AddRecursiveInterfaces (type, [], firstImplementationChain, _tryResolveMetadata);
 			Debug.Assert (firstImplementationChain.All (kvp => context.Resolve (kvp.Item1) == context.Resolve (kvp.Item2.Last ().InterfaceType)));
 
 			return firstImplementationChain;
 
-			static void AddRecursiveInterfaces (TypeReference typeRef, IEnumerable<InterfaceImplementation> pathToType, List<(TypeReference, List<InterfaceImplementation>)> firstImplementationChain, LinkContext Context)
+			static void AddRecursiveInterfaces (TypeReference typeRef, IEnumerable<InterfaceImplementation> pathToType, List<(TypeReference, List<InterfaceImplementation>)> firstImplementationChain, ITryResolveMetadata Context)
 			{
 				var type = Context.TryResolve (typeRef);
 				if (type is null)
@@ -182,9 +191,9 @@ namespace Mono.Linker
 
 			// Foreach interface and for each newslot virtual method on the interface, try
 			// to find the method implementation and record it.
-			foreach (var interfaceImpl in type.GetInflatedInterfaces (context)) {
-				foreach (MethodReference interfaceMethod in interfaceImpl.InflatedInterface.GetMethods (context)) {
-					MethodDefinition? resolvedInterfaceMethod = context.TryResolve (interfaceMethod);
+			foreach (var interfaceImpl in type.GetInflatedInterfaces (_tryResolveMetadata)) {
+				foreach (MethodReference interfaceMethod in interfaceImpl.InflatedInterface.GetMethods (_tryResolveMetadata)) {
+					MethodDefinition? resolvedInterfaceMethod = _tryResolveMetadata.TryResolve (interfaceMethod);
 					if (resolvedInterfaceMethod == null)
 						continue;
 
@@ -245,7 +254,7 @@ namespace Mono.Linker
 			if (@base == null)
 				return;
 
-			Debug.Assert(!@base.DeclaringType.IsInterface);
+			Debug.Assert (!@base.DeclaringType.IsInterface);
 
 			AnnotateMethods (@base, method);
 		}
@@ -253,7 +262,7 @@ namespace Mono.Linker
 		void MapOverrides (MethodDefinition method)
 		{
 			foreach (MethodReference baseMethodRef in method.Overrides) {
-				MethodDefinition? baseMethod = context.TryResolve (baseMethodRef);
+				MethodDefinition? baseMethod = _tryResolveMetadata.TryResolve (baseMethodRef);
 				if (baseMethod == null)
 					continue;
 				if (baseMethod.DeclaringType.IsInterface) {
@@ -307,15 +316,15 @@ namespace Mono.Linker
 				return GetInflatedBaseType (requiredModifierType.ElementType);
 
 			if (type is GenericInstanceType genericInstance) {
-				var baseType = context.TryResolve (type)?.BaseType;
+				var baseType = _tryResolveMetadata.TryResolve (type)?.BaseType;
 
 				if (baseType is GenericInstanceType)
-					return TypeReferenceExtensions.InflateGenericType (genericInstance, baseType, context);
+					return TypeReferenceExtensions.InflateGenericType (genericInstance, baseType, _tryResolveMetadata);
 
 				return baseType;
 			}
 
-			return context.TryResolve (type)?.BaseType;
+			return _tryResolveMetadata.TryResolve (type)?.BaseType;
 		}
 
 		/// <summary>
@@ -335,7 +344,7 @@ namespace Mono.Linker
 			// interface method in question.
 
 			foreach (var interfaceImpl in typeThatMayHaveDIM.Interfaces) {
-				var potentialImplInterface = context.TryResolve (interfaceImpl.InterfaceType);
+				var potentialImplInterface = _tryResolveMetadata.TryResolve (interfaceImpl.InterfaceType);
 				if (potentialImplInterface == null)
 					continue;
 
@@ -354,7 +363,7 @@ namespace Mono.Linker
 
 					// This method is an override of something. Let's see if it's the method we are looking for.
 					foreach (var baseMethod in potentialImplMethod.Overrides) {
-						if (context.TryResolve (baseMethod) == interfaceMethodToBeImplemented) {
+						if (_tryResolveMetadata.TryResolve (baseMethod) == interfaceMethodToBeImplemented) {
 							AddDefaultInterfaceImplementation (interfaceMethodToBeImplemented, new (typeThatImplementsInterface, originalInterfaceImpl, interfaceMethodToBeImplemented.DeclaringType, context), @potentialImplMethod);
 							foundImpl = true;
 							break;
@@ -376,8 +385,8 @@ namespace Mono.Linker
 
 		MethodDefinition? TryMatchMethod (TypeReference type, MethodReference method)
 		{
-			foreach (var candidate in type.GetMethods (context)) {
-				var md = context.TryResolve (candidate);
+			foreach (var candidate in type.GetMethods (_tryResolveMetadata)) {
+				var md = _tryResolveMetadata.TryResolve (candidate);
 				if (md?.IsVirtual != true)
 					continue;
 
@@ -402,8 +411,8 @@ namespace Mono.Linker
 
 			// we need to track what the generic parameter represent - as we cannot allow it to
 			// differ between the return type or any parameter
-			if (candidate.GetReturnType (context) is not TypeReference candidateReturnType ||
-				method.GetReturnType (context) is not TypeReference methodReturnType ||
+			if (candidate.GetReturnType (_tryResolveMetadata) is not TypeReference candidateReturnType ||
+				method.GetReturnType (_tryResolveMetadata) is not TypeReference methodReturnType ||
 				!TypeMatch (candidateReturnType, methodReturnType))
 				return false;
 
@@ -419,8 +428,8 @@ namespace Mono.Linker
 				return false;
 
 			for (int i = 0; i < cp.Count; i++) {
-				if (candidate.GetInflatedParameterType (i, context) is not TypeReference candidateParameterType ||
-					method.GetInflatedParameterType (i, context) is not TypeReference methodParameterType ||
+				if (candidate.GetInflatedParameterType (i, _tryResolveMetadata) is not TypeReference candidateParameterType ||
+					method.GetInflatedParameterType (i, _tryResolveMetadata) is not TypeReference methodParameterType ||
 					!TypeMatch (candidateParameterType, methodParameterType))
 					return false;
 			}
