@@ -434,6 +434,21 @@ namespace LibraryImportGenerator.UnitTests
         }
 
         /// <summary>
+        /// Declaration with parameters with <see cref="StringMarshalling"/> set.
+        /// </summary>
+        public static string BasicParameterWithStringMarshalling(string returnType, string typeName1, string typeName2, StringMarshalling value, string preDeclaration = "") => $$"""
+            using System.Runtime.InteropServices;
+            {{preDeclaration}}
+            partial class Test
+            {
+                [{|#0:LibraryImport("DoesNotExist", StringMarshalling = StringMarshalling.{{value}})|}]
+                public static partial {{returnType}} {|#1:Method|}(
+                    {{typeName1}} {|#2:p|},
+                    {{typeName2}} {|#4:p2|});
+            }
+            """;
+
+        /// <summary>
         /// Declaration with parameters.
         /// </summary>
         public static string BasicParametersAndModifiers(string typeName, string preDeclaration = "") => $$"""

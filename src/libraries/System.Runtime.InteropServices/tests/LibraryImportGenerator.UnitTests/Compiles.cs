@@ -527,6 +527,48 @@ namespace LibraryImportGenerator.UnitTests
             }
         }
 
+        public static IEnumerable<object[]> CodeSnippetsToValidateCharSetPresent()
+        {
+            // Confirm that Charset=... is present
+            {
+                string code = CodeSnippets.BasicParametersAndModifiersWithStringMarshalling(
+                    "System.Text.StringBuilder",
+                    StringMarshalling.Utf16,
+                    CodeSnippets.LibraryImportAttributeDeclaration);
+                yield return new object[] { ID(), code, TestTargetFramework.Net6 };
+                yield return new object[] { ID(), code, TestTargetFramework.Core };
+                yield return new object[] { ID(), code, TestTargetFramework.Standard };
+                yield return new object[] { ID(), code, TestTargetFramework.Framework };
+            }
+            {
+                string code = CodeSnippets.BasicParameterWithStringMarshalling(
+                    "int",
+                    "System.Text.StringBuilder",
+                    "Microsoft.Win32.SafeHandles.SafeHandleZeroOrMinusOneIsInvalid",
+                    StringMarshalling.Utf16,
+                    CodeSnippets.LibraryImportAttributeDeclaration);
+                yield return new object[] { ID(), code, TestTargetFramework.Net6 };
+                yield return new object[] { ID(), code, TestTargetFramework.Core };
+                yield return new object[] { ID(), code, TestTargetFramework.Standard };
+                yield return new object[] { ID(), code, TestTargetFramework.Framework };
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(CodeSnippetsToValidateCharSetPresent))]
+        [OuterLoop("Uses the network for downlevel ref packs")]
+        public async Task ValidateSnippetsCharSetPresent(string id, string source, TestTargetFramework targetFramework)
+        {
+            TestUtils.Use(id);
+            var test = new CharSetIsForwardedTest(targetFramework)
+            {
+                TestCode = source,
+                TestBehaviors = TestBehaviors.SkipGeneratedSourcesCheck
+            };
+
+            await test.RunAsync();
+        }
+
         [Theory]
         [MemberData(nameof(CodeSnippetsToValidateFallbackForwarder))]
         [OuterLoop("Uses the network for downlevel ref packs")]
@@ -564,6 +606,25 @@ namespace LibraryImportGenerator.UnitTests
 
                 // If we expect fallback forwarder, then the DllImportData will not be null.
                 Assert.Equal(_expectFallbackForwarder, method.GetDllImportData() is not null);
+            }
+        }
+
+        class CharSetIsForwardedTest : VerifyCS.Test
+        {
+            public CharSetIsForwardedTest(TestTargetFramework targetFramework)
+                : base(targetFramework)
+            {
+            }
+
+            protected override void VerifyFinalCompilation(Compilation compilation)
+            {
+                SyntaxTree generatedCode = compilation.SyntaxTrees.Last();
+                SemanticModel model = compilation.GetSemanticModel(generatedCode);
+                var hasCharSet = generatedCode.GetRoot()
+                    .DescendantNodes().OfType<AttributeSyntax>()
+                    .Where(att => att.Name.ToString().EndsWith(nameof(DllImportAttribute)))
+                    .All(att => att.ArgumentList?.Arguments.Any(a => a.NameEquals?.Name.ToString().StartsWith(nameof(DllImportAttribute.CharSet)) == true) == true);
+                Assert.True(hasCharSet);
             }
         }
 
