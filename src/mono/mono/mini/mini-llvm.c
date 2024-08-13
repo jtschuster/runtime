@@ -33,9 +33,18 @@
 #include "llvm-c/Core.h"
 #include "llvm-c/BitWriter.h"
 #include "llvm-c/Analysis.h"
+#if LLVM_API_VERSION < 1900
 #include "llvm-c/Transforms/InstCombine.h"
 #include "llvm-c/Transforms/Scalar.h"
 #include "llvm-c/Transforms/IPO.h"
+#else
+// llvm 19 doesn't have the old pass manager
+// it is only used in the LLVM/JIT
+// we don't support that anymore. it will need to be rewritten to use the new pass manager if we want to support it again
+#ifdef _MSC_VER
+#pragma message("llvm 19 doesn't have the old pass manager")
+#endif
+#endif
 
 #include "mini-llvm-cpp.h"
 #include "llvm-jit.h"
@@ -2969,10 +2978,10 @@ build_named_alloca (EmitContext *ctx, MonoType *t, char const *name)
 
 	g_assert (!mini_is_gsharedvt_variable_type (t));
 
-	if (mini_class_is_simd (ctx->cfg, k))
-		align = mono_class_value_size (k, NULL);
+	if (mini_class_is_simd (ctx->cfg, k) && !m_type_is_byref (t))
+		align = mono_class_value_size (k, NULL); // FIXME mono_type_size should report correct alignment
 	else
-		align = mono_class_min_align (k);
+		mono_type_size (t, &align);
 
 	/* Sometimes align is not a power of 2 */
 	while (mono_is_power_of_two (align) == -1)
@@ -6290,6 +6299,9 @@ process_bb (EmitContext *ctx, MonoBasicBlock *bb)
 			gboolean likely = (ins->flags & MONO_INST_LIKELY) != 0;
 			gboolean unlikely = FALSE;
 
+			if (!ins->next)
+				break;
+
 			if (MONO_IS_COND_BRANCH_OP (ins->next)) {
 				if (ins->next->inst_false_bb->out_of_line)
 					likely = TRUE;
@@ -6478,7 +6490,8 @@ process_bb (EmitContext *ctx, MonoBasicBlock *bb)
 			break;
 		}
 		case OP_MOVE_I4_TO_F: {
-			values [ins->dreg] = LLVMBuildFPExt (builder, LLVMBuildBitCast (builder, lhs, LLVMFloatType (), ""), LLVMDoubleType (), "");
+			LLVMValueRef cast = convert (ctx, lhs, LLVMInt32Type ());
+			values [ins->dreg] = LLVMBuildFPExt (builder, LLVMBuildBitCast (builder, cast, LLVMFloatType (), ""), LLVMDoubleType (), "");
 			break;
 		}
 		case OP_MOVE_F_TO_I8: {
@@ -14169,11 +14182,13 @@ mono_llvm_create_aot_module (MonoAssembly *assembly, const char *global_prefix, 
 		mono_llvm_set_is_constant (module->sentinel_exception);
 	}
 
+#if LLVM_API_VERSION < 1900
 	module->func_pass_manager = LLVMCreateFunctionPassManagerForModule (module->lmodule);
 	if (module->func_pass_manager) {
 		LLVMAddCFGSimplificationPass (module->func_pass_manager);
 		LLVMAddInstructionCombiningPass (module->func_pass_manager);
 	}
+#endif
 }
 
 void

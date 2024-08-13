@@ -2,55 +2,55 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using ILLink.Shared.DataFlow;
 using ILLink.Shared.TrimAnalysis;
-using ILLink.Shared.TypeSystemProxy;
 
 namespace ILLink.RoslynAnalyzer.TrimAnalysis
 {
 	internal static class GenericArgumentDataFlow
 	{
-		public static void ProcessGenericArgumentDataFlow (DiagnosticContext diagnosticContext, INamedTypeSymbol type)
+		public static void ProcessGenericArgumentDataFlow (TypeNameResolver typeNameResolver, Location location, INamedTypeSymbol type, Action<Diagnostic>? reportDiagnostic)
 		{
-			ProcessGenericArgumentDataFlow (diagnosticContext, type.TypeArguments, type.TypeParameters);
+			ProcessGenericArgumentDataFlow (typeNameResolver, location, type.TypeArguments, type.TypeParameters, reportDiagnostic);
 		}
 
-		public static void ProcessGenericArgumentDataFlow (DiagnosticContext diagnosticContext, IMethodSymbol method)
+		public static void ProcessGenericArgumentDataFlow (TypeNameResolver typeNameResolver, Location location, IMethodSymbol method, Action<Diagnostic>? reportDiagnostic)
 		{
-			ProcessGenericArgumentDataFlow (diagnosticContext, method.TypeArguments, method.TypeParameters);
+			ProcessGenericArgumentDataFlow (typeNameResolver, location, method.TypeArguments, method.TypeParameters, reportDiagnostic);
 
-			ProcessGenericArgumentDataFlow (diagnosticContext, method.ContainingType);
+			ProcessGenericArgumentDataFlow (typeNameResolver, location, method.ContainingType, reportDiagnostic);
 		}
 
-		public static void ProcessGenericArgumentDataFlow (DiagnosticContext diagnosticContext, IFieldSymbol field)
+		public static void ProcessGenericArgumentDataFlow (TypeNameResolver typeNameResolver, Location location, IFieldSymbol field, Action<Diagnostic>? reportDiagnostic)
 		{
-			ProcessGenericArgumentDataFlow (diagnosticContext, field.ContainingType);
+			ProcessGenericArgumentDataFlow (typeNameResolver, location, field.ContainingType, reportDiagnostic);
 		}
 
 		static void ProcessGenericArgumentDataFlow (
-			DiagnosticContext diagnosticContext,
+			TypeNameResolver typeNameResolver,
+			Location location,
 			ImmutableArray<ITypeSymbol> typeArguments,
-			ImmutableArray<ITypeParameterSymbol> typeParameters)
+			ImmutableArray<ITypeParameterSymbol> typeParameters,
+			Action<Diagnostic>? reportDiagnostic)
 		{
+			var diagnosticContext = new DiagnosticContext (location, reportDiagnostic);
 			for (int i = 0; i < typeArguments.Length; i++) {
 				var typeArgument = typeArguments[i];
 				// Apply annotations to the generic argument
 				var genericParameterValue = new GenericParameterValue (typeParameters[i]);
 				if (genericParameterValue.DynamicallyAccessedMemberTypes != DynamicallyAccessedMemberTypes.None) {
 					SingleValue genericArgumentValue = SingleValueExtensions.FromTypeSymbol (typeArgument)!;
-					var requireDynamicallyAccessedMembersAction = new RequireDynamicallyAccessedMembersAction (diagnosticContext, default (ReflectionAccessAnalyzer));
+					var reflectionAccessAnalyzer = new ReflectionAccessAnalyzer (reportDiagnostic, typeNameResolver);
+					var requireDynamicallyAccessedMembersAction = new RequireDynamicallyAccessedMembersAction (typeNameResolver, location, reportDiagnostic, reflectionAccessAnalyzer);
 					requireDynamicallyAccessedMembersAction.Invoke (genericArgumentValue, genericParameterValue);
 				}
 
 				// Recursively process generic argument data flow on the generic argument if it itself is generic
-				if (typeArgument is INamedTypeSymbol namedTypeArgument && namedTypeArgument.IsGenericType) {
-					ProcessGenericArgumentDataFlow (diagnosticContext, namedTypeArgument);
-				}
+				if (typeArgument is INamedTypeSymbol namedTypeArgument && namedTypeArgument.IsGenericType)
+					ProcessGenericArgumentDataFlow (typeNameResolver, location, namedTypeArgument, reportDiagnostic);
 			}
 		}
 
