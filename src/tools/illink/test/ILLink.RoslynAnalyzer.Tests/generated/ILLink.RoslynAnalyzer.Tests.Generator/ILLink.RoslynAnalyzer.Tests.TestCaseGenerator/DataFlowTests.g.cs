@@ -8,6 +8,12 @@ namespace ILLink.RoslynAnalyzer.Tests
     {
 
         [Fact]
+        public Task CollectionInitializer()
+        {
+            return RunTest(allowMissingWarnings: true);
+        }
+
+        [Fact]
         public Task ExponentialDataFlow()
         {
             return RunTest(allowMissingWarnings: true);

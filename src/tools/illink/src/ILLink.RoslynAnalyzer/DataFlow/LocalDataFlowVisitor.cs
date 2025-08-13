@@ -239,16 +239,6 @@ namespace ILLink.RoslynAnalyzer.DataFlow
 
         private TValue ProcessSingleTargetAssignment(
             IOperation targetOperation,
-            IAssignmentOperation operation,
-            LocalDataFlowState<TValue, TContext, TValueLattice, TContextLattice> state,
-            bool merge
-        )
-        {
-            return ProcessSingleTargetAssignment(targetOperation, operation.Value, operation, state, merge);
-        }
-
-        private TValue ProcessSingleTargetAssignment(
-            IOperation targetOperation,
             IOperation valueOperation,
             IOperation assignmentOperation,
             LocalDataFlowState<TValue, TContext, TValueLattice, TContextLattice> state,
@@ -326,27 +316,37 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 }
                 case IImplicitIndexerReferenceOperation indexerRef:
                 {
-                    // An implicit reference to an indexer where the argument is a System.Index
-                    TValue instanceValue = Visit(indexerRef.Instance, state);
-                    TValue indexArgumentValue = Visit(indexerRef.Argument, state);
+                    // If inside of an object initializer, skip parts
                     TValue value = Visit(valueOperation, state);
-
-                    var property = (IPropertySymbol)indexerRef.IndexerSymbol;
-
-                    var argumentsBuilder = ImmutableArray.CreateBuilder<TValue>();
-                    argumentsBuilder.Add(indexArgumentValue);
-                    argumentsBuilder.Add(value);
-
-                    IMethodSymbol? setMethod = property.GetSetMethod();
-                    if (setMethod == null)
+                    if (indexerRef.Parent is ISimpleAssignmentOperation { Parent: IObjectOrCollectionInitializerOperation })
                     {
-                        // It might actually be a call to a ref-returning get method,
-                        // like Span<T>.this[int].get. We don't handle ref returns yet.
-                        break;
+                        // In object/collection initializer: don't visit the target (instance/index) or setter call.
+                        // Only visit the RHS to produce any relevant diagnostics.
+                        return value;
                     }
+                    else
+                    {
+                        // An implicit reference to an indexer where the argument is a System.Index
+                        TValue instanceValue = Visit(indexerRef.Instance, state);
+                        TValue indexArgumentValue = Visit(indexerRef.Argument, state);
 
-                    HandleMethodCallHelper(setMethod, instanceValue, argumentsBuilder.ToImmutableArray(), assignmentOperation, state);
-                    return value;
+                        var property = (IPropertySymbol)indexerRef.IndexerSymbol;
+
+                        var argumentsBuilder = ImmutableArray.CreateBuilder<TValue>();
+                        argumentsBuilder.Add(indexArgumentValue);
+                        argumentsBuilder.Add(value);
+
+                        IMethodSymbol? setMethod = property.GetSetMethod();
+                        if (setMethod == null)
+                        {
+                            // It might actually be a call to a ref-returning get method,
+                            // like Span<T>.this[int].get. We don't handle ref returns yet.
+                            break;
+                        }
+
+                        HandleMethodCallHelper(setMethod, instanceValue, argumentsBuilder.ToImmutableArray(), assignmentOperation, state);
+                        return value;
+                    }
                 }
 
                 // TODO: when setting a property in an attribute, target is an IPropertyReference.
@@ -463,7 +463,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
         {
             var targetOperation = operation.Target;
             if (targetOperation is not IFlowCaptureReferenceOperation flowCaptureReference)
-                return ProcessSingleTargetAssignment(targetOperation, operation, state, merge: false);
+                return ProcessSingleTargetAssignment(targetOperation, operation.Value, operation, state, merge: false);
 
             // Note: technically we should avoid visiting the target operation in ProcessNonCapturedAssignment when assigning
             // to a flow capture reference, because this should be done when the capture is created.
@@ -481,7 +481,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 var enumerator = capturedReferences.GetKnownValues().GetEnumerator();
                 enumerator.MoveNext();
                 targetOperation = enumerator.Current.Reference;
-                return ProcessSingleTargetAssignment(targetOperation, operation, state, merge: false);
+                return ProcessSingleTargetAssignment(targetOperation, operation.Value, operation, state, merge: false);
             }
 
             // The capture id may have captured multiple references, as in:
@@ -498,7 +498,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
             foreach (var capturedReference in capturedReferences.GetKnownValues())
             {
                 targetOperation = capturedReference.Reference;
-                var singleValue = ProcessSingleTargetAssignment(targetOperation, operation, state, merge: true);
+                var singleValue = ProcessSingleTargetAssignment(targetOperation, operation.Value, operation, state, merge: true);
                 value = LocalStateAndContextLattice.LocalStateLattice.Lattice.ValueLattice.Meet(value, singleValue);
             }
 
@@ -890,9 +890,9 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 TConditionValue conditionValue = GetConditionValue(argumentOperation, state);
                 var current = state.Current;
                 ApplyCondition(
-                    doesNotReturnIfConditionValue == false
-                        ? conditionValue
-                        : conditionValue.Negate(),
+                    doesNotReturnIfConditionValue
+                        ? conditionValue.Negate()
+                        : conditionValue,
                     ref current);
                 state.Current = current;
             }
