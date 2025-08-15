@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using ILLink.Shared.DataFlow;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis;
@@ -92,6 +94,13 @@ namespace ILLink.RoslynAnalyzer.DataFlow
         {
             var dictionary = Lattice.Meet(left.Dictionary, right.Dictionary);
             var capturedProperties = CapturedReferenceLattice.Meet(left.CapturedReferences, right.CapturedReferences);
+            return new LocalState<TValue>(dictionary, capturedProperties);
+        }
+
+        public LocalState<TValue> Meet(IEnumerable<LocalState<TValue>> values)
+        {
+            var dictionary = Lattice.Meet(values.Select(v => v.Dictionary));
+            var capturedProperties = CapturedReferenceLattice.Meet(values.Select(v => v.CapturedReferences));
             return new LocalState<TValue>(dictionary, capturedProperties);
         }
     }

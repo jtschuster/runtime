@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.InteropServices;
 using ILLink.Shared;
 using ILLink.Shared.DataFlow;
@@ -73,5 +74,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
         // We are interested in features which are known to be enabled for all paths through the CFG,
         // so the meet operator is set intersection.
         public FeatureContext Meet(FeatureContext left, FeatureContext right) => left.Intersection(right);
+
+        public FeatureContext Meet(IEnumerable<FeatureContext> values) => values.Aggregate(Meet);
     }
 }

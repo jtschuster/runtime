@@ -34,6 +34,12 @@ namespace ILLink.Shared.DataFlow
             DefaultValue = other.DefaultValue;
         }
 
+        public DefaultValueDictionary(TValue defaultValue, int capacity)
+        {
+            Dictionary = new Dictionary<TKey, TValue>(capacity);
+            DefaultValue = defaultValue;
+        }
+
         public TValue Get(TKey key) => Dictionary?.TryGetValue(key, out var value) == true ? value : DefaultValue;
 
         public void Set(TKey key, TValue value)

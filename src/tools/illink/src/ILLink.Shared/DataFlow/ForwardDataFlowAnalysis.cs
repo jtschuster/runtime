@@ -276,13 +276,16 @@ namespace ILLink.Shared.DataFlow
 
                     // Compute the dataflow state at the beginning of this block.
                     TValue currentState = lattice.Top;
+                    ValuesToMeet.Clear();
+                    ValuesToMeet.Add(lattice.Top);
                     foreach (var predecessor in cfg.GetPredecessors(block))
                     {
                         TValue predecessorState = cfgState.Get(predecessor).Current;
 
                         FlowStateThroughExitedFinallys(predecessor, ref predecessorState);
                         TraceEdgeInput(predecessor, predecessorState);
-                        currentState = lattice.Meet(currentState, predecessorState);
+                        ValuesToMeet.Add(predecessorState);
+                        // currentState = lattice.Meet(currentState, predecessorState);
                     }
                     // State at start of a catch also includes the exceptional state from
                     // try -> catch exceptional control flow.
@@ -290,7 +293,8 @@ namespace ILLink.Shared.DataFlow
                     {
                         TRegion correspondingTry = cfg.GetCorrespondingTry(tryOrCatchOrFilterRegion!);
                         Box<TValue> tryExceptionState = cfgState.GetExceptionState(correspondingTry);
-                        currentState = lattice.Meet(currentState, tryExceptionState.Value);
+                        ValuesToMeet.Add(tryExceptionState.Value);
+                        // currentState = lattice.Meet(currentState, tryExceptionState.Value);
 
                         // A catch or filter can also be reached from a previous filter.
                         foreach (TRegion previousFilter in cfg.GetPreviousFilters(tryOrCatchOrFilterRegion!))
@@ -299,22 +303,28 @@ namespace ILLink.Shared.DataFlow
                             // Exceptions may also propagate from anywhere in a filter region to this catch or filter region.
                             // This covers both cases since the exceptional state is a superset of the normal state.
                             Box<TValue> previousFilterExceptionState = cfgState.GetExceptionState(previousFilter);
-                            currentState = lattice.Meet(currentState, previousFilterExceptionState.Value);
+                            ValuesToMeet.Add(previousFilterExceptionState.Value);
+                            // currentState = lattice.Meet(currentState, previousFilterExceptionState.Value);
                         }
                     }
                     if (isFinallyStart)
                     {
                         TValue finallyInputState = cfgState.GetFinallyInputState(finallyRegion!);
-                        currentState = lattice.Meet(currentState, finallyInputState);
+                        // currentState = lattice.Meet(currentState, finallyInputState);
+                        ValuesToMeet.Add(finallyInputState);
                     }
+                    // merge ValuesToMeet with lattice.merge
+                    currentState = lattice.Meet(ValuesToMeet);
 
                     // Compute the independent exceptional finally state at beginning of a finally.
                     TValue? exceptionFinallyState = null;
+                    ValuesToMeet.Clear();
                     if (isFinallyBlock)
                     {
                         // Inside finally regions, must compute the parallel meet state for unhandled exceptions.
                         // Using predecessors in the finally. But not from outside the finally.
-                        exceptionFinallyState = lattice.Top;
+                        // exceptionFinallyState = lattice.Top;
+                        ValuesToMeet.Add(lattice.Top);
                         foreach (var predecessor in cfg.GetPredecessors(block))
                         {
                             var isPredecessorInFinally = cfgState.TryGetExceptionFinallyState(predecessor, out TValue predecessorState);
@@ -322,7 +332,8 @@ namespace ILLink.Shared.DataFlow
 
                             FlowStateThroughExitedFinallys(predecessor, ref predecessorState);
 
-                            exceptionFinallyState = lattice.Meet(exceptionFinallyState.Value, predecessorState);
+                            // exceptionFinallyState = lattice.Meet(exceptionFinallyState.Value, predecessorState);
+                            ValuesToMeet.Add(predecessorState);
                         }
 
                         // For first block, also initialize it from the try or catch blocks.
@@ -334,8 +345,10 @@ namespace ILLink.Shared.DataFlow
                             // corresponding catch exception state.
                             TRegion correspondingTry = cfg.GetCorrespondingTry(finallyRegion!);
                             Box<TValue> tryExceptionState = cfgState.GetExceptionState(correspondingTry);
-                            exceptionFinallyState = lattice.Meet(exceptionFinallyState.Value, tryExceptionState.Value);
+                            // exceptionFinallyState = lattice.Meet(exceptionFinallyState.Value, tryExceptionState.Value);
+                            ValuesToMeet.Add(tryExceptionState.Value);
                         }
+                        exceptionFinallyState = lattice.Meet(ValuesToMeet);
                     }
 
                     // Initialize the exception state at the start of try/catch regions. Control flow edges from predecessors

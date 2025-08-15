@@ -1,6 +1,8 @@
 // Copyright (c) .NET Foundation and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 // This is needed due to NativeAOT which doesn't enable nullable globally yet
 #nullable enable
@@ -50,5 +52,7 @@ namespace ILLink.Shared.DataFlow
                 return left.DeepCopy();
             return new Maybe<T>(ValueLattice.Meet(leftValue, rightValue));
         }
+
+        public Maybe<T> Meet(IEnumerable<Maybe<T>> values) => values.Aggregate(Meet);
     }
 }

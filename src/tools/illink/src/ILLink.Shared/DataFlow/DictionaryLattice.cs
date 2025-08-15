@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 // This is needed due to NativeAOT which doesn't enable nullable globally yet
 #nullable enable
@@ -34,6 +36,38 @@ namespace ILLink.Shared.DataFlow
                 met.Set(key, ValueLattice.Meet(left.Get(key), rightValue));
             }
             return met;
+        }
+        public DefaultValueDictionary<TKey, TValue> Meet(IEnumerable<DefaultValueDictionary<TKey, TValue>> values)
+        {
+            if (!values.Any())
+                throw new InvalidOperationException();
+
+            if (values.Count() == 1)
+                return values.Single();
+
+            var list = values.ToList();
+
+            var keyToValueList = new Dictionary<TKey, List<TValue>>();
+            foreach (var d in list)
+            {
+                foreach (var entry in d)
+                {
+                    if (!keyToValueList.TryGetValue(entry.Key, out var tmp))
+                    {
+                        tmp = [];
+                        keyToValueList.Add(entry.Key, tmp);
+                    }
+                    tmp.Add(entry.Value);
+                }
+            }
+
+            var result = new DefaultValueDictionary<TKey, TValue>(ValueLattice.Top);
+            foreach (var meetable in keyToValueList)
+            {
+                result.Set(meetable.Key, ValueLattice.Meet(meetable.Value));
+            }
+
+            return result;
         }
     }
 }

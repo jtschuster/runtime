@@ -243,6 +243,17 @@ namespace ILLink.Shared.DataFlow
             return false;
         }
 
+        internal static ValueSet<TValue> Union(IEnumerable<ValueSet<TValue>> values)
+        {
+            if (values.Any(v => v._values == UnknownSentinel))
+                return Unknown;
+
+            var result = new EnumerableValues(values.SelectMany(v => v.DeepCopy().GetKnownValues()));
+            if (result.Count > MaxValuesInSet)
+                return Unknown;
+            return new ValueSet<TValue>(result);
+        }
+
         internal static ValueSet<TValue> Union(ValueSet<TValue> left, ValueSet<TValue> right)
         {
             if (left._values == null)

@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using ILLink.Shared;
 using ILLink.Shared.DataFlow;
 using Mono.Cecil;
@@ -106,5 +107,7 @@ namespace Mono.Linker.Dataflow
                 MethodBodyLattice.Meet(left.MethodBodies, right.MethodBodies),
                 HoistedLocalsLattice.Meet(left.HoistedLocals, right.HoistedLocals),
                 this);
+
+        public InterproceduralState Meet(IEnumerable<InterproceduralState> values) => values.Aggregate(Meet);
     }
 }

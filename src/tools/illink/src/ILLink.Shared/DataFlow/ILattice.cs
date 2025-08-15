@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 // This is needed due to NativeAOT which doesn't enable nullable globally yet
 #nullable enable
@@ -38,5 +40,6 @@ namespace ILLink.Shared.DataFlow
         // This is used in dataflow analysis to iteratively Meet the tracked facts from different control
         // flow paths until the analysis converges to the most specific set of tracked facts.
         public TValue Meet(TValue left, TValue right);
+        public TValue Meet(IEnumerable<TValue> values);
     }
 }

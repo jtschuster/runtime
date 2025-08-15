@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using ILLink.Shared.DataFlow;
 
 namespace ILLink.RoslynAnalyzer.DataFlow
@@ -110,5 +111,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 MethodLattice.Meet(left.Methods, right.Methods),
                 HoistedLocalLattice.Meet(left.HoistedLocals, right.HoistedLocals),
                 this);
+
+        public InterproceduralState<TValue, TValueLattice> Meet(IEnumerable<InterproceduralState<TValue, TValueLattice>> values) => values.Aggregate(Meet);
     }
 }

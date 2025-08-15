@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for full license information.
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 // This is needed due to NativeAOT which doesn't enable nullable globally yet
 #nullable enable
@@ -15,5 +17,6 @@ namespace ILLink.Shared.DataFlow
         public ValueSet<TValue> Top => default;
 
         public ValueSet<TValue> Meet(ValueSet<TValue> left, ValueSet<TValue> right) => ValueSet<TValue>.Union(left, right);
+        public ValueSet<TValue> Meet(IEnumerable<ValueSet<TValue>> values) => ValueSet<TValue>.Union(values);
     }
 }

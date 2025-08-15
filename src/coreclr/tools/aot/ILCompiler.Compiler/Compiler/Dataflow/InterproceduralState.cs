@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-
+using System.Linq;
 using ILLink.Shared.DataFlow;
 using Internal.IL;
 using Internal.TypeSystem;
@@ -163,5 +163,7 @@ namespace ILCompiler.Dataflow
                 MethodBodyLattice.Meet(left.MethodBodies, right.MethodBodies),
                 HoistedLocalsLattice.Meet(left.HoistedLocals, right.HoistedLocals),
                 this);
+
+        public InterproceduralState Meet(IEnumerable<InterproceduralState> values) => values.Aggregate(Meet);
     }
 }
