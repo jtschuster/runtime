@@ -5,9 +5,11 @@ using System;
 using System.ComponentModel;
 using System.IO;
 using System.IO.MemoryMappedFiles;
+using System.Reflection.PortableExecutable;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.NET.HostModel.MachO;
+using Microsoft.NET.HostModel.Win32Resources;
 
 namespace Microsoft.NET.HostModel.AppHost
 {
