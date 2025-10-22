@@ -282,9 +282,9 @@ namespace Internal.IL
                 il.EmitLdArg(argIndex++);
             }
 
-            // Get the async other variant method and call it
-            //MethodDesc asyncOtherVariant = new AsyncMethodDesc(method, null);
-            il.Emit(ILOpcode.call, ilEmitter.NewToken(method));
+            // Get the async call conv method and call it
+            MethodDesc asyncOtherVariant = new AsyncMethodDesc(method, null);
+            il.Emit(ILOpcode.call, ilEmitter.NewToken(asyncOtherVariant));
 
             // Store result if there is one
             if (logicalResultLocal != default)

@@ -46,10 +46,10 @@ namespace Internal.JitInterface
         public override MethodDesc GetTypicalMethodDefinition()
         {
             MethodDesc real = _wrappedMethod.GetTypicalMethodDefinition();
-            return real;
-            //if (real != _wrappedMethod)
-            //    return _factory.GetAsyncMethod(real);
-            //return this;
+            //return real;
+            if (real != _wrappedMethod)
+                return _factory.GetAsyncMethod(real);
+            return this;
         }
 
         public override MethodDesc InstantiateSignature(Instantiation typeInstantiation, Instantiation methodInstantiation)

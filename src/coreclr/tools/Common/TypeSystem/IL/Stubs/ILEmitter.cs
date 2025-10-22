@@ -852,9 +852,9 @@ namespace Internal.IL.Stubs
     }
     public class AsyncResumptionStub : ILStubMethod
     {
-        MethodDesc _method;
-        MethodSignature _signature;
-        MethodIL _methodIL;
+        private MethodDesc _method;
+        private MethodSignature _signature;
+        private MethodIL _methodIL;
         public AsyncResumptionStub(MethodDesc method)
         {
             _method = method;
@@ -867,7 +867,7 @@ namespace Internal.IL.Stubs
 
         public override MethodSignature Signature => _signature ?? BuildResumptionStubCalliSignature(_method.Signature);
 
-        private MethodSignature BuildResumptionStubCalliSignature(MethodSignature originalSignature)
+        private MethodSignature BuildResumptionStubCalliSignature(MethodSignature _)
         {
             var flags = MethodSignatureFlags.None;
             TypeDesc continuation = Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "Continuation"u8);
@@ -879,7 +879,7 @@ namespace Internal.IL.Stubs
         public override TypeSystemContext Context => _method.Context;
 
         private static int _classCode = new Random().Next(int.MinValue, int.MaxValue);
-        protected override int ClassCode => _classCode;
+        protected internal override int ClassCode => _classCode;
 
         public override MethodIL EmitIL()
         {
@@ -887,7 +887,6 @@ namespace Internal.IL.Stubs
                 return _methodIL;
             ILEmitter ilEmitter = new ILEmitter();
             ILCodeStream ilStream = ilEmitter.NewCodeStream();
-            int numArgs = 0;
 
             // if it has this pointer
             if (!_method.Signature.IsStatic)
@@ -901,7 +900,6 @@ namespace Internal.IL.Stubs
                 {
                     ilStream.Emit(ILOpcode.ldnull);
                 }
-                numArgs++;
             }
 
             foreach (var param in _method.Signature)
@@ -942,9 +940,9 @@ namespace Internal.IL.Stubs
             ilStream.EmitLdLoc(newContinuationLocal);
             ilStream.Emit(ILOpcode.ret);
 
-
             return ilEmitter.Link(this);
         }
-        protected override int CompareToImpl(MethodDesc other, TypeSystemComparer comparer) => throw new NotImplementedException();
+
+        protected internal override int CompareToImpl(MethodDesc other, TypeSystemComparer comparer) => throw new NotImplementedException();
     }
 }

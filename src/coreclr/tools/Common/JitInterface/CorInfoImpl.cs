@@ -1839,14 +1839,14 @@ namespace Internal.JitInterface
             {
                 if (pResolvedToken.tokenType == CorInfoTokenKind.CORINFO_TOKENKIND_Await)
                 {
-                    Debug.Assert(method.ReturnsTaskLike());
+                    Debug.Assert(method.IsTaskReturning());
                     method = _asyncMethodDescFactory.GetAsyncMethod(method);
                     result = method;
                 }
                 else if (method.IsAsync)
                 {
-                    //method = _asyncTaskWrapperMethodDescFactory.GetTaskReturningAsyncWrapperMethod(method);
-                    //result = method;
+                    method = _asyncTaskWrapperMethodDescFactory.GetTaskReturningAsyncWrapperMethod(method);
+                    result = method;
                     _ = 0;
                 }
 
