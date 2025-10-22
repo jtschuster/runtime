@@ -6,7 +6,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Internal.TypeSystem;
-
+using Internal.TypeSystem.Ecma;
 using Debug = System.Diagnostics.Debug;
 
 namespace Internal.IL.Stubs
@@ -505,6 +505,8 @@ namespace Internal.IL.Stubs
 
     public class ILExceptionRegionBuilder
     {
+        internal readonly ILExceptionRegionKind Kind;
+        internal readonly int ClassToken;
         internal ILCodeStream _beginTryStream;
         internal int _beginTryOffset;
 
@@ -517,8 +519,10 @@ namespace Internal.IL.Stubs
         internal ILCodeStream _endHandlerStream;
         internal int _endHandlerOffset;
 
-        internal ILExceptionRegionBuilder()
+        internal ILExceptionRegionBuilder(ILExceptionRegionKind kind, int classToken)
         {
+            Kind = kind;
+            ClassToken = classToken;
         }
 
         internal int TryOffset => _beginTryStream.RelativeToAbsoluteOffset(_beginTryOffset);
@@ -669,7 +673,7 @@ namespace Internal.IL.Stubs
         private ArrayBuilder<ILCodeStream> _codeStreams;
         private ArrayBuilder<LocalVariableDefinition> _locals;
         private ArrayBuilder<object> _tokens;
-        private ArrayBuilder<ILExceptionRegionBuilder> _finallyRegions;
+        private ArrayBuilder<ILExceptionRegionBuilder> _ehRegions;
 
         public ILEmitter()
         {
@@ -729,8 +733,15 @@ namespace Internal.IL.Stubs
 
         public ILExceptionRegionBuilder NewFinallyRegion()
         {
-            var region = new ILExceptionRegionBuilder();
-            _finallyRegions.Add(region);
+            var region = new ILExceptionRegionBuilder(ILExceptionRegionKind.Finally, 0);
+            _ehRegions.Add(region);
+            return region;
+        }
+
+        public ILExceptionRegionBuilder NewCatchRegion(ILToken classToken)
+        {
+            var region = new ILExceptionRegionBuilder(ILExceptionRegionKind.Catch, (int)classToken);
+            _ehRegions.Add(region);
             return region;
         }
 
@@ -782,20 +793,20 @@ namespace Internal.IL.Stubs
 
             ILExceptionRegion[] exceptionRegions = null;
 
-            int numberOfExceptionRegions = _finallyRegions.Count;
+            int numberOfExceptionRegions = _ehRegions.Count;
             if (numberOfExceptionRegions > 0)
             {
                 exceptionRegions = new ILExceptionRegion[numberOfExceptionRegions];
 
-                for (int i = 0; i < _finallyRegions.Count; i++)
+                for (int i = 0; i < _ehRegions.Count; i++)
                 {
-                    ILExceptionRegionBuilder region = _finallyRegions[i];
+                    ILExceptionRegionBuilder region = _ehRegions[i];
 
                     Debug.Assert(region.IsDefined);
 
-                    exceptionRegions[i] = new ILExceptionRegion(ILExceptionRegionKind.Finally,
+                    exceptionRegions[i] = new ILExceptionRegion(region.Kind,
                         region.TryOffset, region.TryLength, region.HandlerOffset, region.HandlerLength,
-                        classToken: 0, filterOffset: 0);
+                        classToken: region.ClassToken, filterOffset: 0);
                 }
             }
 
@@ -838,5 +849,102 @@ namespace Internal.IL.Stubs
         {
             return false;
         }
+    }
+    public class AsyncResumptionStub : ILStubMethod
+    {
+        MethodDesc _method;
+        MethodSignature _signature;
+        MethodIL _methodIL;
+        public AsyncResumptionStub(MethodDesc method)
+        {
+            _method = method;
+            _signature = null;
+            _methodIL = null;
+        }
+        public override string DiagnosticName => $"IL_STUB_AsyncResume__{_method.DiagnosticName}";
+
+        public override TypeDesc OwningType => _method.OwningType;
+
+        public override MethodSignature Signature => _signature ?? BuildResumptionStubCalliSignature(_method.Signature);
+
+        private MethodSignature BuildResumptionStubCalliSignature(MethodSignature originalSignature)
+        {
+            var flags = MethodSignatureFlags.None;
+            TypeDesc continuation = Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "Continuation"u8);
+            ByRefType outputObject = Context.GetByRefType(
+                Context.GetWellKnownType(WellKnownType.Byte));
+            return new MethodSignature(flags, 0, continuation, [continuation, outputObject]);
+        }
+
+        public override TypeSystemContext Context => _method.Context;
+
+        private static int _classCode = new Random().Next(int.MinValue, int.MaxValue);
+        protected override int ClassCode => _classCode;
+
+        public override MethodIL EmitIL()
+        {
+            if (_methodIL != null)
+                return _methodIL;
+            ILEmitter ilEmitter = new ILEmitter();
+            ILCodeStream ilStream = ilEmitter.NewCodeStream();
+            int numArgs = 0;
+
+            // if it has this pointer
+            if (!_method.Signature.IsStatic)
+            {
+                if (_method.OwningType.IsValueType)
+                {
+                    ilStream.EmitLdc(0);
+                    ilStream.Emit(ILOpcode.conv_u);
+                }
+                else
+                {
+                    ilStream.Emit(ILOpcode.ldnull);
+                }
+                numArgs++;
+            }
+
+            foreach (var param in _method.Signature)
+            {
+                var local = ilEmitter.NewLocal(param);
+                ilStream.EmitLdLoca(local);
+                ilStream.Emit(ILOpcode.initobj, ilEmitter.NewToken(param));
+                ilStream.EmitLdLoc(local);
+            }
+            ilStream.Emit(ILOpcode.ldftn, ilEmitter.NewToken(_method));
+            ilStream.Emit(ILOpcode.calli, ilEmitter.NewToken(this.Signature));
+
+            bool returnsVoid = _method.Signature.ReturnType != Context.GetWellKnownType(WellKnownType.Void);
+            IL.Stubs.ILLocalVariable resultLocal = default;
+            if (!returnsVoid)
+            {
+                resultLocal = ilEmitter.NewLocal(_method.Signature.ReturnType);
+                ilStream.EmitStLoc(resultLocal);
+            }
+
+            MethodDesc asyncCallContinuation = Context.SystemModule.GetKnownType("System.StubHelpers"u8, "StubHelpers"u8)
+                .GetKnownMethod("AsyncCallContinuation"u8, null);
+            TypeDesc continuation = Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "Continuation"u8);
+            var newContinuationLocal = ilEmitter.NewLocal(continuation);
+            ilStream.Emit(ILOpcode.call, ilEmitter.NewToken(asyncCallContinuation));
+            ilStream.EmitStLoc(newContinuationLocal);
+
+            if (!returnsVoid)
+            {
+                var doneResult = ilEmitter.NewCodeLabel();
+                ilStream.EmitLdLoca(newContinuationLocal);
+                ilStream.Emit(ILOpcode.brtrue, doneResult);
+                ilStream.EmitLdArg(1);
+                ilStream.EmitLdLoc(resultLocal);
+                ilStream.Emit(ILOpcode.stobj, ilEmitter.NewToken(_method.Signature.ReturnType));
+                ilStream.EmitLabel(doneResult);
+            }
+            ilStream.EmitLdLoc(newContinuationLocal);
+            ilStream.Emit(ILOpcode.ret);
+
+
+            return ilEmitter.Link(this);
+        }
+        protected override int CompareToImpl(MethodDesc other, TypeSystemComparer comparer) => throw new NotImplementedException();
     }
 }

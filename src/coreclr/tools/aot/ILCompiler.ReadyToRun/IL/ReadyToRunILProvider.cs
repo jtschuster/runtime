@@ -14,6 +14,9 @@ using Internal.IL.Stubs;
 using System.Buffers.Binary;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
+using Internal.JitInterface;
+using System.Text;
+using System.Text.Unicode;
 
 namespace Internal.IL
 {
@@ -165,6 +168,14 @@ namespace Internal.IL
                         return result;
                 }
 
+                if (method.IsAsync)
+                {
+                    // AsyncCallConv methods should be AsyncMethodDesc, not EcmaMethod
+                    // Generate IL for Task wrapping stub
+                    MethodIL result = TryGetTaskReturningAsyncWrapperThunkIL(method);
+                    return result;
+                }
+
                 // Check to see if there is an override for the EcmaMethodIL. If there is not
                 // then simply return the EcmaMethodIL. In theory this could call
                 // CreateCrossModuleInlineableTokensForILBody, but we explicitly do not want
@@ -202,6 +213,202 @@ namespace Internal.IL
                 return null;
             }
         }
+        // Emits roughly the following code:
+        //
+        // ExecutionAndSyncBlockStore store = default;
+        // store.Push();
+        // try
+        // {
+        //   try
+        //   {
+        //     T result = Inner(args);
+        //     // call an intrisic to see if the call above produced a continuation
+        //     if (StubHelpers.AsyncCallContinuation() == null)
+        //       return Task.FromResult(result);
+        //
+        //     return FinalizeTaskReturningThunk();
+        //   }
+        //   catch (Exception ex)
+        //   {
+        //     return TaskFromException(ex);
+        //   }
+        // }
+        // finally
+        // {
+        //   store.Pop();
+        // }
+        private MethodIL TryGetTaskReturningAsyncWrapperThunkIL(MethodDesc method)
+        {
+            ILEmitter ilEmitter = new ILEmitter();
+            ILCodeStream il = ilEmitter.NewCodeStream();
+            TypeDesc retType = method.Signature.ReturnType;
+            IL.Stubs.ILLocalVariable returnTaskLocal = ilEmitter.NewLocal(retType);
+            bool isValueTask = retType.IsValueType;
+            TypeDesc logicalResultType = null;
+            IL.Stubs.ILLocalVariable logicalResultLocal = default;
+            if (retType.HasInstantiation)
+            {
+                logicalResultType = retType.Instantiation[0];
+                logicalResultLocal = ilEmitter.NewLocal(logicalResultType);
+            }
+            var executionAndSyncBlockStoreType = method.Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "ExecutionAndSyncBlockStore"u8);
+            var executionAndSyncBlockStoreLocal = ilEmitter.NewLocal(executionAndSyncBlockStoreType);
+
+            ILCodeLabel returnTaskLabel = ilEmitter.NewCodeLabel();
+            ILCodeLabel suspendedLabel = ilEmitter.NewCodeLabel();
+            ILCodeLabel finishedLabel = ilEmitter.NewCodeLabel();
+
+            // store.Push()
+            il.EmitLdLoca(executionAndSyncBlockStoreLocal);
+            il.Emit(ILOpcode.call, ilEmitter.NewToken(executionAndSyncBlockStoreType.GetKnownMethod("Push"u8, null)));
+
+            // Inner try block must appear first in metadata
+            var exceptionType = ilEmitter.NewToken(method.Context.GetWellKnownType(WellKnownType.Exception));
+            ILExceptionRegionBuilder innerTryRegion = ilEmitter.NewCatchRegion(exceptionType);
+            // Outer try block
+            ILExceptionRegionBuilder outerTryRegion = ilEmitter.NewFinallyRegion();
+            il.BeginTry(outerTryRegion);
+            il.BeginTry(innerTryRegion);
+
+            // Call the async variant method with arguments
+            int argIndex = 0;
+            if (!method.Signature.IsStatic)
+            {
+                il.EmitLdArg(argIndex++);
+            }
+
+            for (int i = 0; i < method.Signature.Length; i++)
+            {
+                il.EmitLdArg(argIndex++);
+            }
+
+            // Get the async other variant method and call it
+            //MethodDesc asyncOtherVariant = new AsyncMethodDesc(method, null);
+            il.Emit(ILOpcode.call, ilEmitter.NewToken(method));
+
+            // Store result if there is one
+            if (logicalResultLocal != default)
+            {
+                il.EmitStLoc(logicalResultLocal);
+            }
+
+            il.Emit(ILOpcode.call, ilEmitter.NewToken(
+                method.Context.SystemModule.GetKnownType("System.StubHelpers"u8, "StubHelpers"u8)
+                    .GetKnownMethod("AsyncCallContinuation"u8, null)));
+            il.Emit(ILOpcode.brfalse, finishedLabel);
+
+            il.Emit(ILOpcode.leave, suspendedLabel);
+
+            il.EmitLabel(finishedLabel);
+            if (logicalResultLocal != default)
+            {
+                il.EmitLdLoc(logicalResultLocal);
+                MethodDesc fromResultMethod;
+                if (isValueTask)
+                {
+                    fromResultMethod = method.Context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "ValueTask"u8)
+                        .GetKnownMethod("FromResult"u8, null)
+                        .MakeInstantiatedMethod(logicalResultType);
+                }
+                else
+                {
+                    fromResultMethod = method.Context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "Task"u8)
+                        .GetKnownMethod("FromResult"u8, null)
+                        .MakeInstantiatedMethod(logicalResultType);
+                }
+                il.Emit(ILOpcode.call, ilEmitter.NewToken(fromResultMethod));
+            }
+            else
+            {
+                MethodDesc completedTaskGetter;
+                if (isValueTask)
+                {
+                    completedTaskGetter = method.Context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "ValueTask"u8)
+                        .GetKnownMethod("get_CompletedTask"u8, null);
+                }
+                else
+                {
+                    completedTaskGetter = method.Context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "Task"u8)
+                        .GetKnownMethod("get_CompletedTask"u8, null);
+                }
+                il.Emit(ILOpcode.call, ilEmitter.NewToken(completedTaskGetter));
+            }
+            il.EmitStLoc(returnTaskLocal);
+
+            il.Emit(ILOpcode.leave, returnTaskLabel);
+            il.EndTry(innerTryRegion);
+
+            il.BeginHandler(innerTryRegion);
+
+            MethodDesc fromExceptionMethod;
+            TypeDesc asyncHelpers = method.Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8);
+            if (isValueTask)
+            {
+                fromExceptionMethod = GetMethod(asyncHelpers, "ValueTaskFromException"u8, generic: logicalResultLocal != default);
+            }
+            else
+            {
+                fromExceptionMethod = GetMethod(asyncHelpers, "TaskFromException"u8, generic: logicalResultLocal != default);
+            }
+            if (logicalResultLocal != default)
+            {
+                fromExceptionMethod = fromExceptionMethod.MakeInstantiatedMethod(logicalResultType);
+            }
+
+            il.Emit(ILOpcode.call, ilEmitter.NewToken(fromExceptionMethod));
+            il.EmitStLoc(returnTaskLocal);
+
+            il.Emit(ILOpcode.leave, returnTaskLabel);
+            il.EndHandler(innerTryRegion);
+
+            il.EmitLabel(suspendedLabel);
+
+            MethodDesc finalizeMethod;
+            if (isValueTask)
+            {
+                finalizeMethod = GetMethod(asyncHelpers, "FinalizeValueTaskReturningThunk"u8, generic: logicalResultType != default);
+            }
+            else
+            {
+                finalizeMethod = GetMethod(asyncHelpers, "FinalizeTaskReturningThunk"u8, generic: logicalResultType != default);
+            }
+            if (logicalResultLocal != default)
+            {
+                finalizeMethod = finalizeMethod.MakeInstantiatedMethod(logicalResultType);
+            }
+
+            il.Emit(ILOpcode.call, ilEmitter.NewToken(finalizeMethod));
+            il.EmitStLoc(returnTaskLocal);
+
+            il.Emit(ILOpcode.leave, returnTaskLabel);
+            il.EndTry(outerTryRegion);
+
+            // Finally block
+            il.BeginHandler(outerTryRegion);
+            il.EmitLdLoca(executionAndSyncBlockStoreLocal);
+            il.Emit(ILOpcode.call, ilEmitter.NewToken(executionAndSyncBlockStoreType.GetKnownMethod("Pop"u8, null)));
+            il.Emit(ILOpcode.endfinally);
+            il.EndHandler(outerTryRegion);
+
+            // Return task label
+            il.EmitLabel(returnTaskLabel);
+            il.EmitLdLoc(returnTaskLocal);
+            il.Emit(ILOpcode.ret);
+
+            return ilEmitter.Link(method);
+
+            static MethodDesc GetMethod(TypeDesc type, ReadOnlySpan<byte> name, bool generic)
+            {
+                foreach (var m in type.GetMethods())
+                {
+                    if (m.Name.SequenceEqual(name) && m.HasInstantiation == generic)
+                    {
+                        return m;
+                    }
+                }
+                throw new InvalidOperationException($"Cannot find method '{UTF8Encoding.UTF8.GetString(name)}' on {type.GetDisplayName()} {(generic ? "with" : "without")} a generic parameter");
+            }
+        }
 
         /// <summary>
         /// A MethodIL Provider which provides tokens relative to a MutableModule. Used to implement cross
@@ -218,7 +425,7 @@ namespace Internal.IL
 
             MutableModule _mutableModule;
 
-            public ManifestModuleWrappedMethodIL() {}
+            public ManifestModuleWrappedMethodIL() { }
 
             public bool Initialize(MutableModule mutableModule, EcmaMethodIL wrappedMethod)
             {

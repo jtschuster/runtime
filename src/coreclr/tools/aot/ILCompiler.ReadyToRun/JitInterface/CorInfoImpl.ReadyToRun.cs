@@ -465,6 +465,9 @@ namespace Internal.JitInterface
         private NativeVarInfo[] _debugVarInfos;
         private HashSet<MethodDesc> _inlinedMethods;
         private UnboxingMethodDescFactory _unboxingThunkFactory = new UnboxingMethodDescFactory();
+        private AsyncMethodDescFactory _asyncMethodDescFactory = new AsyncMethodDescFactory();
+        private TaskReturningAsyncWrapperMethodDescFactory _asyncTaskWrapperMethodDescFactory = new TaskReturningAsyncWrapperMethodDescFactory();
+
         private List<ISymbolNode> _precodeFixups;
         private List<EcmaMethod> _ilBodiesNeeded;
         private Dictionary<TypeDesc, bool> _preInitedTypes = new Dictionary<TypeDesc, bool>();
@@ -547,6 +550,8 @@ namespace Internal.JitInterface
         public static bool ShouldCodeNotBeCompiledIntoFinalImage(InstructionSetSupport instructionSetSupport, MethodDesc method)
         {
             EcmaMethod ecmaMethod = method.GetTypicalMethodDefinition() as EcmaMethod;
+            if (ecmaMethod is null)
+                return false;
 
             var metadataReader = ecmaMethod.MetadataReader;
             var stringComparer = metadataReader.StringComparer;
@@ -1383,7 +1388,6 @@ namespace Internal.JitInterface
             // If the method body is synthetized by the compiler (the definition of the MethodIL is not
             // an EcmaMethodIL), the tokens in the MethodIL are not actual tokens: they're just
             // "per-MethodIL unique cookies". For ready to run, we need to be able to get to an actual
-            // token to refer to the result of token lookup in the R2R fixups; we replace the token
             // token to refer to the result of token lookup in the R2R fixups.
             //
             // We replace the token with the token of the ECMA entity. This only works for **types/members
@@ -2479,6 +2483,7 @@ namespace Internal.JitInterface
                         {
                             nonUnboxingMethod = rawPinvoke.Target;
                         }
+                        // Async equivalent here?
 
                         if (methodToCall.OwningType.IsArray && methodToCall.IsConstructor)
                         {

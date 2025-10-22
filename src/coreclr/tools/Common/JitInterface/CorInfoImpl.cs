@@ -25,6 +25,9 @@ using Internal.Pgo;
 
 using ILCompiler;
 using ILCompiler.DependencyAnalysis;
+using Internal.IL.Stubs;
+
+
 
 #if READYTORUN
 using System.Reflection.Metadata.Ecma335;
@@ -126,10 +129,10 @@ namespace Internal.JitInterface
         }
 
         [DllImport(JitLibrary)]
-        private static extern uint getLikelyClasses(LikelyClassMethodRecord* pLikelyClasses, uint maxLikelyClasses, PgoInstrumentationSchema* schema, uint countSchemaItems, byte*pInstrumentationData, int ilOffset);
+        private static extern uint getLikelyClasses(LikelyClassMethodRecord* pLikelyClasses, uint maxLikelyClasses, PgoInstrumentationSchema* schema, uint countSchemaItems, byte* pInstrumentationData, int ilOffset);
 
         [DllImport(JitLibrary)]
-        private static extern uint getLikelyMethods(LikelyClassMethodRecord* pLikelyMethods, uint maxLikelyMethods, PgoInstrumentationSchema* schema, uint countSchemaItems, byte*pInstrumentationData, int ilOffset);
+        private static extern uint getLikelyMethods(LikelyClassMethodRecord* pLikelyMethods, uint maxLikelyMethods, PgoInstrumentationSchema* schema, uint countSchemaItems, byte* pInstrumentationData, int ilOffset);
 
         [DllImport(JitSupportLibrary)]
         private static extern IntPtr GetJitHost(IntPtr configProvider);
@@ -150,7 +153,7 @@ namespace Internal.JitInterface
             ref CORINFO_METHOD_INFO info, uint flags, out IntPtr nativeEntry, out uint codeSize);
 
         [DllImport(JitSupportLibrary)]
-        private static extern IntPtr AllocException([MarshalAs(UnmanagedType.LPWStr)]string message, int messageLength);
+        private static extern IntPtr AllocException([MarshalAs(UnmanagedType.LPWStr)] string message, int messageLength);
 
         [DllImport(JitSupportLibrary)]
         private static extern void JitSetOs(IntPtr jit, CORINFO_OS os);
@@ -816,12 +819,12 @@ namespace Internal.JitInterface
         private Dictionary<Instantiation, IntPtr[]> _instantiationToJitVisibleInstantiation;
         private CORINFO_CLASS_STRUCT_** GetJitInstantiation(Instantiation inst)
         {
-            IntPtr [] jitVisibleInstantiation;
+            IntPtr[] jitVisibleInstantiation;
             _instantiationToJitVisibleInstantiation ??= new Dictionary<Instantiation, IntPtr[]>();
 
             if (!_instantiationToJitVisibleInstantiation.TryGetValue(inst, out jitVisibleInstantiation))
             {
-                jitVisibleInstantiation =  new IntPtr[inst.Length];
+                jitVisibleInstantiation = new IntPtr[inst.Length];
                 for (int i = 0; i < inst.Length; i++)
                     jitVisibleInstantiation[i] = (IntPtr)ObjectToHandle(inst[i]);
                 _instantiationToJitVisibleInstantiation.Add(inst, jitVisibleInstantiation);
@@ -853,6 +856,11 @@ namespace Internal.JitInterface
                 sig->callConv |= CorInfoCallConv.CORINFO_CALLCONV_PARAMTYPE;
             }
 
+            if (method.IsAsyncCallConv())
+            {
+                sig->callConv |= CorInfoCallConv.CORINFO_CALLCONV_ASYNCCALL;
+            }
+
             Instantiation owningTypeInst = method.OwningType.Instantiation;
             sig->sigInst.classInstCount = (uint)owningTypeInst.Length;
             if (owningTypeInst.Length != 0)
@@ -877,6 +885,7 @@ namespace Internal.JitInterface
 
             if (!signature.IsStatic) sig->callConv |= CorInfoCallConv.CORINFO_CALLCONV_HASTHIS;
             if (signature.IsExplicitThis) sig->callConv |= CorInfoCallConv.CORINFO_CALLCONV_EXPLICITTHIS;
+            if (signature.IsAsyncCallConv) sig->callConv |= CorInfoCallConv.CORINFO_CALLCONV_ASYNCCALL;
 
             TypeDesc returnType = signature.ReturnType;
 
@@ -1044,7 +1053,7 @@ namespace Internal.JitInterface
         {
             if (contextStruct == contextFromMethodBeingCompiled())
             {
-                return MethodBeingCompiled.HasInstantiation ? (TypeSystemEntity)MethodBeingCompiled: (TypeSystemEntity)MethodBeingCompiled.OwningType;
+                return MethodBeingCompiled.HasInstantiation ? (TypeSystemEntity)MethodBeingCompiled : (TypeSystemEntity)MethodBeingCompiled.OwningType;
             }
 
             return (TypeSystemEntity)HandleToObject((void*)((nuint)contextStruct & ~(nuint)CorInfoContextFlags.CORINFO_CONTEXTFLAGS_MASK));
@@ -1801,6 +1810,7 @@ namespace Internal.JitInterface
 
         private void resolveToken(ref CORINFO_RESOLVED_TOKEN pResolvedToken)
         {
+            // If the token is an async method but await tokenkind is not requested, wrap it with a AsyncTaskWrapperMethodDesc
             var methodIL = HandleToObject(pResolvedToken.tokenScope);
 
             var typeOrMethodContext = (pResolvedToken.tokenContext == contextFromMethodBeingCompiled()) ?
@@ -1827,6 +1837,19 @@ namespace Internal.JitInterface
 
             if (result is MethodDesc method)
             {
+                if (pResolvedToken.tokenType == CorInfoTokenKind.CORINFO_TOKENKIND_Await)
+                {
+                    Debug.Assert(method.ReturnsTaskLike());
+                    method = _asyncMethodDescFactory.GetAsyncMethod(method);
+                    result = method;
+                }
+                else if (method.IsAsync)
+                {
+                    //method = _asyncTaskWrapperMethodDescFactory.GetTaskReturningAsyncWrapperMethod(method);
+                    //result = method;
+                    _ = 0;
+                }
+
                 pResolvedToken.hMethod = ObjectToHandle(method);
 
                 TypeDesc owningClass = method.OwningType;
@@ -2258,7 +2281,7 @@ namespace Internal.JitInterface
         //
         private static bool ShouldAlign8(int dwR8Fields, int dwTotalFields)
         {
-            return dwR8Fields*2>dwTotalFields && dwR8Fields>=2;
+            return dwR8Fields * 2 > dwTotalFields && dwR8Fields >= 2;
         }
 
         private static bool ShouldAlign8(DefType type)
@@ -3376,7 +3399,8 @@ namespace Internal.JitInterface
         private CORINFO_CLASS_STRUCT_* getContinuationType(nuint dataSize, ref bool objRefs, nuint objRefsSize)
         {
             Debug.Assert(objRefsSize == (dataSize + (nuint)(PointerSize - 1)) / (nuint)PointerSize);
-            throw new NotImplementedException("getContinuationType");
+            return ObjectToHandle(_compilation.TypeSystemContext.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "Continuation"u8));
+            //throw new NotImplementedException("getContinuationType");
         }
 
         private mdToken getMethodDefFromMethod(CORINFO_METHOD_STRUCT_* hMethod)
@@ -3563,7 +3587,7 @@ namespace Internal.JitInterface
         { throw new NotImplementedException("getThreadTLSIndex"); }
 
         private Dictionary<CorInfoHelpFunc, ISymbolNode> _helperCache = new Dictionary<CorInfoHelpFunc, ISymbolNode>();
-        private void getHelperFtn(CorInfoHelpFunc ftnNum, CORINFO_CONST_LOOKUP *pNativeEntrypoint, CORINFO_METHOD_STRUCT_** pMethod)
+        private void getHelperFtn(CorInfoHelpFunc ftnNum, CORINFO_CONST_LOOKUP* pNativeEntrypoint, CORINFO_METHOD_STRUCT_** pMethod)
         {
             // We never return a method handle from the managed implementation of this method today
             if (pMethod != null)
@@ -3614,7 +3638,11 @@ namespace Internal.JitInterface
         }
 
         private void getFunctionFixedEntryPoint(CORINFO_METHOD_STRUCT_* ftn, bool isUnsafeFunctionPointer, ref CORINFO_CONST_LOOKUP pResult)
-        { throw new NotImplementedException("getFunctionFixedEntryPoint"); }
+        {
+            var method = HandleToObject(ftn);
+            pResult.handle = (CORINFO_GENERIC_STRUCT_*)ObjectToHandle(HandleToObject(ftn));
+            pResult.accessType = InfoAccessType.IAT_PVALUE;
+        }
 
 #pragma warning disable CA1822 // Mark members as static
         private CorInfoHelpFunc getLazyStringLiteralHelper(CORINFO_MODULE_STRUCT_* handle)
@@ -3731,8 +3759,10 @@ namespace Internal.JitInterface
         private CORINFO_METHOD_STRUCT_* getAsyncResumptionStub()
 #pragma warning restore CA1822 // Mark members as static
         {
-            throw new NotImplementedException("Crossgen2 does not support runtime-async yet");
+            // does m_finalCodeAddressSlot become a reloc? Or will jit give it to us somehow?
+            return ObjectToHandle(new AsyncResumptionStub(MethodBeingCompiled));
         }
+
 
         private byte[] _code;
         private byte[] _coldCode;
@@ -4315,7 +4345,7 @@ namespace Internal.JitInterface
                 flags.Set(CorJitFlag.CORJIT_FLAG_SOFTFP_ABI);
             }
 
-            if (this.MethodBeingCompiled.IsAsync)
+            if (this.MethodBeingCompiled.IsAsyncCallConv())
             {
                 flags.Set(CorJitFlag.CORJIT_FLAG_ASYNC);
             }

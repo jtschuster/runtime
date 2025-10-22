@@ -37,6 +37,8 @@ namespace Internal.JitInterface
         private DebugLocInfo[] _debugLocInfos;
         private DebugVarInfo[] _debugVarInfos;
         private readonly UnboxingMethodDescFactory _unboxingThunkFactory = new UnboxingMethodDescFactory();
+        private AsyncMethodDescFactory _asyncMethodDescFactory = new AsyncMethodDescFactory();
+        private TaskReturningAsyncWrapperMethodDescFactory _asyncTaskWrapperMethodDescFactory = new TaskReturningAsyncWrapperMethodDescFactory();
         private bool _isFallbackBodyCompilation;
 
         public CorInfoImpl(RyuJitCompilation compilation)
