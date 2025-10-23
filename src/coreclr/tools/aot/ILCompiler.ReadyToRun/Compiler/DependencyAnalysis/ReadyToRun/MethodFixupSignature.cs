@@ -126,8 +126,17 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                     }
                 }
             }
+            else
+            {
+                if (method.Token.TokenType == CorTokenType.mdtMethodDef)
+                {
+                    method = new MethodWithToken(method.Method, factory.SignatureContext.Resolver.GetModuleTokenForMethod(method.Method, true, false), method.ConstrainedType, unboxing: _method.Unboxing, null);
+                }
 
-            SignatureContext innerContext = dataBuilder.EmitFixup(factory, fixupKind, method.Token.Module, factory.SignatureContext);
+            }
+
+
+                SignatureContext innerContext = dataBuilder.EmitFixup(factory, fixupKind, method.Token.Module, factory.SignatureContext);
 
             if (optimized && method.Token.TokenType == CorTokenType.mdtMethodDef)
             {

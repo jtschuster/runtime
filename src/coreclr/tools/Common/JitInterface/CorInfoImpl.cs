@@ -1845,8 +1845,8 @@ namespace Internal.JitInterface
                 }
                 else if (method.IsAsync)
                 {
-                    method = _asyncTaskWrapperMethodDescFactory.GetTaskReturningAsyncWrapperMethod(method);
-                    result = method;
+                    //method = _asyncTaskWrapperMethodDescFactory.GetTaskReturningAsyncWrapperMethod(method);
+                    //result = method;
                     _ = 0;
                 }
 

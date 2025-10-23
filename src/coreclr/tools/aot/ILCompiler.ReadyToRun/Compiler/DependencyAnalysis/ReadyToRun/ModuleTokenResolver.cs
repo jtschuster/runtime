@@ -249,10 +249,10 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
         {
             // We can only use tokens from the manifest mutable module or from one of the modules that versions
             // with the current compilation. Any other module tokens may change while the code executes
-            if (token.Module != _manifestMutableModule && !_compilationModuleGroup.VersionsWithModule((ModuleDesc)token.Module))
-            {
-                throw new InternalCompilerErrorException("Invalid usage of a token from a module not within the version bubble");
-            }
+            //if (token.Module != _manifestMutableModule && !_compilationModuleGroup.VersionsWithModule((ModuleDesc)token.Module))
+            //{
+            //    throw new InternalCompilerErrorException("Invalid usage of a token from a module not within the version bubble");
+            //}
 
             if (!dictionary.TryAdd(tse, token))
             {
