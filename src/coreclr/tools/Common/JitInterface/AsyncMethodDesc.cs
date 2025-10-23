@@ -10,6 +10,7 @@ namespace Internal.JitInterface
     /// <summary>
     /// Represents the async-callable (CORINFO_CALLCONV_ASYNCCALL) variant of a Task/ValueTask returning method.
     /// The wrapper should be short‑lived and only used while interacting with the JIT interface.
+    /// NOPE: These things aren't short lived in R2R scenarios. Please make a normal method, and give them normal, long lifetimes
     /// </summary>
     internal sealed class AsyncMethodDesc : MethodDelegator
     {

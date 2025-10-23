@@ -17,6 +17,7 @@ using System.Reflection.Metadata.Ecma335;
 using Internal.JitInterface;
 using System.Text;
 using System.Text.Unicode;
+using ILCompiler.DependencyAnalysis.ReadyToRun;
 
 namespace Internal.IL
 {
@@ -37,9 +38,10 @@ namespace Internal.IL
             _compilationModuleGroup = compilationModuleGroup;
         }
 
-        public void InitManifestMutableModule(MutableModule module)
+        public void InitManifestMutableModule(MutableModule module, ModuleTokenResolver tokenResolver)
         {
             _manifestMutableModule = module;
+            EnsureR2RKnownMethodsAreInManifestModule(tokenResolver);
         }
 
         void IncrementVersion()
@@ -213,6 +215,124 @@ namespace Internal.IL
                 return null;
             }
         }
+
+        public enum R2RKnownType
+        {
+            ExecutionAndSyncBlockStore,
+            SystemException,
+        }
+
+        public enum R2RKnownMethod
+        {
+            ExecutionAndSyncBlockStore_Push,
+            ExecutionAndSyncBlockStore_Pop,
+            ValueTask_FromResult,
+            Task_FromResult,
+            ValueTask_get_CompletedTask,
+            Task_get_CompletedTask,
+            StubHelpers_AsyncCallContinuation,
+            AsyncHelpers_TaskFromException,
+            AsyncHelpers_ValueTaskFromException,
+            AsyncHelpers_TaskFromExceptionGeneric,
+            AsyncHelpers_ValueTaskFromExceptionGeneric,
+            AsyncHelpers_FinalizeTaskReturningThunk,
+            AsyncHelpers_FinalizeValueTaskReturningThunk,
+            AsyncHelpers_FinalizeTaskReturningThunkGeneric,
+            AsyncHelpers_FinalizeValueTaskReturningThunkGeneric,
+        }
+
+        public MetadataType GetR2RKnownType(R2RKnownType knownType)
+        {
+            switch (knownType)
+            {
+                case R2RKnownType.ExecutionAndSyncBlockStore:
+                    return _manifestMutableModule.Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "ExecutionAndSyncBlockStore"u8);
+                case R2RKnownType.SystemException:
+                    return _manifestMutableModule.Context.SystemModule.GetKnownType("System"u8, "SystemException"u8);
+                default:
+                    throw new InvalidOperationException($"Unknown R2R known type: {knownType}");
+            }
+        }
+
+        public MethodDesc GetR2RKnownMethod(R2RKnownMethod knownMethod)
+        {
+            TypeSystemContext context = _manifestMutableModule.Context;
+            switch (knownMethod)
+            {
+                case R2RKnownMethod.ExecutionAndSyncBlockStore_Push:
+                    return GetR2RKnownType(R2RKnownType.ExecutionAndSyncBlockStore).GetKnownMethod("Push"u8, null);
+                case R2RKnownMethod.ExecutionAndSyncBlockStore_Pop:
+                    return GetR2RKnownType(R2RKnownType.ExecutionAndSyncBlockStore).GetKnownMethod("Pop"u8, null);
+                case R2RKnownMethod.ValueTask_FromResult:
+                    return _manifestMutableModule.Context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "ValueTask"u8).GetKnownMethod("FromResult"u8, null);
+                case R2RKnownMethod.Task_FromResult:
+                    return _manifestMutableModule.Context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "Task"u8).GetKnownMethod("FromResult"u8, null);
+                case R2RKnownMethod.ValueTask_get_CompletedTask:
+                    return _manifestMutableModule.Context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "ValueTask"u8).GetKnownMethod("get_CompletedTask"u8, null);
+                case R2RKnownMethod.Task_get_CompletedTask:
+                    return _manifestMutableModule.Context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "Task"u8).GetKnownMethod("get_CompletedTask"u8, null);
+                case R2RKnownMethod.StubHelpers_AsyncCallContinuation:
+                    return _manifestMutableModule.Context.SystemModule.GetKnownType("System.StubHelpers"u8, "StubHelpers"u8).GetKnownMethod("AsyncCallContinuation"u8, null);
+                case R2RKnownMethod.AsyncHelpers_TaskFromException:
+                    return _manifestMutableModule.Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8).GetKnownMethod("TaskFromException"u8, new MethodSignature(MethodSignatureFlags.Static, 0, context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "Task"u8), new TypeDesc[] { context.SystemModule.GetKnownType("System"u8, "Exception"u8) }));
+                case R2RKnownMethod.AsyncHelpers_ValueTaskFromException:
+                    return _manifestMutableModule.Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8).GetKnownMethod("ValueTaskFromException"u8, new MethodSignature(MethodSignatureFlags.Static, 0, context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "ValueTask"u8), new TypeDesc[] { context.SystemModule.GetKnownType("System"u8, "Exception"u8) }));
+                case R2RKnownMethod.AsyncHelpers_TaskFromExceptionGeneric:
+                    return _manifestMutableModule.Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8).GetKnownMethod("TaskFromException"u8, new MethodSignature(MethodSignatureFlags.Static, 1, context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "Task`1"u8).MakeInstantiatedType(context.GetSignatureVariable(0, method: true)), new TypeDesc[] { context.SystemModule.GetKnownType("System"u8, "Exception"u8) }));
+                case R2RKnownMethod.AsyncHelpers_ValueTaskFromExceptionGeneric:
+                    return _manifestMutableModule.Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8).GetKnownMethod("ValueTaskFromException"u8, new MethodSignature(MethodSignatureFlags.Static, 1, context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "ValueTask`1"u8).MakeInstantiatedType(context.GetSignatureVariable(0, method: true)), new TypeDesc[] { context.SystemModule.GetKnownType("System"u8, "Exception"u8) }));
+                case R2RKnownMethod.AsyncHelpers_FinalizeTaskReturningThunk:
+                    return _manifestMutableModule.Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8).GetKnownMethod("FinalizeTaskReturningThunk"u8, new MethodSignature(MethodSignatureFlags.Static, 0, context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "Task"u8), Array.Empty<TypeDesc>()));
+                case R2RKnownMethod.AsyncHelpers_FinalizeValueTaskReturningThunk:
+                    return _manifestMutableModule.Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8).GetKnownMethod("FinalizeValueTaskReturningThunk"u8, new MethodSignature(MethodSignatureFlags.Static, 0, context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "ValueTask"u8), Array.Empty<TypeDesc>()));
+                case R2RKnownMethod.AsyncHelpers_FinalizeTaskReturningThunkGeneric:
+                    return _manifestMutableModule.Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8).GetKnownMethod("FinalizeTaskReturningThunk"u8, new MethodSignature(MethodSignatureFlags.Static, 1, context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "Task`1"u8).MakeInstantiatedType(context.GetSignatureVariable(0, method: true)), Array.Empty<TypeDesc>()));
+                case R2RKnownMethod.AsyncHelpers_FinalizeValueTaskReturningThunkGeneric:
+                        return _manifestMutableModule.Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8).GetKnownMethod("FinalizeValueTaskReturningThunk"u8, new MethodSignature(MethodSignatureFlags.Static, 1, context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "ValueTask`1"u8).MakeInstantiatedType(context.GetSignatureVariable(0, method: true)), Array.Empty<TypeDesc>()));
+
+                default:
+                    throw new InvalidOperationException($"Unknown R2R known method: {knownMethod}");
+            }
+        }
+
+        public void EnsureR2RKnownMethodsAreInManifestModule(ModuleTokenResolver tokenResolver)
+        {
+            try
+            {
+                Debug.Assert(_manifestMutableModule.ModuleThatIsCurrentlyTheSourceOfNewReferences == null);
+                _manifestMutableModule.ModuleThatIsCurrentlyTheSourceOfNewReferences = _manifestMutableModule.Context.SystemModule;
+                _manifestMutableModule.AddingReferencesToR2RKnownTypesAndMethods = true;
+
+                // Force all known R2R methods to be present in the manifest module
+                foreach (R2RKnownMethod knownMethod in Enum.GetValues(typeof(R2RKnownMethod)))
+                {
+                    MethodDesc method = GetR2RKnownMethod(knownMethod);
+                    if (!_compilationModuleGroup.VersionsWithMethodBody(method))
+                    {
+                        tokenResolver.AddModuleTokenForMethod(method, new ModuleToken(_manifestMutableModule, _manifestMutableModule.TryGetEntityHandle(method).Value));
+
+                        // This is effectively an assert
+                        tokenResolver.GetModuleTokenForMethod(method, allowDynamicallyCreatedReference: true, throwIfNotFound: true);
+                    }
+                }
+                // Force all known R2R types to be present in the manifest module
+                foreach (R2RKnownType knownType in Enum.GetValues(typeof(R2RKnownType)))
+                {
+                    TypeDesc type = GetR2RKnownType(knownType);
+                    if (!_compilationModuleGroup.VersionsWithType(type))
+                    {
+                        tokenResolver.AddModuleTokenForType((EcmaType)type, new ModuleToken(_manifestMutableModule, _manifestMutableModule.TryGetEntityHandle(type).Value));
+                        tokenResolver.GetModuleTokenForType((EcmaType)type, allowDynamicallyCreatedReference: true, throwIfNotFound: true);
+                    }
+                }
+            }
+            finally
+            {
+                _manifestMutableModule.AddingReferencesToR2RKnownTypesAndMethods = false;
+                _manifestMutableModule.ModuleThatIsCurrentlyTheSourceOfNewReferences = null;
+            }
+        }
+
         // Emits roughly the following code:
         //
         // ExecutionAndSyncBlockStore store = default;
@@ -251,7 +371,7 @@ namespace Internal.IL
                 logicalResultType = retType.Instantiation[0];
                 logicalResultLocal = ilEmitter.NewLocal(logicalResultType);
             }
-            var executionAndSyncBlockStoreType = method.Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "ExecutionAndSyncBlockStore"u8);
+            var executionAndSyncBlockStoreType = GetR2RKnownType(R2RKnownType.ExecutionAndSyncBlockStore);
             var executionAndSyncBlockStoreLocal = ilEmitter.NewLocal(executionAndSyncBlockStoreType);
 
             ILCodeLabel returnTaskLabel = ilEmitter.NewCodeLabel();
@@ -260,10 +380,10 @@ namespace Internal.IL
 
             // store.Push()
             il.EmitLdLoca(executionAndSyncBlockStoreLocal);
-            il.Emit(ILOpcode.call, ilEmitter.NewToken(executionAndSyncBlockStoreType.GetKnownMethod("Push"u8, null)));
+            il.Emit(ILOpcode.call, ilEmitter.NewToken(GetR2RKnownMethod(R2RKnownMethod.ExecutionAndSyncBlockStore_Push)));
 
             // Inner try block must appear first in metadata
-            var exceptionType = ilEmitter.NewToken(method.Context.GetWellKnownType(WellKnownType.Exception));
+            var exceptionType = ilEmitter.NewToken(GetR2RKnownType(R2RKnownType.SystemException));
             ILExceptionRegionBuilder innerTryRegion = ilEmitter.NewCatchRegion(exceptionType);
             // Outer try block
             ILExceptionRegionBuilder outerTryRegion = ilEmitter.NewFinallyRegion();
@@ -292,9 +412,7 @@ namespace Internal.IL
                 il.EmitStLoc(logicalResultLocal);
             }
 
-            il.Emit(ILOpcode.call, ilEmitter.NewToken(
-                method.Context.SystemModule.GetKnownType("System.StubHelpers"u8, "StubHelpers"u8)
-                    .GetKnownMethod("AsyncCallContinuation"u8, null)));
+            il.Emit(ILOpcode.call, ilEmitter.NewToken(GetR2RKnownMethod(R2RKnownMethod.StubHelpers_AsyncCallContinuation)));
             il.Emit(ILOpcode.brfalse, finishedLabel);
 
             il.Emit(ILOpcode.leave, suspendedLabel);
@@ -303,19 +421,8 @@ namespace Internal.IL
             if (logicalResultLocal != default)
             {
                 il.EmitLdLoc(logicalResultLocal);
-                MethodDesc fromResultMethod;
-                if (isValueTask)
-                {
-                    fromResultMethod = method.Context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "ValueTask"u8)
-                        .GetKnownMethod("FromResult"u8, null)
-                        .MakeInstantiatedMethod(logicalResultType);
-                }
-                else
-                {
-                    fromResultMethod = method.Context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "Task"u8)
-                        .GetKnownMethod("FromResult"u8, null)
-                        .MakeInstantiatedMethod(logicalResultType);
-                }
+                R2RKnownMethod fromResultValue = isValueTask ? R2RKnownMethod.ValueTask_FromResult : R2RKnownMethod.Task_FromResult;
+                MethodDesc fromResultMethod = GetR2RKnownMethod(fromResultValue).MakeInstantiatedMethod(logicalResultType);
                 il.Emit(ILOpcode.call, ilEmitter.NewToken(fromResultMethod));
             }
             else
@@ -323,13 +430,11 @@ namespace Internal.IL
                 MethodDesc completedTaskGetter;
                 if (isValueTask)
                 {
-                    completedTaskGetter = method.Context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "ValueTask"u8)
-                        .GetKnownMethod("get_CompletedTask"u8, null);
+                    completedTaskGetter = GetR2RKnownMethod(R2RKnownMethod.ValueTask_get_CompletedTask);
                 }
                 else
                 {
-                    completedTaskGetter = method.Context.SystemModule.GetKnownType("System.Threading.Tasks"u8, "Task"u8)
-                        .GetKnownMethod("get_CompletedTask"u8, null);
+                    completedTaskGetter = GetR2RKnownMethod(R2RKnownMethod.Task_get_CompletedTask);
                 }
                 il.Emit(ILOpcode.call, ilEmitter.NewToken(completedTaskGetter));
             }
@@ -341,15 +446,20 @@ namespace Internal.IL
             il.BeginHandler(innerTryRegion);
 
             MethodDesc fromExceptionMethod;
-            TypeDesc asyncHelpers = method.Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8);
+            R2RKnownMethod fromExceptionKnownMethod;
             if (isValueTask)
             {
-                fromExceptionMethod = GetMethod(asyncHelpers, "ValueTaskFromException"u8, generic: logicalResultLocal != default);
+                fromExceptionKnownMethod = logicalResultLocal != default ?
+                    R2RKnownMethod.AsyncHelpers_ValueTaskFromExceptionGeneric :
+                    R2RKnownMethod.AsyncHelpers_ValueTaskFromException;
             }
             else
             {
-                fromExceptionMethod = GetMethod(asyncHelpers, "TaskFromException"u8, generic: logicalResultLocal != default);
+                fromExceptionKnownMethod = logicalResultLocal != default ?
+                    R2RKnownMethod.AsyncHelpers_TaskFromExceptionGeneric :
+                    R2RKnownMethod.AsyncHelpers_TaskFromException;
             }
+            fromExceptionMethod = GetR2RKnownMethod(fromExceptionKnownMethod);
             if (logicalResultLocal != default)
             {
                 fromExceptionMethod = fromExceptionMethod.MakeInstantiatedMethod(logicalResultType);
@@ -364,14 +474,22 @@ namespace Internal.IL
             il.EmitLabel(suspendedLabel);
 
             MethodDesc finalizeMethod;
+            R2RKnownMethod finalizeKnownMethod;
             if (isValueTask)
             {
-                finalizeMethod = GetMethod(asyncHelpers, "FinalizeValueTaskReturningThunk"u8, generic: logicalResultType != default);
+                finalizeKnownMethod = logicalResultLocal != default ?
+                    R2RKnownMethod.AsyncHelpers_FinalizeValueTaskReturningThunkGeneric :
+                    R2RKnownMethod.AsyncHelpers_FinalizeValueTaskReturningThunk;
             }
             else
             {
-                finalizeMethod = GetMethod(asyncHelpers, "FinalizeTaskReturningThunk"u8, generic: logicalResultType != default);
+                finalizeKnownMethod = logicalResultLocal != default ?
+                    R2RKnownMethod.AsyncHelpers_FinalizeTaskReturningThunkGeneric :
+                    R2RKnownMethod.AsyncHelpers_FinalizeTaskReturningThunk;
             }
+
+            finalizeMethod = GetR2RKnownMethod(finalizeKnownMethod);
+
             if (logicalResultLocal != default)
             {
                 finalizeMethod = finalizeMethod.MakeInstantiatedMethod(logicalResultType);
@@ -386,7 +504,7 @@ namespace Internal.IL
             // Finally block
             il.BeginHandler(outerTryRegion);
             il.EmitLdLoca(executionAndSyncBlockStoreLocal);
-            il.Emit(ILOpcode.call, ilEmitter.NewToken(executionAndSyncBlockStoreType.GetKnownMethod("Pop"u8, null)));
+            il.Emit(ILOpcode.call, ilEmitter.NewToken(GetR2RKnownMethod(R2RKnownMethod.ExecutionAndSyncBlockStore_Pop)));
             il.Emit(ILOpcode.endfinally);
             il.EndHandler(outerTryRegion);
 
@@ -396,18 +514,6 @@ namespace Internal.IL
             il.Emit(ILOpcode.ret);
 
             return ilEmitter.Link(method);
-
-            static MethodDesc GetMethod(TypeDesc type, ReadOnlySpan<byte> name, bool generic)
-            {
-                foreach (var m in type.GetMethods())
-                {
-                    if (m.Name.SequenceEqual(name) && m.HasInstantiation == generic)
-                    {
-                        return m;
-                    }
-                }
-                throw new InvalidOperationException($"Cannot find method '{UTF8Encoding.UTF8.GetString(name)}' on {type.GetDisplayName()} {(generic ? "with" : "without")} a generic parameter");
-            }
         }
 
         /// <summary>
@@ -486,7 +592,7 @@ namespace Internal.IL
                     }
                     if (!newToken.HasValue)
                     {
-                        // Toekn replacement has failed. Do not attempt to use this IL.
+                        // Token replacement has failed. Do not attempt to use this IL.
                         failedToReplaceToken = true;
                         return 1;
                     }
