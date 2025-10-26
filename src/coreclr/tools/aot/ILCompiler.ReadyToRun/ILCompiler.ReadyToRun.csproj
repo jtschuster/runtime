@@ -345,11 +345,5 @@
     <Compile Include="..\..\Common\JitInterface\AsyncMethodDescFactory.cs">
       <Link>JitInterface\AsyncMethodDesc.cs</Link>
     </Compile>
-    <Compile Include="..\..\Common\JitInterface\TaskReturningAsyncWrapperMethodDesc.cs">
-      <Link>JitInterface\TaskReturningAsyncWrapperMethodDesc.cs</Link>
-    </Compile>
-    <Compile Include="..\..\Common\JitInterface\TaskReturningAsyncWrapperMethodDescFactory.cs">
-      <Link>JitInterface\TaskReturningAsyncWrapperMethodDescFactory.cs</Link>
-    </Compile>
   </ItemGroup>
 </Project>

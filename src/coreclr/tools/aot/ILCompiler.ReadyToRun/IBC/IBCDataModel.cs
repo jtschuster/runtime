@@ -376,6 +376,8 @@ namespace ILCompiler.IBC
         { return (flags & (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_UnboxingStub) != 0; }
         public static bool IsInstantiatingStub(uint flags)
         { return (flags & (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_InstantiatingStub) != 0; }
+        public static bool IsAsyncVariant(uint flags)
+        { return (flags & (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_AsyncVariant) != 0; }
     }
 
 

@@ -90,8 +90,7 @@ namespace Internal.JitInterface
     public enum mdToken : uint
     { }
 
-    public enum HRESULT
-    {
+    public enum HRESULT {
         S_OK = 0,
         E_NOTIMPL = -2147467263
     }
@@ -269,8 +268,8 @@ namespace Internal.JitInterface
             {
                 // constLookup is union with runtimeLookup
                 Debug.Assert(sizeof(CORINFO_RUNTIME_LOOKUP) >= sizeof(CORINFO_CONST_LOOKUP));
-                fixed (CORINFO_RUNTIME_LOOKUP* p = &runtimeLookup)
-                    return ref *(CORINFO_CONST_LOOKUP*)p;
+                fixed (CORINFO_RUNTIME_LOOKUP * p = &runtimeLookup)
+                    return ref *(CORINFO_CONST_LOOKUP *)p;
             }
         }
     }
@@ -503,7 +502,7 @@ namespace Internal.JitInterface
     public enum CorInfoInlineTypeCheckSource
     {
         CORINFO_INLINE_TYPECHECK_SOURCE_VTABLE = 0x00000000, // Type handle comes from the vtable
-        CORINFO_INLINE_TYPECHECK_SOURCE_TOKEN = 0x00000001, // Type handle comes from an ldtoken
+        CORINFO_INLINE_TYPECHECK_SOURCE_TOKEN  = 0x00000001, // Type handle comes from an ldtoken
     }
 
     // If you add more values here, keep it in sync with TailCallTypeMap in ..\vm\ClrEtwAll.man
@@ -741,7 +740,7 @@ namespace Internal.JitInterface
         CORJIT_ALLOCMEM_DEFAULT_CODE_ALIGN = 0x00000000, // The code will be use the normal alignment
         CORJIT_ALLOCMEM_FLG_16BYTE_ALIGN = 0x00000001, // The code will be 16-byte aligned
         CORJIT_ALLOCMEM_FLG_RODATA_16BYTE_ALIGN = 0x00000002, // The read-only data will be 16-byte aligned
-        CORJIT_ALLOCMEM_FLG_32BYTE_ALIGN = 0x00000004, // The code will be 32-byte aligned
+        CORJIT_ALLOCMEM_FLG_32BYTE_ALIGN   = 0x00000004, // The code will be 32-byte aligned
         CORJIT_ALLOCMEM_FLG_RODATA_32BYTE_ALIGN = 0x00000008, // The read-only data will be 32-byte aligned
         CORJIT_ALLOCMEM_FLG_RODATA_64BYTE_ALIGN = 0x00000010, // The read-only data will be 64-byte aligned
     }
@@ -915,9 +914,9 @@ namespace Internal.JitInterface
     public unsafe struct CORINFO_TAILCALL_HELPERS
     {
         private CORINFO_TAILCALL_HELPERS_FLAGS flags;
-        private CORINFO_METHOD_STRUCT_* hStoreArgs;
-        private CORINFO_METHOD_STRUCT_* hCallTarget;
-        private CORINFO_METHOD_STRUCT_* hDispatcher;
+        private CORINFO_METHOD_STRUCT_*        hStoreArgs;
+        private CORINFO_METHOD_STRUCT_*        hCallTarget;
+        private CORINFO_METHOD_STRUCT_*        hDispatcher;
     };
 
     public enum CORINFO_THIS_TRANSFORM
@@ -1201,14 +1200,14 @@ namespace Internal.JitInterface
     // The Classification types are described in the ABI spec at https://software.intel.com/sites/default/files/article/402129/mpx-linux64-abi.pdf
     public enum SystemVClassificationType : byte
     {
-        SystemVClassificationTypeUnknown = 0,
-        SystemVClassificationTypeStruct = 1,
-        SystemVClassificationTypeNoClass = 2,
-        SystemVClassificationTypeMemory = 3,
-        SystemVClassificationTypeInteger = 4,
-        SystemVClassificationTypeIntegerReference = 5,
-        SystemVClassificationTypeIntegerByRef = 6,
-        SystemVClassificationTypeSSE = 7,
+        SystemVClassificationTypeUnknown            = 0,
+        SystemVClassificationTypeStruct             = 1,
+        SystemVClassificationTypeNoClass            = 2,
+        SystemVClassificationTypeMemory             = 3,
+        SystemVClassificationTypeInteger            = 4,
+        SystemVClassificationTypeIntegerReference   = 5,
+        SystemVClassificationTypeIntegerByRef       = 6,
+        SystemVClassificationTypeSSE                = 7,
         // SystemVClassificationTypeSSEUp           = Unused, // Not supported by the CLR.
         // SystemVClassificationTypeX87             = Unused, // Not supported by the CLR.
         // SystemVClassificationTypeX87Up           = Unused, // Not supported by the CLR.
@@ -1282,22 +1281,22 @@ namespace Internal.JitInterface
         public uint nativeOffset;
         public uint ilOffset;
         public SourceTypes source; // The debugger needs this so that
-                                   // we don't put Edit and Continue breakpoints where
-                                   // the stack isn't empty.  We can put regular breakpoints
-                                   // there, though, so we need a way to discriminate
-                                   // between offsets.
+        // we don't put Edit and Continue breakpoints where
+        // the stack isn't empty.  We can put regular breakpoints
+        // there, though, so we need a way to discriminate
+        // between offsets.
     };
 
     public enum ILNum
     {
-        VARARGS_HND_ILNUM = -1, // Value for the CORINFO_VARARGS_HANDLE varNumber
-        RETBUF_ILNUM = -2, // Pointer to the return-buffer
-        TYPECTXT_ILNUM = -3, // ParamTypeArg for CORINFO_GENERICS_CTXT_FROM_PARAMTYPEARG
+        VARARGS_HND_ILNUM   = -1, // Value for the CORINFO_VARARGS_HANDLE varNumber
+        RETBUF_ILNUM        = -2, // Pointer to the return-buffer
+        TYPECTXT_ILNUM      = -3, // ParamTypeArg for CORINFO_GENERICS_CTXT_FROM_PARAMTYPEARG
 
-        UNKNOWN_ILNUM = -4, // Unknown variable
+        UNKNOWN_ILNUM       = -4, // Unknown variable
 
-        MAX_ILNUM = -4  // Sentinel value. This should be set to the largest magnitude value in the enum
-                        // so that the compression routines know the enum's range.
+        MAX_ILNUM           = -4  // Sentinel value. This should be set to the largest magnitude value in the enum
+                                  // so that the compression routines know the enum's range.
     };
 
     public struct ILVarInfo
@@ -1396,40 +1395,40 @@ namespace Internal.JitInterface
         CORJIT_FLAG_CALL_GETJITFLAGS = 0xffffffff, // Indicates that the JIT should retrieve flags in the form of a
                                                    // pointer to a CORJIT_FLAGS value via ICorJitInfo::getJitFlags().
 
-        CORJIT_FLAG_SPEED_OPT = 0, // optimize for speed
-        CORJIT_FLAG_SIZE_OPT = 1, // optimize for code size
-        CORJIT_FLAG_DEBUG_CODE = 2, // generate "debuggable" code (no code-mangling optimizations)
-        CORJIT_FLAG_DEBUG_EnC = 3, // We are in Edit-n-Continue mode
-        CORJIT_FLAG_DEBUG_INFO = 4, // generate line and local-var info
-        CORJIT_FLAG_MIN_OPT = 5, // disable all jit optimizations (not necessarily debuggable code)
-        CORJIT_FLAG_ENABLE_CFG = 6, // generate CFG enabled code
-        CORJIT_FLAG_OSR = 7, // Generate alternate version for On Stack Replacement
-        CORJIT_FLAG_ALT_JIT = 8, // JIT should consider itself an ALT_JIT
-        CORJIT_FLAG_FROZEN_ALLOC_ALLOWED = 9, // JIT is allowed to use *_MAYBEFROZEN allocators
-                                              // CORJIT_FLAG_UNUSED               = 10,
-        CORJIT_FLAG_AOT = 11, // Do ahead-of-time code generation (ReadyToRun or NativeAOT)
-        CORJIT_FLAG_PROF_ENTERLEAVE = 12, // Instrument prologues/epilogues
-        CORJIT_FLAG_PROF_NO_PINVOKE_INLINE = 13, // Disables PInvoke inlining
-                                                 // CORJIT_FLAG_UNUSED               = 14,
-        CORJIT_FLAG_RELOC = 15, // Generate relocatable code
-        CORJIT_FLAG_IL_STUB = 16, // method is an IL stub
-        CORJIT_FLAG_PROCSPLIT = 17, // JIT should separate code into hot and cold sections
-        CORJIT_FLAG_BBINSTR = 18, // Collect basic block profile information
-        CORJIT_FLAG_BBINSTR_IF_LOOPS = 19, // JIT must instrument current method if it has loops
-        CORJIT_FLAG_BBOPT = 20, // Optimize method based on profile information
-        CORJIT_FLAG_FRAMED = 21, // All methods have an EBP frame
-        CORJIT_FLAG_PUBLISH_SECRET_PARAM = 22, // JIT must place stub secret param into local 0.  (used by IL stubs)
-        CORJIT_FLAG_USE_PINVOKE_HELPERS = 23, // The JIT should use the PINVOKE_{BEGIN,END} helpers instead of emitting inline transitions
-        CORJIT_FLAG_REVERSE_PINVOKE = 24, // The JIT should insert REVERSE_PINVOKE_{ENTER,EXIT} helpers into method prolog/epilog
-        CORJIT_FLAG_TRACK_TRANSITIONS = 25, // The JIT should insert the helper variants that track transitions.
-        CORJIT_FLAG_TIER0 = 26, // This is the initial tier for tiered compilation which should generate code as quickly as possible
-        CORJIT_FLAG_TIER1 = 27, // This is the final tier (for now) for tiered compilation which should generate high quality code
-        CORJIT_FLAG_NO_INLINING = 28, // JIT should not inline any called method into this method
+        CORJIT_FLAG_SPEED_OPT               = 0, // optimize for speed
+        CORJIT_FLAG_SIZE_OPT                = 1, // optimize for code size
+        CORJIT_FLAG_DEBUG_CODE              = 2, // generate "debuggable" code (no code-mangling optimizations)
+        CORJIT_FLAG_DEBUG_EnC               = 3, // We are in Edit-n-Continue mode
+        CORJIT_FLAG_DEBUG_INFO              = 4, // generate line and local-var info
+        CORJIT_FLAG_MIN_OPT                 = 5, // disable all jit optimizations (not necessarily debuggable code)
+        CORJIT_FLAG_ENABLE_CFG              = 6, // generate CFG enabled code
+        CORJIT_FLAG_OSR                     = 7, // Generate alternate version for On Stack Replacement
+        CORJIT_FLAG_ALT_JIT                 = 8, // JIT should consider itself an ALT_JIT
+        CORJIT_FLAG_FROZEN_ALLOC_ALLOWED    = 9, // JIT is allowed to use *_MAYBEFROZEN allocators
+        // CORJIT_FLAG_UNUSED               = 10,
+        CORJIT_FLAG_AOT                     = 11, // Do ahead-of-time code generation (ReadyToRun or NativeAOT)
+        CORJIT_FLAG_PROF_ENTERLEAVE         = 12, // Instrument prologues/epilogues
+        CORJIT_FLAG_PROF_NO_PINVOKE_INLINE  = 13, // Disables PInvoke inlining
+        // CORJIT_FLAG_UNUSED               = 14,
+        CORJIT_FLAG_RELOC                   = 15, // Generate relocatable code
+        CORJIT_FLAG_IL_STUB                 = 16, // method is an IL stub
+        CORJIT_FLAG_PROCSPLIT               = 17, // JIT should separate code into hot and cold sections
+        CORJIT_FLAG_BBINSTR                 = 18, // Collect basic block profile information
+        CORJIT_FLAG_BBINSTR_IF_LOOPS        = 19, // JIT must instrument current method if it has loops
+        CORJIT_FLAG_BBOPT                   = 20, // Optimize method based on profile information
+        CORJIT_FLAG_FRAMED                  = 21, // All methods have an EBP frame
+        CORJIT_FLAG_PUBLISH_SECRET_PARAM    = 22, // JIT must place stub secret param into local 0.  (used by IL stubs)
+        CORJIT_FLAG_USE_PINVOKE_HELPERS     = 23, // The JIT should use the PINVOKE_{BEGIN,END} helpers instead of emitting inline transitions
+        CORJIT_FLAG_REVERSE_PINVOKE         = 24, // The JIT should insert REVERSE_PINVOKE_{ENTER,EXIT} helpers into method prolog/epilog
+        CORJIT_FLAG_TRACK_TRANSITIONS       = 25, // The JIT should insert the helper variants that track transitions.
+        CORJIT_FLAG_TIER0                   = 26, // This is the initial tier for tiered compilation which should generate code as quickly as possible
+        CORJIT_FLAG_TIER1                   = 27, // This is the final tier (for now) for tiered compilation which should generate high quality code
+        CORJIT_FLAG_NO_INLINING             = 28, // JIT should not inline any called method into this method
 
         // ARM only
-        CORJIT_FLAG_RELATIVE_CODE_RELOCS = 29, // JIT should generate PC-relative address computations instead of EE relocation records
-        CORJIT_FLAG_SOFTFP_ABI = 30, // Enable armel calling convention
-        CORJIT_FLAG_ASYNC = 31,  // Generate code for use as an async function
+        CORJIT_FLAG_RELATIVE_CODE_RELOCS    = 29, // JIT should generate PC-relative address computations instead of EE relocation records
+        CORJIT_FLAG_SOFTFP_ABI              = 30, // Enable armel calling convention
+        CORJIT_FLAG_ASYNC                   = 31,  // Generate code for use as an async function
     }
 
     public struct CORJIT_FLAGS

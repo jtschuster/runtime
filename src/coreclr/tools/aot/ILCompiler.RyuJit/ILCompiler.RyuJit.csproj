@@ -86,12 +86,6 @@
     <Compile Include="..\..\Common\JitInterface\AsyncMethodDescFactory.cs">
       <Link>JitInterface\AsyncMethodDescFactory.cs</Link>
     </Compile>
-    <Compile Include="..\..\Common\JitInterface\TaskReturningAsyncWrapperMethodDesc.cs">
-      <Link>JitInterface\TaskReturningAsyncWrapperMethodDesc.cs</Link>
-    </Compile>
-    <Compile Include="..\..\Common\JitInterface\TaskReturningAsyncWrapperMethodDescFactory.cs">
-      <Link>JitInterface\TaskReturningAsyncWrapperMethodDescFactory.cs</Link>
-    </Compile>
     <Compile Include="..\..\Common\JitInterface\SystemVStructClassificator.cs">
       <Link>JitInterface\SystemVStructClassificator.cs</Link>
     </Compile>
