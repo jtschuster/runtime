@@ -995,7 +995,7 @@ static bool SigMatchesMethodDesc(MethodDesc* pMD, SigPointer &sig, ModuleBase * 
 {
     STANDARD_VM_CONTRACT;
 
-    _ASSERTE(!pMD->IsAsyncVariantMethod());
+    // _ASSERTE(!pMD->IsAsyncVariantMethod());
 
     ModuleBase *pOrigModule = pModule;
     ZapSig::Context    zapSigContext(pModule, (void *)pModule, ZapSig::NormalTokens);
@@ -1183,7 +1183,10 @@ PCODE ReadyToRunInfo::GetEntryPoint(MethodDesc * pMD, PrepareCodeConfig* pConfig
 
     // TODO: (async) R2R support for async variants
     if (pMD->IsAsyncVariantMethod())
-        goto done;
+    {
+        // TODO
+        // goto done;
+    }
 
     ETW::MethodLog::GetR2RGetEntryPointStart(pMD);
 
