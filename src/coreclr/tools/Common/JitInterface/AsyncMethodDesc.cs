@@ -84,6 +84,10 @@ namespace Internal.JitInterface
             }
             return -1;
         }
+        public override string ToString()
+        {
+            return "Async MethodDesc: " + _wrappedMethod.ToString();
+        }
     }
 
     internal static class AsyncMethodDescExtensions

@@ -81,6 +81,8 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
         private byte[] BuildSignatureForMethod(MethodWithGCInfo method, NodeFactory factory)
         {
+            // This has to return a Signature with the AsyncCallConv flag set for AsyncMethodDesc methods
+            // I think it does already, but should validate
             return BuildSignatureForMethodDefinedInModule(method.Method, factory);
         }
 
@@ -102,7 +104,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
             foreach (MethodWithGCInfo method in factory.EnumerateCompiledMethods(null, CompiledMethodCategory.Instantiated))
             {
-                Debug.Assert(method.Method.HasInstantiation || method.Method.OwningType.HasInstantiation);
+                Debug.Assert(method.Method.HasInstantiation || method.Method.OwningType.HasInstantiation || method.Method.IsAsyncCallConv());
 
                 int methodIndex = factory.RuntimeFunctionsTable.GetIndex(method);
 

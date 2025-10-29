@@ -10,6 +10,7 @@ using Internal.Text;
 using Internal.TypeSystem;
 using Internal.TypeSystem.Ecma;
 using System.Diagnostics;
+using Internal.JitInterface;
 
 namespace ILCompiler
 {
@@ -432,6 +433,12 @@ namespace ILCompiler
                     return _unqualifiedMangledMethodNames[method];
                 }
             }
+#if READYTORUN
+            if (method is AsyncMethodDesc)
+            {
+                return "<Async>_" + ComputeUnqualifiedMangledMethodName(method.GetTypicalMethodDefinition());
+            }
+#endif
 
             Utf8String utf8MangledName;
 

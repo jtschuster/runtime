@@ -195,6 +195,15 @@ namespace Internal.IL
 
                 return null;
             }
+            else if (method is AsyncMethodDesc asyncMethod)
+            {
+                if (asyncMethod.Target is EcmaMethod target)
+                {
+                    var methodIL = EcmaMethodIL.Create(target);
+                    return methodIL;
+                }
+                return null;
+            }
             else if (method is MethodForInstantiatedType || method is InstantiatedMethod)
             {
                 // Intrinsics specialized per instantiation

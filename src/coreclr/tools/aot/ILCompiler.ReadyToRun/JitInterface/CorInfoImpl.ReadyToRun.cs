@@ -369,6 +369,8 @@ namespace Internal.JitInterface
             debuggingName.Append(Token.ToString());
             if (Unboxing)
                 debuggingName.Append("; UNBOXING");
+            if (AsyncCallConv)
+                debuggingName.Append("; ASYNCCALLCONV");
 
             return debuggingName.ToString();
         }
@@ -470,8 +472,6 @@ namespace Internal.JitInterface
         private HashSet<MethodDesc> _inlinedMethods;
         private UnboxingMethodDescFactory _unboxingThunkFactory = new UnboxingMethodDescFactory();
         private AsyncMethodDescFactory _asyncMethodDescFactory = new AsyncMethodDescFactory();
-        private TaskReturningAsyncWrapperMethodDescFactory _asyncTaskWrapperMethodDescFactory = new TaskReturningAsyncWrapperMethodDescFactory();
-
         private List<ISymbolNode> _precodeFixups;
         private List<EcmaMethod> _ilBodiesNeeded;
         private Dictionary<TypeDesc, bool> _preInitedTypes = new Dictionary<TypeDesc, bool>();

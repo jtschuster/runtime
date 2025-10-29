@@ -3639,6 +3639,7 @@ namespace Internal.JitInterface
 
         private void getFunctionFixedEntryPoint(CORINFO_METHOD_STRUCT_* ftn, bool isUnsafeFunctionPointer, ref CORINFO_CONST_LOOKUP pResult)
         {
+            // Called for AsyncResumption stubs
             var method = HandleToObject(ftn);
             pResult.handle = (CORINFO_GENERIC_STRUCT_*)ObjectToHandle(HandleToObject(ftn));
             pResult.accessType = InfoAccessType.IAT_PVALUE;
@@ -3760,9 +3761,12 @@ namespace Internal.JitInterface
 #pragma warning restore CA1822 // Mark members as static
         {
             // does m_finalCodeAddressSlot become a reloc? Or will jit give it to us somehow?
+#if READYTORUN
             return ObjectToHandle(new AsyncResumptionStub(MethodBeingCompiled));
+#else
+            throw new NotImplementedException(nameof(getAsyncResumptionStub));
+#endif
         }
-
 
         private byte[] _code;
         private byte[] _coldCode;

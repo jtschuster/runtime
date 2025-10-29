@@ -309,6 +309,12 @@
     <Compile Include="..\..\Common\TypeSystem\IL\HelperExtensions.cs">
       <Link>IL\HelperExtensions.cs</Link>
     </Compile>
+    <!-- <Compile Include="..\..\Common\TypeSystem\IL\Stubs\AsyncMethodEmitter.cs">
+      <Link>IL\Stubs\AsyncMethodEmitter.cs</Link>
+    </Compile> -->
+    <Compile Include="..\..\Common\TypeSystem\IL\Stubs\AsyncResumptionStub.cs">
+      <Link>IL\Stubs\AsyncResumptionStub.cs</Link>
+    </Compile>
     <Compile Include="..\..\Common\JitInterface\JitTypeNameFormatter.cs">
       <Link>JitInterface\JitTypeNameFormatter.cs</Link>
     </Compile>
