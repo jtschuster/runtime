@@ -996,6 +996,7 @@ static bool SigMatchesMethodDesc(MethodDesc* pMD, SigPointer &sig, ModuleBase * 
     STANDARD_VM_CONTRACT;
 
     // _ASSERTE(!pMD->IsAsyncVariantMethod());
+    // TODO: Validate the signature matches for async variants as well.
 
     ModuleBase *pOrigModule = pModule;
     ZapSig::Context    zapSigContext(pModule, (void *)pModule, ZapSig::NormalTokens);
@@ -1184,18 +1185,19 @@ PCODE ReadyToRunInfo::GetEntryPoint(MethodDesc * pMD, PrepareCodeConfig* pConfig
     // TODO: (async) R2R support for async variants
     if (pMD->IsAsyncVariantMethod())
     {
-        // TODO
         // goto done;
     }
 
     ETW::MethodLog::GetR2RGetEntryPointStart(pMD);
 
     uint offset;
-    if (pMD->HasClassOrMethodInstantiation())
+    if (pMD->HasClassOrMethodInstantiation() || pMD->IsAsyncThunkMethod())
     {
         if (m_instMethodEntryPoints.IsNull())
             goto done;
 
+        // This VersionResilientMethodHashCode should take into account the Async flag as well.
+        // For now it should be okay to have non-async and async have the same hash, just won't be as efficient.
         NativeHashtable::Enumerator lookup = m_instMethodEntryPoints.Lookup(GetVersionResilientMethodHashCode(pMD));
         NativeParser entryParser;
         offset = (uint)-1;
