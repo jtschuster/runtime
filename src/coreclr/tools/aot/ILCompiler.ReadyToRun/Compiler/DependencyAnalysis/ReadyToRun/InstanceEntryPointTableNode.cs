@@ -104,7 +104,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
             foreach (MethodWithGCInfo method in factory.EnumerateCompiledMethods(null, CompiledMethodCategory.Instantiated))
             {
-                Debug.Assert(method.Method.HasInstantiation || method.Method.OwningType.HasInstantiation || method.Method.IsAsyncCallConv());
+                Debug.Assert(method.Method.HasInstantiation || method.Method.OwningType.HasInstantiation || method.Method.AsyncMethodData.IsThunk);
 
                 int methodIndex = factory.RuntimeFunctionsTable.GetIndex(method);
 

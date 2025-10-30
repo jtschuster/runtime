@@ -856,7 +856,7 @@ namespace Internal.JitInterface
                 sig->callConv |= CorInfoCallConv.CORINFO_CALLCONV_PARAMTYPE;
             }
 
-            if (method.IsAsyncCallConv())
+            if (method.AsyncMethodData.IsAsyncCallConv)
             {
                 sig->callConv |= CorInfoCallConv.CORINFO_CALLCONV_ASYNCCALL;
             }
@@ -1837,17 +1837,39 @@ namespace Internal.JitInterface
 
             if (result is MethodDesc method)
             {
-                if (pResolvedToken.tokenType == CorInfoTokenKind.CORINFO_TOKENKIND_Await)
+                bool requestingAsync = pResolvedToken.tokenType == CorInfoTokenKind.CORINFO_TOKENKIND_Await;
+                bool isAsync = method.AsyncMethodData.IsAsyncCallConv;
+                if (requestingAsync && !isAsync)
                 {
-                    Debug.Assert(method.IsTaskReturning());
-                    method = _asyncMethodDescFactory.GetAsyncMethod(method);
-                    result = method;
+                    if (method.IsTaskReturning)
+                    {
+                        method = method.GetAsyncOtherVariant();
+                        result = method;
+                    }
+                    else
+                    {
+                        Debug.Assert(method.AsyncMethodData.Kind == AsyncMethodKind.AsyncExplicitImpl);
+                    }
                 }
-                else if (method.IsAsync)
+                if (!requestingAsync && isAsync)
                 {
-                    //method = _asyncTaskWrapperMethodDescFactory.GetTaskReturningAsyncWrapperMethod(method);
-                    //result = method;
-                    _ = 0;
+                    if (method.IsTaskReturning)
+                    {
+                        if (typeOrMethodContext == method.GetAsyncOtherVariant())
+                        {
+                            // This is a TaskReturningThunk that wants the asynccallconv method.
+                            // Don't get the other variant
+                        }
+                        else
+                        {
+                            method = method.GetAsyncOtherVariant();
+                            result = method;
+                        }
+                    }
+                    else
+                    {
+                        Debug.Assert(method.AsyncMethodData.Kind == AsyncMethodKind.AsyncExplicitImpl);
+                    }
                 }
 
                 pResolvedToken.hMethod = ObjectToHandle(method);
@@ -4349,7 +4371,7 @@ namespace Internal.JitInterface
                 flags.Set(CorJitFlag.CORJIT_FLAG_SOFTFP_ABI);
             }
 
-            if (this.MethodBeingCompiled.IsAsyncCallConv())
+            if (this.MethodBeingCompiled.AsyncMethodData.IsAsyncCallConv)
             {
                 flags.Set(CorJitFlag.CORJIT_FLAG_ASYNC);
             }

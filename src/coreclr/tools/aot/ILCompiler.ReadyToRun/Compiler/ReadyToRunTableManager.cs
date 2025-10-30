@@ -47,7 +47,8 @@ namespace ILCompiler
 
             public readonly EcmaModule Module;
             public List<IMethodNode> MethodsGenerated = new List<IMethodNode>();
-            public List<IMethodNode> GenericMethodsGenerated = new List<IMethodNode>();
+            // Generic instantiations and Async methods
+            public List<IMethodNode> InstantiatedMethodsGenerated = new List<IMethodNode>();
         }
 
         private Dictionary<EcmaModule, PerModuleMethodsGenerated> _methodsGenerated = new Dictionary<EcmaModule, PerModuleMethodsGenerated>();
@@ -85,9 +86,9 @@ namespace ILCompiler
                         perModuleData = new PerModuleMethodsGenerated(module);
                         _methodsGenerated[module] = perModuleData;
                     }
-                    if (method.HasInstantiation || method.OwningType.HasInstantiation)
+                    if (method.HasInstantiation || method.OwningType.HasInstantiation || method.AsyncMethodData.IsThunk)
                     {
-                        perModuleData.GenericMethodsGenerated.Add(methodNode);
+                        perModuleData.InstantiatedMethodsGenerated.Add(methodNode);
                     }
                     else
                     {
@@ -112,7 +113,7 @@ namespace ILCompiler
                         int methodOnlyResult = comparer.Compare(x.Method, y.Method);
 
                         // Assert the two sorting techniques produce the same result unless there is a CustomSort applied
-                        Debug.Assert((nodeComparerResult == methodOnlyResult) || 
+                        Debug.Assert((nodeComparerResult == methodOnlyResult) ||
                             ((x is SortableDependencyNode sortableX && sortableX.CustomSort != Int32.MaxValue) ||
                              (y is SortableDependencyNode sortableY && sortableY.CustomSort != Int32.MaxValue)));
 #endif
@@ -126,10 +127,10 @@ namespace ILCompiler
                     foreach (var perModuleData in perModuleDatas)
                     {
                         perModuleData.MethodsGenerated.MergeSort(sortHelperNoCustomSort);
-                        perModuleData.GenericMethodsGenerated.MergeSort(sortHelperNoCustomSort);
+                        perModuleData.InstantiatedMethodsGenerated.MergeSort(sortHelperNoCustomSort);
                         _completeSortedMethods.AddRange(perModuleData.MethodsGenerated);
-                        _completeSortedMethods.AddRange(perModuleData.GenericMethodsGenerated);
-                        _completeSortedGenericMethods.AddRange(perModuleData.GenericMethodsGenerated);
+                        _completeSortedMethods.AddRange(perModuleData.InstantiatedMethodsGenerated);
+                        _completeSortedGenericMethods.AddRange(perModuleData.InstantiatedMethodsGenerated);
                     }
                     _completeSortedMethods.MergeSort(sortHelper);
                     _completeSortedGenericMethods.MergeSort(sortHelper);
@@ -162,7 +163,7 @@ namespace ILCompiler
 
                 if (methodCategory == CompiledMethodCategory.Instantiated)
                 {
-                    return perModuleData.GenericMethodsGenerated;
+                    return perModuleData.InstantiatedMethodsGenerated;
                 }
                 else
                 {

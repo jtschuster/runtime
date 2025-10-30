@@ -141,7 +141,7 @@ namespace Internal.JitInterface
             Token = token;
             ConstrainedType = constrainedType;
             Unboxing = unboxing;
-            AsyncCallConv = method.IsAsyncCallConv();
+            AsyncCallConv = method.AsyncMethodData.IsAsyncCallConv;
             OwningType = GetMethodTokenOwningType(this, constrainedType, context, devirtualizedMethodOwner, out OwningTypeNotDerivedFromToken);
         }
 
@@ -471,7 +471,6 @@ namespace Internal.JitInterface
         private NativeVarInfo[] _debugVarInfos;
         private HashSet<MethodDesc> _inlinedMethods;
         private UnboxingMethodDescFactory _unboxingThunkFactory = new UnboxingMethodDescFactory();
-        private AsyncMethodDescFactory _asyncMethodDescFactory = new AsyncMethodDescFactory();
         private List<ISymbolNode> _precodeFixups;
         private List<EcmaMethod> _ilBodiesNeeded;
         private Dictionary<TypeDesc, bool> _preInitedTypes = new Dictionary<TypeDesc, bool>();
@@ -1413,11 +1412,6 @@ namespace Internal.JitInterface
                     // token - SignatureBuilder will generate the generic method signature
                     // using instantiation parameters from the MethodDesc entity.
                     resultMethod = resultMethod.GetTypicalMethodDefinition();
-
-                    if (resultMethod is AsyncMethodDesc asyncMethodDescMethod)
-                    {
-                        resultMethod = asyncMethodDescMethod.Target;
-                    }
                     Debug.Assert(resultMethod is EcmaMethod);
                     if (!_compilation.NodeFactory.CompilationModuleGroup.VersionsWithType(((EcmaMethod)resultMethod).OwningType))
                     {

@@ -28,6 +28,8 @@ namespace Internal.JitInterface
             _jitVisibleHashCode = HashCode.Combine(wrappedMethod.GetHashCode(), 401752602);
         }
 
+        public override AsyncMethodData AsyncMethodData => _wrappedMethod.AsyncMethodData;
+
         public override MethodDesc GetCanonMethodTarget(CanonicalFormKind kind)
         {
             MethodDesc realCanonTarget = _wrappedMethod.GetCanonMethodTarget(kind);
