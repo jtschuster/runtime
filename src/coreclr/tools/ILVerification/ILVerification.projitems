@@ -291,6 +291,9 @@
     <Compile Include="$(ToolsCommonPath)TypeSystem\Common\AsyncMethodDesc.cs">
       <Link>Common\AsyncMethodDesc.cs</Link>
     </Compile>
+    <Compile Include="$(ToolsCommonPath)TypeSystem\Common\MethodDelegator.cs">
+      <Link>Common\MethodDelegator.cs</Link>
+    </Compile>
     <Compile Include="$(ToolsCommonPath)TypeSystem\Common\TaskReturningAsyncThunk.cs">
       <Link>Common\TaskReturningAsyncThunk.cs</Link>
     </Compile>

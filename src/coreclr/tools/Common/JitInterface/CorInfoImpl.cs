@@ -834,7 +834,9 @@ namespace Internal.JitInterface
 
         private void Get_CORINFO_SIG_INFO(MethodDesc method, CORINFO_SIG_INFO* sig, MethodILScope scope, bool suppressHiddenArgument = false)
         {
-            Get_CORINFO_SIG_INFO(method.Signature, sig, scope);
+            var signature = method.AsyncMethodData.IsAsyncCallConv ? 
+                method.AsyncMethodData.Signature : method.Signature;
+            Get_CORINFO_SIG_INFO(signature, sig, scope);
 
             // Does the method have a hidden parameter?
             bool hasHiddenParameter = !suppressHiddenArgument && method.RequiresInstArg();

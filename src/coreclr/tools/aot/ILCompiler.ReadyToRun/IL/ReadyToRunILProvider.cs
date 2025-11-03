@@ -188,7 +188,7 @@ namespace Internal.IL
 
                 return null;
             }
-            else if (method is AsyncMethodDesc)
+            else if (method is AsyncMethodThunk)
             {
                 // TODO: Async version of task-returning wrapper thunk
                 return null;

@@ -434,9 +434,13 @@ namespace ILCompiler
                 }
             }
 #if READYTORUN
-            if (method is AsyncMethodDesc)
+            if (method is AsyncMethodThunk)
             {
                 return "<Async>_" + ComputeUnqualifiedMangledMethodName(method.GetTypicalMethodDefinition());
+            }
+            if (method is TaskReturningAsyncThunk)
+            {
+                return "<TaskReturningAsync>_" + ComputeUnqualifiedMangledMethodName(method.GetTypicalMethodDefinition());
             }
 #endif
 

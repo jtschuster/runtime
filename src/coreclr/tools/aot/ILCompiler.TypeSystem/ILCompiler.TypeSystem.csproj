@@ -381,8 +381,8 @@
     <Compile Include="..\..\Common\TypeSystem\Common\MethodDelegator.Diagnostic.cs">
       <Link>TypeSystem\Common\MethodDelegator.Diagnostic.cs</Link>
     </Compile>
-    <Compile Include="..\..\Common\TypeSystem\Common\AsyncMethodDesc.cs">
-      <Link>TypeSystem\Common\AsyncMethodDesc.cs</Link>
+    <Compile Include="..\..\Common\TypeSystem\Common\AsyncMethodThunk.cs">
+      <Link>TypeSystem\Common\AsyncMethodThunk.cs</Link>
     </Compile>
     <Compile Include="..\..\Common\TypeSystem\Common\MethodDesc.cs">
       <Link>TypeSystem\Common\MethodDesc.cs</Link>

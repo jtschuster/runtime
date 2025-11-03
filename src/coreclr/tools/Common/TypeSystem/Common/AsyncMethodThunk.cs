@@ -12,11 +12,11 @@ namespace Internal.TypeSystem
     /// <summary>
     /// Represents the async-callable (CORINFO_CALLCONV_ASYNCCALL) variant of a Task/ValueTask returning method.
     /// </summary>
-    public sealed class AsyncMethodDesc : MethodDelegator
+    public sealed class AsyncMethodThunk : MethodDelegator
     {
         private readonly AsyncMethodData _asyncMethodData;
 
-        public AsyncMethodDesc(MethodDesc wrappedMethod)
+        public AsyncMethodThunk(MethodDesc wrappedMethod)
             : base(wrappedMethod)
         {
             Debug.Assert(wrappedMethod.IsTaskReturning);
@@ -73,7 +73,7 @@ namespace Internal.TypeSystem
 
         protected internal override int CompareToImpl(MethodDesc other, TypeSystemComparer comparer)
         {
-            if (other is AsyncMethodDesc otherAsync)
+            if (other is AsyncMethodThunk otherAsync)
             {
                 return comparer.Compare(_wrappedMethod, otherAsync._wrappedMethod);
             }
