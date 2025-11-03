@@ -3320,7 +3320,7 @@ MethodTableBuilder::EnumerateClassMethods()
                 if (IsTaskReturning(returnKind))
                 {
                     // ordinary Task-returning method:
-                    //    Declare a TaskReturning method and add an Async variant that is a thunk to the TaskReturing one.
+                    //    Declare a TaskReturning method and add an Async variant that is a thunk to the TaskReturning one.
                     //
                     // IsMiAsync Task-returning method:
                     //    Declare a RuntimeAsync method and add an Async variant with the actual implementation.

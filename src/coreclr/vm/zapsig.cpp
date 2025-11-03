@@ -760,6 +760,7 @@ MethodDesc *ZapSig::DecodeMethod(ModuleBase *pInfoModule,
                                  PCCOR_SIGNATURE *ppAfterSig /*=NULL*/,
                                  BOOL actualOwnerRequired /*=FALSE*/)
 {
+    // TODO: This should return an Async methodDesc when requested. I think this already does, but not sure.
     STANDARD_VM_CONTRACT;
 
     MethodDesc *pMethod = NULL;

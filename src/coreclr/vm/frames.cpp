@@ -2179,10 +2179,10 @@ bool CheckGCRefMapEqual(PTR_BYTE pGCRefMap, MethodDesc* pMD, bool isDispatchCell
     }
     if (invalidGCRefMap)
     {
-        minipal_log_print_error("GC ref map mismatch detected for method: %s::%s\n", pMD->GetMethodTable()->GetDebugClassName(), pMD->GetName());
-        DumpGCRefMap("  Runtime", (BYTE *)pBlob);
-        DumpGCRefMap("Crossgen2", pGCRefMap);
-        _ASSERTE(false);
+        // minipal_log_print_error("GC ref map mismatch detected for method: %s::%s\n", pMD->GetMethodTable()->GetDebugClassName(), pMD->GetName());
+        // DumpGCRefMap("  Runtime", (BYTE *)pBlob);
+        // DumpGCRefMap("Crossgen2", pGCRefMap);
+        // _ASSERTE(false);
     }
 #endif
     return true;

@@ -14,6 +14,10 @@ using Internal.IL.Stubs;
 using System.Buffers.Binary;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
+using Internal.JitInterface;
+using System.Text;
+using System.Text.Unicode;
+using ILCompiler.DependencyAnalysis.ReadyToRun;
 
 namespace Internal.IL
 {
@@ -22,10 +26,10 @@ namespace Internal.IL
     /// </summary>
     public interface IMethodTokensAreUseableInCompilation { }
 
-
     public sealed class ReadyToRunILProvider : ILProvider
     {
         private CompilationModuleGroup _compilationModuleGroup;
+        private AsyncMethodEmitter _asyncMethodEmitter;
         private MutableModule _manifestMutableModule;
         private int _version = 0;
 
@@ -34,9 +38,11 @@ namespace Internal.IL
             _compilationModuleGroup = compilationModuleGroup;
         }
 
-        public void InitManifestMutableModule(MutableModule module)
+        public void InitManifestMutableModule(MutableModule module, ModuleTokenResolver tokenResolver)
         {
+            _asyncMethodEmitter = new AsyncMethodEmitter(module, _compilationModuleGroup);
             _manifestMutableModule = module;
+            _asyncMethodEmitter.EnsureR2RKnownMethodsAreInManifestModule(tokenResolver);
         }
 
         void IncrementVersion()
@@ -182,6 +188,18 @@ namespace Internal.IL
 
                 return null;
             }
+            else if (method is AsyncMethodThunk)
+            {
+                // TODO: Async version of task-returning wrapper thunk
+                return null;
+            }
+            else if (method is TaskReturningAsyncThunk)
+            {
+                // AsyncCallConv methods should be AsyncMethodDesc, not EcmaMethod
+                // Generate IL for Task wrapping stub
+                MethodIL result = _asyncMethodEmitter.EmitIL(method);
+                return result;
+            }
             else if (method is MethodForInstantiatedType || method is InstantiatedMethod)
             {
                 // Intrinsics specialized per instantiation
@@ -218,7 +236,7 @@ namespace Internal.IL
 
             MutableModule _mutableModule;
 
-            public ManifestModuleWrappedMethodIL() {}
+            public ManifestModuleWrappedMethodIL() { }
 
             public bool Initialize(MutableModule mutableModule, EcmaMethodIL wrappedMethod)
             {
@@ -279,7 +297,7 @@ namespace Internal.IL
                     }
                     if (!newToken.HasValue)
                     {
-                        // Toekn replacement has failed. Do not attempt to use this IL.
+                        // Token replacement has failed. Do not attempt to use this IL.
                         failedToReplaceToken = true;
                         return 1;
                     }

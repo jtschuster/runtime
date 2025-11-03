@@ -129,6 +129,7 @@ namespace Internal.JitInterface
         public readonly ModuleToken Token;
         public readonly TypeDesc ConstrainedType;
         public readonly bool Unboxing;
+        public readonly bool AsyncCallConv;
         public readonly bool OwningTypeNotDerivedFromToken;
         public readonly TypeDesc OwningType;
 
@@ -140,6 +141,7 @@ namespace Internal.JitInterface
             Token = token;
             ConstrainedType = constrainedType;
             Unboxing = unboxing;
+            AsyncCallConv = method.AsyncMethodData.IsAsyncCallConv;
             OwningType = GetMethodTokenOwningType(this, constrainedType, context, devirtualizedMethodOwner, out OwningTypeNotDerivedFromToken);
         }
 
@@ -349,6 +351,8 @@ namespace Internal.JitInterface
             }
             if (Unboxing)
                 sb.Append("; UNBOXING"u8);
+            if (AsyncCallConv)
+                sb.Append("; ASYNCCALLCONV"u8);
         }
 
         public override string ToString()
@@ -365,6 +369,8 @@ namespace Internal.JitInterface
             debuggingName.Append(Token.ToString());
             if (Unboxing)
                 debuggingName.Append("; UNBOXING");
+            if (AsyncCallConv)
+                debuggingName.Append("; ASYNCCALLCONV");
 
             return debuggingName.ToString();
         }
@@ -547,6 +553,8 @@ namespace Internal.JitInterface
         public static bool ShouldCodeNotBeCompiledIntoFinalImage(InstructionSetSupport instructionSetSupport, MethodDesc method)
         {
             EcmaMethod ecmaMethod = method.GetTypicalMethodDefinition() as EcmaMethod;
+            if (ecmaMethod is null)
+                return false;
 
             var metadataReader = ecmaMethod.MetadataReader;
             var stringComparer = metadataReader.StringComparer;
@@ -1383,7 +1391,6 @@ namespace Internal.JitInterface
             // If the method body is synthetized by the compiler (the definition of the MethodIL is not
             // an EcmaMethodIL), the tokens in the MethodIL are not actual tokens: they're just
             // "per-MethodIL unique cookies". For ready to run, we need to be able to get to an actual
-            // token to refer to the result of token lookup in the R2R fixups; we replace the token
             // token to refer to the result of token lookup in the R2R fixups.
             //
             // We replace the token with the token of the ECMA entity. This only works for **types/members
@@ -1405,9 +1412,13 @@ namespace Internal.JitInterface
                     // token - SignatureBuilder will generate the generic method signature
                     // using instantiation parameters from the MethodDesc entity.
                     resultMethod = resultMethod.GetTypicalMethodDefinition();
-
                     Debug.Assert(resultMethod is EcmaMethod);
-                    Debug.Assert(_compilation.NodeFactory.CompilationModuleGroup.VersionsWithType(((EcmaMethod)resultMethod).OwningType));
+                    if (!_compilation.NodeFactory.CompilationModuleGroup.VersionsWithType(((EcmaMethod)resultMethod).OwningType))
+                    {
+                        // TODO Add assert that the method is one of the R2RKnownMethods
+                        ModuleToken result = _compilation.NodeFactory.SignatureContext.Resolver.GetModuleTokenForMethod(resultMethod, allowDynamicallyCreatedReference: true, throwIfNotFound: true);
+                        return result;
+                    }
                     token = (mdToken)MetadataTokens.GetToken(((EcmaMethod)resultMethod).Handle);
                     module = ((EcmaMethod)resultMethod).Module;
                 }
@@ -1427,7 +1438,12 @@ namespace Internal.JitInterface
                 {
                     if (resultDef is EcmaType ecmaType)
                     {
-                        Debug.Assert(_compilation.NodeFactory.CompilationModuleGroup.VersionsWithType(ecmaType));
+                        if (!_compilation.NodeFactory.CompilationModuleGroup.VersionsWithType(ecmaType))
+                        {
+                            // TODO Add assert that the method is one of the R2RKnownTypes
+                            ModuleToken result = _compilation.NodeFactory.SignatureContext.Resolver.GetModuleTokenForType(ecmaType, allowDynamicallyCreatedReference: true, throwIfNotFound: true);
+                            return result;
+                        }
                         token = (mdToken)MetadataTokens.GetToken(ecmaType.Handle);
                         module = ecmaType.Module;
                     }
@@ -2479,6 +2495,7 @@ namespace Internal.JitInterface
                         {
                             nonUnboxingMethod = rawPinvoke.Target;
                         }
+                        // Async equivalent here?
 
                         if (methodToCall.OwningType.IsArray && methodToCall.IsConstructor)
                         {

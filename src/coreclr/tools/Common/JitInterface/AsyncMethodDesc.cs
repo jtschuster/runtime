@@ -9,9 +9,8 @@ namespace Internal.JitInterface
 {
     /// <summary>
     /// Represents the async-callable (CORINFO_CALLCONV_ASYNCCALL) variant of a Task/ValueTask returning method.
-    /// The wrapper should be short‑lived and only used while interacting with the JIT interface.
     /// </summary>
-    internal sealed class AsyncMethodDesc : MethodDelegator, IJitHashableOnly
+    internal sealed class AsyncMethodDesc : MethodDelegator
     {
         private readonly AsyncMethodDescFactory _factory;
         private readonly int _jitVisibleHashCode;
@@ -46,9 +45,10 @@ namespace Internal.JitInterface
         public override MethodDesc GetTypicalMethodDefinition()
         {
             MethodDesc real = _wrappedMethod.GetTypicalMethodDefinition();
-            if (real != _wrappedMethod)
-                return _factory.GetAsyncMethod(real);
-            return this;
+            return real;
+            //if (real != _wrappedMethod)
+            //    return _factory.GetAsyncMethod(real);
+            //return this;
         }
 
         public override MethodDesc InstantiateSignature(Instantiation typeInstantiation, Instantiation methodInstantiation)
@@ -72,19 +72,28 @@ namespace Internal.JitInterface
             }
         }
 
-#if !SUPPORT_JIT
-        // Same pattern as UnboxingMethodDesc: these should not escape JIT hashing scope.
-        protected override int ClassCode => throw new NotImplementedException();
-        protected override int CompareToImpl(MethodDesc other, TypeSystemComparer comparer) => throw new NotImplementedException();
-        protected override int ComputeHashCode() => _jitVisibleHashCode;
-        int IJitHashableOnly.GetJitVisibleHashCode() => _jitVisibleHashCode;
-#else
-        int IJitHashableOnly.GetJitVisibleHashCode() => _jitVisibleHashCode;
-#endif
+        protected override int ClassCode => 0x554d08b9;
+
+        protected override int CompareToImpl(MethodDesc other, TypeSystemComparer comparer)
+        {
+            if (other is AsyncMethodDesc otherAsync)
+            {
+                return comparer.Compare(_wrappedMethod, otherAsync._wrappedMethod);
+            }
+            return -1;
+        }
+        public override string ToString()
+        {
+            return "Async MethodDesc: " + _wrappedMethod.ToString();
+        }
     }
 
     internal static class AsyncMethodDescExtensions
     {
+        public static bool IsAsyncCallConv(this MethodDesc method)
+        {
+            return method is AsyncMethodDesc;
+        }
         /// <summary>
         /// Returns true if the method returns Task, Task&lt;T&gt;, ValueTask, or ValueTask&lt;T&gt;, otherwise false.
         /// </summary>

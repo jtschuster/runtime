@@ -89,7 +89,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             // Optimize some of the fixups into a more compact form
             ReadyToRunFixupKind fixupKind = _fixupKind;
             bool optimized = false;
-            if (!_method.Unboxing && !IsInstantiatingStub && _method.ConstrainedType == null &&
+            if (!_method.Unboxing && !IsInstantiatingStub && _method.ConstrainedType == null && !_method.AsyncCallConv &&
                 fixupKind == ReadyToRunFixupKind.MethodEntry)
             {
                 if (!_method.Method.HasInstantiation && !_method.Method.OwningType.HasInstantiation && !_method.Method.OwningType.IsArray)
@@ -128,7 +128,6 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             }
 
             SignatureContext innerContext = dataBuilder.EmitFixup(factory, fixupKind, method.Token.Module, factory.SignatureContext);
-
             if (optimized && method.Token.TokenType == CorTokenType.mdtMethodDef)
             {
                 dataBuilder.EmitMethodDefToken(method.Token);

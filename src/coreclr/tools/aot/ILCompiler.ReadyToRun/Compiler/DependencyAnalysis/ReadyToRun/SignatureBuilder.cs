@@ -424,6 +424,10 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             {
                 flags |= (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_UnboxingStub;
             }
+            if (method.AsyncCallConv)
+            {
+                flags |= (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_AsyncVariant;
+            }
             if (isInstantiatingStub)
             {
                 flags |= (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_InstantiatingStub;
@@ -492,7 +496,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
             if ((method.Token.Module != context.LocalContext) && (!enforceOwningType || (enforceDefEncoding && methodToken.TokenType == CorTokenType.mdtMemberRef)))
             {
-                // If enforeOwningType is set, this is an entry for the InstanceEntryPoint or InstrumentationDataTable nodes
+                // If enforceOwningType is set, this is an entry for the InstanceEntryPoint or InstrumentationDataTable nodes
                 // which are not used in quite the same way, and for which the MethodDef is always matched to the module
                 // which defines the type
                 flags |= (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_UpdateContext;
@@ -606,7 +610,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                 {
                     throw new InternalCompilerErrorException("Attempt to use token from a module not within the version bubble");
                 }
-                
+
                 EmitUInt((uint)factory.ManifestMetadataTable.ModuleToIndex(targetModule));
                 return new SignatureContext(targetModule, outerContext.Resolver);
             }

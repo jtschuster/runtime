@@ -80,6 +80,9 @@
     <Compile Include="..\..\Common\JitInterface\UnboxingMethodDescFactory.cs">
       <Link>JitInterface\UnboxingMethodDescFactory.cs</Link>
     </Compile>
+    <Compile Include="..\..\Common\JitInterface\AsyncMethodDesc.cs">
+      <Link>JitInterface\AsyncMethodDesc.cs</Link>
+    </Compile>
     <Compile Include="..\..\Common\JitInterface\SystemVStructClassificator.cs">
       <Link>JitInterface\SystemVStructClassificator.cs</Link>
     </Compile>

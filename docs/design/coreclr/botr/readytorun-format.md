@@ -300,6 +300,7 @@ token, and additional data determined by the flags.
 | READYTORUN_METHOD_SIG_Constrained         |  0x20 | Constrained type for method resolution. Typespec appended as additional data.
 | READYTORUN_METHOD_SIG_OwnerType           |  0x40 | Method type. Typespec appended as additional data.
 | READYTORUN_METHOD_SIG_UpdateContext       |  0x80 | If set, update the module which is used to parse tokens before performing any token processing. A uint index into the modules table immediately follows the flags
+| READYTORUN_METHOD_SIG_AsyncVariant        | 0x100 | If set, the token is the AsyncCallConv variant of a runtime async method
 
 #### Field Signatures
 

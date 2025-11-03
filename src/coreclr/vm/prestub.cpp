@@ -2808,6 +2808,7 @@ EXTERN_C PCODE STDCALL ExternalMethodFixupWorker(TransitionBlock * pTransitionBl
 #if _DEBUG
             if (pEMFrame->GetGCRefMap() != NULL)
             {
+                // Failure in AsyncR2R
                 _ASSERTE(CheckGCRefMapEqual(pEMFrame->GetGCRefMap(), pMD, false));
             }
 #endif // _DEBUG
