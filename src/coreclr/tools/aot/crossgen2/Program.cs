@@ -587,7 +587,7 @@ namespace ILCompiler
                     string compilationUnitPrefix = "";
                     builder.UseCompilationUnitPrefix(compilationUnitPrefix);
 
-                    ILProvider ilProvider = new ReadyToRunILProvider(compilationGroup);
+                    ILProvider ilProvider = new ReadyToRunILProvider(compilationGroup, typeSystemContext);
 
                     DependencyTrackingLevel trackingLevel = dgmlLogFileName == null ?
                         DependencyTrackingLevel.None : (Get(_command.GenerateFullDgmlLog) ? DependencyTrackingLevel.All : DependencyTrackingLevel.First);

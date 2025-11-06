@@ -575,7 +575,7 @@ namespace ILCompiler
                 // In addition, the method must not have any EH.
                 // The method may only have locals which are NonVersionable structures, or classes
 
-                MethodIL methodIL = new ReadyToRunILProvider(this).GetMethodIL(method);
+                MethodIL methodIL = new ReadyToRunILProvider(this, _tokenResolver.CompilerContext).GetMethodIL(method);
                 if (methodIL.GetExceptionRegions().Length > 0)
                     return false;
 

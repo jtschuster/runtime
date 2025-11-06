@@ -1411,8 +1411,15 @@ namespace Internal.JitInterface
                     // using instantiation parameters from the MethodDesc entity.
                     resultMethod = resultMethod.GetTypicalMethodDefinition();
 
+                    if (resultMethod is AsyncMethodVariant asyncMethod)
+                        resultMethod = asyncMethod.Target;
                     Debug.Assert(resultMethod is EcmaMethod);
-                    Debug.Assert(_compilation.NodeFactory.CompilationModuleGroup.VersionsWithType(((EcmaMethod)resultMethod).OwningType));
+                    if (!_compilation.NodeFactory.CompilationModuleGroup.VersionsWithType(((EcmaMethod)resultMethod).OwningType))
+                    {
+                        // TODO Add assert that the method is one of the R2RKnownMethods
+                        ModuleToken result = _compilation.NodeFactory.SignatureContext.Resolver.GetModuleTokenForMethod(resultMethod, allowDynamicallyCreatedReference: true, throwIfNotFound: true);
+                        return result;
+                    }
                     token = (mdToken)MetadataTokens.GetToken(((EcmaMethod)resultMethod).Handle);
                     module = ((EcmaMethod)resultMethod).Module;
                 }
@@ -1432,7 +1439,12 @@ namespace Internal.JitInterface
                 {
                     if (resultDef is EcmaType ecmaType)
                     {
-                        Debug.Assert(_compilation.NodeFactory.CompilationModuleGroup.VersionsWithType(ecmaType));
+                        if (!_compilation.NodeFactory.CompilationModuleGroup.VersionsWithType(ecmaType))
+                        {
+                            // TODO Add assert that the method is one of the R2RKnownTypes
+                            ModuleToken result = _compilation.NodeFactory.SignatureContext.Resolver.GetModuleTokenForType(ecmaType, allowDynamicallyCreatedReference: true, throwIfNotFound: true);
+                            return result;
+                        }
                         token = (mdToken)MetadataTokens.GetToken(ecmaType.Handle);
                         module = ecmaType.Module;
                     }

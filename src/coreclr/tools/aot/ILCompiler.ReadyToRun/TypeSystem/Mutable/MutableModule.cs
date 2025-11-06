@@ -303,6 +303,7 @@ namespace Internal.TypeSystem.Ecma
 
         public bool DisableNewTokens;
         public ModuleDesc ModuleThatIsCurrentlyTheSourceOfNewReferences;
+        public bool AddingReferencesToR2RKnownTypesAndMethods;
         private ReadyToRunCompilationModuleGroupBase _compilationGroup;
         private Dictionary<ModuleDesc, string> _moduleToModuleRefString = new Dictionary<ModuleDesc, string>();
 

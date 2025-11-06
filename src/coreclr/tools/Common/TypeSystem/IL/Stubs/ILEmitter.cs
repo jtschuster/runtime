@@ -6,7 +6,7 @@ using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Internal.TypeSystem;
-
+using Internal.TypeSystem.Ecma;
 using Debug = System.Diagnostics.Debug;
 
 namespace Internal.IL.Stubs
@@ -505,6 +505,8 @@ namespace Internal.IL.Stubs
 
     public class ILExceptionRegionBuilder
     {
+        internal readonly ILExceptionRegionKind Kind;
+        internal readonly int ClassToken;
         internal ILCodeStream _beginTryStream;
         internal int _beginTryOffset;
 
@@ -517,8 +519,10 @@ namespace Internal.IL.Stubs
         internal ILCodeStream _endHandlerStream;
         internal int _endHandlerOffset;
 
-        internal ILExceptionRegionBuilder()
+        internal ILExceptionRegionBuilder(ILExceptionRegionKind kind, int classToken)
         {
+            Kind = kind;
+            ClassToken = classToken;
         }
 
         internal int TryOffset => _beginTryStream.RelativeToAbsoluteOffset(_beginTryOffset);
@@ -669,7 +673,7 @@ namespace Internal.IL.Stubs
         private ArrayBuilder<ILCodeStream> _codeStreams;
         private ArrayBuilder<LocalVariableDefinition> _locals;
         private ArrayBuilder<object> _tokens;
-        private ArrayBuilder<ILExceptionRegionBuilder> _finallyRegions;
+        private ArrayBuilder<ILExceptionRegionBuilder> _ehRegions;
 
         public ILEmitter()
         {
@@ -729,8 +733,15 @@ namespace Internal.IL.Stubs
 
         public ILExceptionRegionBuilder NewFinallyRegion()
         {
-            var region = new ILExceptionRegionBuilder();
-            _finallyRegions.Add(region);
+            var region = new ILExceptionRegionBuilder(ILExceptionRegionKind.Finally, 0);
+            _ehRegions.Add(region);
+            return region;
+        }
+
+        public ILExceptionRegionBuilder NewCatchRegion(ILToken classToken)
+        {
+            var region = new ILExceptionRegionBuilder(ILExceptionRegionKind.Catch, (int)classToken);
+            _ehRegions.Add(region);
             return region;
         }
 
@@ -782,20 +793,20 @@ namespace Internal.IL.Stubs
 
             ILExceptionRegion[] exceptionRegions = null;
 
-            int numberOfExceptionRegions = _finallyRegions.Count;
+            int numberOfExceptionRegions = _ehRegions.Count;
             if (numberOfExceptionRegions > 0)
             {
                 exceptionRegions = new ILExceptionRegion[numberOfExceptionRegions];
 
-                for (int i = 0; i < _finallyRegions.Count; i++)
+                for (int i = 0; i < _ehRegions.Count; i++)
                 {
-                    ILExceptionRegionBuilder region = _finallyRegions[i];
+                    ILExceptionRegionBuilder region = _ehRegions[i];
 
                     Debug.Assert(region.IsDefined);
 
-                    exceptionRegions[i] = new ILExceptionRegion(ILExceptionRegionKind.Finally,
+                    exceptionRegions[i] = new ILExceptionRegion(region.Kind,
                         region.TryOffset, region.TryLength, region.HandlerOffset, region.HandlerLength,
-                        classToken: 0, filterOffset: 0);
+                        classToken: region.ClassToken, filterOffset: 0);
                 }
             }
 

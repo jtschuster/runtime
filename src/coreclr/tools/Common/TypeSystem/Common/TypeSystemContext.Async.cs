@@ -1,18 +1,21 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using Internal.IL;
-using Internal.TypeSystem;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+
+using Internal.NativeFormat;
 using Internal.TypeSystem.Ecma;
 
-using Debug = System.Diagnostics.Debug;
+#if TYPE_LOADER_IMPLEMENTATION
+using MetadataType = Internal.TypeSystem.DefType;
+#endif
 
-namespace ILCompiler
+namespace Internal.TypeSystem
 {
-    public partial class CompilerTypeSystemContext
+    public abstract partial class TypeSystemContext
     {
-        private AsyncVariantImplHashtable _asyncVariantImplHashtable = new AsyncVariantImplHashtable();
-
         public MethodDesc GetAsyncVariantMethod(MethodDesc taskReturningMethod)
         {
             Debug.Assert(taskReturningMethod.Signature.ReturnsTaskOrValueTask());
@@ -41,5 +44,6 @@ namespace ILCompiler
                 => value1.Target == value2.Target;
             protected override AsyncMethodVariant CreateValueFromKey(EcmaMethod key) => new AsyncMethodVariant(key);
         }
+        private AsyncVariantImplHashtable _asyncVariantImplHashtable = new AsyncVariantImplHashtable();
     }
 }

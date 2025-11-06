@@ -833,6 +833,9 @@ namespace Internal.JitInterface
         {
             Get_CORINFO_SIG_INFO(method.Signature, sig, scope);
 
+            if (method.IsAsync && method.Signature.ReturnType.IsWellKnownType(WellKnownType.Void))
+                sig->callConv |= CorInfoCallConv.CORINFO_CALLCONV_ASYNCCALL;
+
             // Does the method have a hidden parameter?
             bool hasHiddenParameter = !suppressHiddenArgument && method.RequiresInstArg();
 
@@ -1828,6 +1831,22 @@ namespace Internal.JitInterface
 
             if (result is MethodDesc method)
             {
+                bool requestingAsync = pResolvedToken.tokenType == CorInfoTokenKind.CORINFO_TOKENKIND_Await;
+
+                if (requestingAsync && !method.Signature.IsAsyncCall && method.Signature.ReturnsTaskOrValueTask())
+                {
+                    // Jit wants async variant of an async method
+                    method = _compilation.TypeSystemContext.GetAsyncVariantMethod(method);
+                    result = method;
+                }
+                else if (!requestingAsync && method.Signature.IsAsyncCall)
+                {
+                    Debug.Assert(MethodBeingCompiled.IsAsync && MethodBeingCompiled.Signature.ReturnsTaskOrValueTask());
+                    //// Jit wants Task-returning version of an async method
+                    //method = ((AsyncMethodVariant)method).Target;
+                    //result = method;
+                }
+
                 pResolvedToken.hMethod = ObjectToHandle(method);
 
                 TypeDesc owningClass = method.OwningType;
@@ -4316,7 +4335,8 @@ namespace Internal.JitInterface
                 flags.Set(CorJitFlag.CORJIT_FLAG_SOFTFP_ABI);
             }
 
-            if (this.MethodBeingCompiled.IsAsync)
+            if (this.MethodBeingCompiled.Signature.IsAsyncCall
+                || this.MethodBeingCompiled.IsAsync && !this.MethodBeingCompiled.IsAsyncVariant())
             {
                 flags.Set(CorJitFlag.CORJIT_FLAG_ASYNC);
             }

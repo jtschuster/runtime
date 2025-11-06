@@ -62,7 +62,7 @@ namespace ILCompiler
             string compositeRootPath)
             : base(context, group, new NativeAotNameMangler())
         {
-            _ilProvider = new ReadyToRunILProvider(group);
+            _ilProvider = new ReadyToRunILProvider(group, context);
             _inputFiles = inputFiles;
             _compositeRootPath = compositeRootPath;
         }

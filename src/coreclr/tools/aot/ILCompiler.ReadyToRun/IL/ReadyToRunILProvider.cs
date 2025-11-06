@@ -14,6 +14,7 @@ using Internal.IL.Stubs;
 using System.Buffers.Binary;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
+using ILCompiler.DependencyAnalysis.ReadyToRun;
 
 namespace Internal.IL
 {
@@ -26,17 +27,22 @@ namespace Internal.IL
     public sealed class ReadyToRunILProvider : ILProvider
     {
         private CompilationModuleGroup _compilationModuleGroup;
+        private AsyncMethodEmitter _asyncMethodEmitter;
         private MutableModule _manifestMutableModule;
+        private CompilerTypeSystemContext _typeSystemContext;
         private int _version = 0;
 
-        public ReadyToRunILProvider(CompilationModuleGroup compilationModuleGroup)
+        public ReadyToRunILProvider(CompilationModuleGroup compilationModuleGroup, CompilerTypeSystemContext context)
         {
             _compilationModuleGroup = compilationModuleGroup;
+            _typeSystemContext = context;
         }
 
-        public void InitManifestMutableModule(MutableModule module)
+        public void InitManifestMutableModule(MutableModule module, ModuleTokenResolver tokenResolver)
         {
             _manifestMutableModule = module;
+            _asyncMethodEmitter = new AsyncMethodEmitter(module, _compilationModuleGroup, _typeSystemContext);
+            _asyncMethodEmitter.EnsureR2RKnownMethodsAreInManifestModule(tokenResolver);
         }
 
         void IncrementVersion()
@@ -167,10 +173,8 @@ namespace Internal.IL
 
                 if (method.IsAsync)
                 {
-                    // We should not be creating any AsyncMethodVariants yet.
-                    // This hasn't been implemented.
                     Debug.Assert(!method.IsAsyncVariant());
-                    return null;
+                    return _asyncMethodEmitter.EmitTaskReturningStub(ecmaMethod);
                 }
 
                 // Check to see if there is an override for the EcmaMethodIL. If there is not
