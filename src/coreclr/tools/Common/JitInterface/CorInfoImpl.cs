@@ -688,6 +688,7 @@ namespace Internal.JitInterface
 #if !READYTORUN
             _debugInfo = null;
 #endif
+            _asyncResumptionStub = null;
 
             _debugLocInfos = null;
             _debugVarInfos = null;
@@ -882,7 +883,6 @@ namespace Internal.JitInterface
 
             if (!signature.IsStatic) sig->callConv |= CorInfoCallConv.CORINFO_CALLCONV_HASTHIS;
             if (signature.IsExplicitThis) sig->callConv |= CorInfoCallConv.CORINFO_CALLCONV_EXPLICITTHIS;
-            if (signature.IsAsyncCall) sig->callConv |= CorInfoCallConv.CORINFO_CALLCONV_ASYNCCALL;
 
             TypeDesc returnType = signature.ReturnType;
 
@@ -3430,7 +3430,15 @@ namespace Internal.JitInterface
 #if READYTORUN
             throw new RequiresRuntimeJitException("getContinuationType");
 #else
-            throw new NotImplementedException("getContinuationType");
+            GCPointerMapBuilder gcMapBuilder = new GCPointerMapBuilder((int)dataSize, PointerSize);
+            ReadOnlySpan<bool> bools = MemoryMarshal.CreateReadOnlySpan(ref objRefs, (int)objRefsSize);
+            for (int i = 0; i < bools.Length; i++)
+            {
+                if (bools[i])
+                    gcMapBuilder.MarkGCPointer(i * PointerSize);
+            }
+
+            return ObjectToHandle(_compilation.TypeSystemContext.GetContinuationType(gcMapBuilder.ToGCMap()));
 #endif
         }
 
@@ -3782,9 +3790,6 @@ namespace Internal.JitInterface
 #endif
         }
 
-#if READYTORUN
-        private AsyncResumptionStub _asyncResumptionStub;
-#endif
 #pragma warning disable CA1822 // Mark members as static
         private CORINFO_METHOD_STRUCT_* getAsyncResumptionStub(ref void* entryPoint)
 #pragma warning restore CA1822 // Mark members as static
@@ -3801,7 +3806,10 @@ namespace Internal.JitInterface
             *((CORINFO_CONST_LOOKUP*)entryPoint) = CreateConstLookupToSymbol(_compilation.NodeFactory.MethodEntrypoint(new MethodWithToken(_asyncResumptionStub, new ModuleToken(ecmaDef.Module, ecmaDef.Handle), constrainedType, false, MethodBeingCompiled), false, false, false));
             return ObjectToHandle(_asyncResumptionStub);
 #else
-            throw new NotImplementedException("getAsyncResumptionStub");
+            _asyncResumptionStub ??= new AsyncResumptionStub(MethodBeingCompiled);
+
+            entryPoint = (void*)ObjectToHandle(_compilation.NodeFactory.MethodEntrypoint(_asyncResumptionStub));
+            return ObjectToHandle(_asyncResumptionStub);
 #endif
         }
 

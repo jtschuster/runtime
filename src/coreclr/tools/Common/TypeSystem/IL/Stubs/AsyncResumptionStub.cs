@@ -2,46 +2,42 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
-using System.Buffers.Binary;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
+
+using Internal.IL;
+using Internal.IL.Stubs;
 using Internal.TypeSystem;
-using Internal.TypeSystem.Ecma;
 
 using Debug = System.Diagnostics.Debug;
 
-namespace Internal.IL.Stubs
+namespace ILCompiler
 {
-   public class AsyncResumptionStub : ILStubMethod
+    public partial class AsyncResumptionStub : ILStubMethod
     {
-        private MethodDesc _method;
+        private readonly MethodDesc _owningMethod;
         private MethodSignature _signature;
-        private MethodIL _methodIL;
-        public AsyncResumptionStub(MethodDesc method)
+
+        public AsyncResumptionStub(MethodDesc owningMethod)
         {
-            _method = method;
-            _signature = null;
-            _methodIL = null;
-        }
-        public override string DiagnosticName => $"IL_STUB_AsyncResume__{_method.DiagnosticName}";
-
-        public override TypeDesc OwningType => _method.OwningType;
-
-        public override MethodSignature Signature => _signature ??= BuildResumptionStubCalliSignature(_method.Signature);
-
-        private MethodSignature BuildResumptionStubCalliSignature(MethodSignature _)
-        {
-            var flags = MethodSignatureFlags.None;
-            TypeDesc continuation = Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "Continuation"u8);
-            ByRefType outputObject = Context.GetByRefType(
-                Context.GetWellKnownType(WellKnownType.Byte));
-            return new MethodSignature(flags, 0, continuation, [continuation, outputObject]);
+            Debug.Assert(owningMethod.IsAsyncVariant()
+                || (owningMethod.IsAsync && !owningMethod.Signature.ReturnsTaskOrValueTask()));
+            _owningMethod = owningMethod;
         }
 
-        public override TypeSystemContext Context => _method.Context;
+        public override ReadOnlySpan<byte> Name => _owningMethod.Name;
+        public override string DiagnosticName => _owningMethod.DiagnosticName;
 
-        private static int _classCode = new Random().Next(int.MinValue, int.MaxValue);
-        protected override int ClassCode => _classCode;
+        public override TypeDesc OwningType => _owningMethod.OwningType;
+
+        public override MethodSignature Signature => _signature ??= InitializeSignature();
+
+        public override TypeSystemContext Context => _owningMethod.Context;
+
+        private MethodSignature InitializeSignature()
+        {
+            TypeDesc objectType = Context.GetWellKnownType(WellKnownType.Object);
+            TypeDesc byrefByte = Context.GetWellKnownType(WellKnownType.Byte).MakeByRefType();
+            return _signature = new MethodSignature(0, 0, objectType, [objectType, byrefByte]);
+        }
 
         public override MethodIL EmitIL()
         {
@@ -104,7 +100,5 @@ namespace Internal.IL.Stubs
 
             return ilEmitter.Link(this);
         }
-
-        protected override int CompareToImpl(MethodDesc other, TypeSystemComparer comparer) => throw new NotImplementedException();
     }
 }
