@@ -11,7 +11,7 @@ namespace ILCompiler
 {
     public partial class CompilerTypeSystemContext
     {
-        private AsyncVariantImplHashtable _asyncVariantImplHashtable = new AsyncVariantImplHashtable();
+        private AsyncVariantHashtable _asyncVariantImplHashtable = new AsyncVariantHashtable();
 
         public MethodDesc GetAsyncVariantMethod(MethodDesc taskReturningMethod)
         {
@@ -45,6 +45,7 @@ namespace ILCompiler
 
         public MetadataType GetContinuationType(GCPointerMap pointerMap)
         {
+            _continuationTypeHashtable ??= new(this);
             return _continuationTypeHashtable.GetOrCreateValue(pointerMap);
         }
 

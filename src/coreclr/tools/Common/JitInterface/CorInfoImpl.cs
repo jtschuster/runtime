@@ -1833,20 +1833,20 @@ namespace Internal.JitInterface
 
             if (result is MethodDesc method)
             {
-                bool requestingAsync = pResolvedToken.tokenType == CorInfoTokenKind.CORINFO_TOKENKIND_Await;
+                bool awaitedCall = pResolvedToken.tokenType == CorInfoTokenKind.CORINFO_TOKENKIND_Await;
 
-                if (requestingAsync && !method.Signature.IsAsyncCall && method.Signature.ReturnsTaskOrValueTask())
+                if (awaitedCall && !method.IsAsyncCall())
                 {
                     // Jit wants async variant of an async method
                     method = _compilation.TypeSystemContext.GetAsyncVariantMethod(method);
                     result = method;
                 }
-                else if (!requestingAsync && method.Signature.IsAsyncCall)
+                else if (!awaitedCall && method.IsAsyncCall())
                 {
                     Debug.Assert(MethodBeingCompiled.IsAsync && MethodBeingCompiled.Signature.ReturnsTaskOrValueTask());
                     //// Jit wants Task-returning version of an async method
-                    //method = ((AsyncMethodVariant)method).Target;
-                    //result = method;
+                    method = ((AsyncMethodVariant)method).Target;
+                    result = method;
                 }
 
                 pResolvedToken.hMethod = ObjectToHandle(method);
@@ -3790,6 +3790,7 @@ namespace Internal.JitInterface
 #endif
         }
 
+        AsyncResumptionStub _asyncResumptionStub;
 #pragma warning disable CA1822 // Mark members as static
         private CORINFO_METHOD_STRUCT_* getAsyncResumptionStub(ref void* entryPoint)
 #pragma warning restore CA1822 // Mark members as static
@@ -4394,8 +4395,7 @@ namespace Internal.JitInterface
                 flags.Set(CorJitFlag.CORJIT_FLAG_SOFTFP_ABI);
             }
 
-            if (this.MethodBeingCompiled.Signature.IsAsyncCall
-                || this.MethodBeingCompiled.IsAsync && !this.MethodBeingCompiled.IsAsyncVariant())
+            if (this.MethodBeingCompiled.IsAsyncCall())
             {
                 flags.Set(CorJitFlag.CORJIT_FLAG_ASYNC);
             }

@@ -13,24 +13,26 @@ namespace ILCompiler
 {
     public partial class AsyncResumptionStub : ILStubMethod
     {
-        private readonly MethodDesc _owningMethod;
+        private readonly MethodDesc _method;
         private MethodSignature _signature;
+        private MethodIL _methodIL = null;
 
         public AsyncResumptionStub(MethodDesc owningMethod)
         {
-            Debug.Assert(owningMethod.IsAsyncVariant()
-                || (owningMethod.IsAsync && !owningMethod.Signature.ReturnsTaskOrValueTask()));
-            _owningMethod = owningMethod;
+            Debug.Assert(owningMethod.IsAsyncCall());
+            _method = owningMethod;
         }
 
-        public override ReadOnlySpan<byte> Name => _owningMethod.Name;
-        public override string DiagnosticName => _owningMethod.DiagnosticName;
+        public override ReadOnlySpan<byte> Name => _method.Name;
+        public override string DiagnosticName => _method.DiagnosticName;
 
-        public override TypeDesc OwningType => _owningMethod.OwningType;
+        public override TypeDesc OwningType => _method.OwningType;
 
         public override MethodSignature Signature => _signature ??= InitializeSignature();
 
-        public override TypeSystemContext Context => _owningMethod.Context;
+        public override TypeSystemContext Context => _method.Context;
+
+        protected override int ClassCode => unchecked((int)0xa91ac565);
 
         private MethodSignature InitializeSignature()
         {
@@ -71,7 +73,7 @@ namespace ILCompiler
             ilStream.Emit(ILOpcode.calli, ilEmitter.NewToken(this.Signature));
 
             bool returnsVoid = _method.Signature.ReturnType != Context.GetWellKnownType(WellKnownType.Void);
-            IL.Stubs.ILLocalVariable resultLocal = default;
+            Internal.IL.Stubs.ILLocalVariable resultLocal = default;
             if (!returnsVoid)
             {
                 resultLocal = ilEmitter.NewLocal(_method.Signature.ReturnType);
@@ -99,6 +101,12 @@ namespace ILCompiler
             ilStream.Emit(ILOpcode.ret);
 
             return ilEmitter.Link(this);
+        }
+
+        protected override int CompareToImpl(MethodDesc other, TypeSystemComparer comparer)
+        {
+            var othr = (AsyncResumptionStub)other;
+            return comparer.Compare(_method, othr._method);
         }
     }
 }
