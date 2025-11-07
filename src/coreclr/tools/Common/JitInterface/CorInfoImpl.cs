@@ -25,6 +25,8 @@ using Internal.Pgo;
 
 using ILCompiler;
 using ILCompiler.DependencyAnalysis;
+using Internal.IL.Stubs;
+
 
 #if READYTORUN
 using System.Reflection.Metadata.Ecma335;
@@ -3425,7 +3427,11 @@ namespace Internal.JitInterface
         private CORINFO_CLASS_STRUCT_* getContinuationType(nuint dataSize, ref bool objRefs, nuint objRefsSize)
         {
             Debug.Assert(objRefsSize == (dataSize + (nuint)(PointerSize - 1)) / (nuint)PointerSize);
+#if READYTORUN
+            throw new RequiresRuntimeJitException("getContinuationType");
+#else
             throw new NotImplementedException("getContinuationType");
+#endif
         }
 
         private mdToken getMethodDefFromMethod(CORINFO_METHOD_STRUCT_* hMethod)
@@ -3776,11 +3782,27 @@ namespace Internal.JitInterface
 #endif
         }
 
+#if READYTORUN
+        private AsyncResumptionStub _asyncResumptionStub;
+#endif
 #pragma warning disable CA1822 // Mark members as static
         private CORINFO_METHOD_STRUCT_* getAsyncResumptionStub(ref void* entryPoint)
 #pragma warning restore CA1822 // Mark members as static
         {
-            throw new NotImplementedException("Crossgen2 does not support runtime-async yet");
+#if READYTORUN
+            _asyncResumptionStub ??= new AsyncResumptionStub(MethodBeingCompiled);
+            TypeDesc constrainedType = null;
+            var def = MethodBeingCompiled.GetTypicalMethodDefinition();
+            if (def is AsyncMethodVariant asyncMethod)
+            {
+                def = asyncMethod.Target;
+            }
+            EcmaMethod ecmaDef = (EcmaMethod)def;
+            *((CORINFO_CONST_LOOKUP*)entryPoint) = CreateConstLookupToSymbol(_compilation.NodeFactory.MethodEntrypoint(new MethodWithToken(_asyncResumptionStub, new ModuleToken(ecmaDef.Module, ecmaDef.Handle), constrainedType, false, MethodBeingCompiled), false, false, false));
+            return ObjectToHandle(_asyncResumptionStub);
+#else
+            throw new NotImplementedException("getAsyncResumptionStub");
+#endif
         }
 
         private byte[] _code;
