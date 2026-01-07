@@ -46,16 +46,42 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
                 IEcmaModule targetModule = factory.SignatureContext.GetTargetModule(_typeDesc);
                 SignatureContext innerContext = dataBuilder.EmitFixup(factory, fixupKind, targetModule, factory.SignatureContext);
-                dataBuilder.EmitTypeSignature(_typeDesc, innerContext);
-
                 if ((fixupKind == ReadyToRunFixupKind.Check_TypeLayout) ||
                     (fixupKind == ReadyToRunFixupKind.Verify_TypeLayout))
                 {
+                    dataBuilder.EmitTypeSignature(_typeDesc, innerContext);
                     EncodeTypeLayout(dataBuilder, _typeDesc);
+                }
+                else if (fixupKind == ReadyToRunFixupKind.ContinuationLayout)
+                {
+                    dataBuilder.EmitContinuationType((AsyncContinuationType)_typeDesc, innerContext);
                 }
             }
 
             return dataBuilder.ToObjectData();
+        }
+
+        private static void EncodeContinuationTypeLayout(ObjectDataSignatureBuilder dataBuilder, TypeDesc type)
+        {
+            if (type is not AsyncContinuationType act)
+                throw new InvalidOperationException();
+
+            GCPointerMap gcMap = ((AsyncContinuationType)type).PointerMap;
+            int size = gcMap.Size;
+            dataBuilder.EmitUInt((uint)(size));
+            byte[] encodedGCRefMap = new byte[size];
+            int bitIndex = 0;
+            foreach (bool bit in gcMap)
+            {
+                if (bit)
+                {
+                    encodedGCRefMap[bitIndex / 8] |= (byte)(1 << (bitIndex & 7));
+                }
+
+                ++bitIndex;
+            }
+
+            dataBuilder.EmitBytes(encodedGCRefMap);
         }
 
         private static void EncodeTypeLayout(ObjectDataSignatureBuilder dataBuilder, TypeDesc type)

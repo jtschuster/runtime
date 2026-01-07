@@ -144,6 +144,8 @@ BOOL ZapSig::GetSignatureForTypeHandle(TypeHandle      handle,
     }
     CONTRACTL_END
 
+    // Can we encode an AsyncContinuation type?
+
     if (handle.IsTypeDesc())
         return GetSignatureForTypeDesc(handle.AsTypeDesc(), pSigBuilder);
 
@@ -721,6 +723,7 @@ TypeHandle ZapSig::DecodeType(Module *pEncodeModuleContext,
 
     SigTypeContext typeContext;    // empty context is OK: encoding should not contain type variables.
 
+    // TODO: Decode Continuation<object, nint> as Continuation_10
     TypeHandle th = p.GetTypeHandleThrowing(pInfoModule,
                                             &typeContext,
                                             ClassLoader::LoadTypes,

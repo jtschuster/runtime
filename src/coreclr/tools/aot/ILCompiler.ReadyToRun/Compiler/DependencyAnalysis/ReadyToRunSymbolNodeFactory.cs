@@ -176,6 +176,23 @@ namespace ILCompiler.DependencyAnalysis
                         key.MethodWithToken,
                         isInstantiatingStub: false));
             });
+
+            _continuationTypeFixups = new NodeCache<AsyncContinuationType, ISymbolNode>((key) =>
+            {
+                return new DelayLoadHelperImport(
+                    _codegenNodeFactory,
+                    _codegenNodeFactory.HelperImports,
+                    ReadyToRunHelper.DelayLoad_Helper,
+                    _codegenNodeFactory.TypeSignature(ReadyToRunFixupKind.ContinuationLayout, key)
+                );
+            });
+        }
+
+        private NodeCache<AsyncContinuationType, ISymbolNode> _continuationTypeFixups;
+
+        public ISymbolNode ContinuationDelayLoadHelper(AsyncContinuationType key)
+        {
+            return _continuationTypeFixups.GetOrAdd(key);
         }
 
         private NodeCache<ModuleToken, ISymbolNode> _importStrings;

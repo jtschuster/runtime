@@ -557,6 +557,8 @@ namespace Internal.JitInterface
 
         public static bool ShouldCodeNotBeCompiledIntoFinalImage(InstructionSetSupport instructionSetSupport, MethodDesc method)
         {
+            if (method is AsyncResumptionStub)
+                return true;
             MethodDesc methodDef = method.GetTypicalMethodDefinition();
             EcmaMethod ecmaMethod = (EcmaMethod)(methodDef.GetPrimaryMethodDesc());
             var metadataReader = ecmaMethod.MetadataReader;
@@ -981,6 +983,7 @@ namespace Internal.JitInterface
             switch (ftnNum)
             {
                 case CorInfoHelpFunc.CORINFO_HELP_THROW:
+                case CorInfoHelpFunc.CORINFO_HELP_THROWEXACT: // todo
                     id = ReadyToRunHelper.Throw;
                     break;
                 case CorInfoHelpFunc.CORINFO_HELP_RETHROW:
@@ -1270,17 +1273,12 @@ namespace Internal.JitInterface
                     break;
 
                 case CorInfoHelpFunc.CORINFO_HELP_ALLOC_CONTINUATION:
-                    id = ReadyToRunHelper.AllocContinuation;
-                    break;
+                    var method = _compilation.NodeFactory.TypeSystemContext.GetCoreLibEntryPoint("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8, "AllocContinuation"u8, null);
+                    var methodWithToken = new MethodWithToken(method, _compilation.CompilationModuleGroup.Resolver.GetModuleTokenForMethod(method, true, true), null, false, null);
+                    return _compilation.NodeFactory.MethodEntrypoint(methodWithToken, false, false, false);
 
                 case CorInfoHelpFunc.CORINFO_HELP_ALLOC_CONTINUATION_METHOD:
-                    id = ReadyToRunHelper.AllocContinuationMethod;
-                    break;
-
                 case CorInfoHelpFunc.CORINFO_HELP_ALLOC_CONTINUATION_CLASS:
-                    id = ReadyToRunHelper.AllocContinuationClass;
-                    break;
-
                 case CorInfoHelpFunc.CORINFO_HELP_INITCLASS:
                 case CorInfoHelpFunc.CORINFO_HELP_INITINSTCLASS:
                 case CorInfoHelpFunc.CORINFO_HELP_GETSYNCFROMCLASSHANDLE:
@@ -2782,12 +2780,22 @@ namespace Internal.JitInterface
         private CORINFO_CLASS_STRUCT_* embedClassHandle(CORINFO_CLASS_STRUCT_* handle, ref void* ppIndirection)
         {
             TypeDesc type = HandleToObject(handle);
-            //if (!_compilation.CompilationModuleGroup.VersionsWithType(type))
-            //    throw new RequiresRuntimeJitException(type.ToString());
+            // For continuation:
+            // DelayLoadHelper(
+            //   TypeHandle(ReadyToRunFixupKind.ContinuationLayout)
+            // )
+            if (type is AsyncContinuationType act)
+            {
+                Import import = (Import)_compilation.SymbolNodeFactory.ContinuationDelayLoadHelper(act);
+                ppIndirection = (void*)ObjectToHandle(import);
+                return null;
+            }
+            if (!_compilation.CompilationModuleGroup.VersionsWithType(type))
+                throw new RequiresRuntimeJitException(type.ToString());
 
-            Import typeHandleImport = (Import)_compilation.SymbolNodeFactory.CreateReadyToRunHelper(ReadyToRunHelperId.TypeHandle, type);
-            Debug.Assert(typeHandleImport.RepresentsIndirectionCell);
-            ppIndirection = (void*)ObjectToHandle(typeHandleImport);
+            //Import typeHandleImport = (Import)_compilation.SymbolNodeFactory.CreateReadyToRunHelper(ReadyToRunHelperId.TypeHandle, type);
+            //Debug.Assert(typeHandleImport.RepresentsIndirectionCell);
+            //ppIndirection = (void*)ObjectToHandle(typeHandleImport);
             return null;
         }
 

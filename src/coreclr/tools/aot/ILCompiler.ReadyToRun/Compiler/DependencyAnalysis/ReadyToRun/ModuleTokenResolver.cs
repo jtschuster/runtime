@@ -67,8 +67,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                 }
             }
 
-            // If the token was not lazily mapped, search the input compilation set for a type reference token
-            if (_compilationModuleGroup.TryGetModuleTokenForExternalType(type, out token))
+            if (!_compilationModuleGroup.VersionsWithType(type) && _compilationModuleGroup.TryGetModuleTokenForExternalType(type, out token))
             {
                 return token;
             }
@@ -95,9 +94,9 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             }
         }
 
-        public ModuleToken GetModuleTokenForMethod(EcmaMethod method, bool allowDynamicallyCreatedReference, bool throwIfNotFound)
+        public ModuleToken GetModuleTokenForMethod(MethodDesc method, bool allowDynamicallyCreatedReference, bool throwIfNotFound)
         {
-            //method = method.GetCanonMethodTarget(CanonicalFormKind.Specific);
+            method = method.GetCanonMethodTarget(CanonicalFormKind.Specific);
 
             if (method.GetTypicalMethodDefinition() is EcmaMethod ecmaMethod)
             {

@@ -200,28 +200,6 @@ namespace ILCompiler
         }
         private AsyncVariantHashtable _asyncVariantHashtable = new AsyncVariantHashtable();
 
-        public MetadataType GetContinuationType(GCPointerMap pointerMap)
-        {
-            return _continuationTypeHashtable.GetOrCreateValue(pointerMap);
-        }
-
-        private sealed class ContinuationTypeHashtable : LockFreeReaderHashtable<GCPointerMap, AsyncContinuationType>
-        {
-            private readonly CompilerTypeSystemContext _parent;
-
-            public ContinuationTypeHashtable(CompilerTypeSystemContext parent)
-                => _parent = parent;
-
-            protected override int GetKeyHashCode(GCPointerMap key) => key.GetHashCode();
-            protected override int GetValueHashCode(AsyncContinuationType value) => value.PointerMap.GetHashCode();
-            protected override bool CompareKeyToValue(GCPointerMap key, AsyncContinuationType value) => key.Equals(value.PointerMap);
-            protected override bool CompareValueToValue(AsyncContinuationType value1, AsyncContinuationType value2)
-                => value1.PointerMap.Equals(value2.PointerMap);
-            protected override AsyncContinuationType CreateValueFromKey(GCPointerMap key)
-            {
-                return new AsyncContinuationType(_parent.ContinuationType, key);
-            }
-        }
         private ContinuationTypeHashtable _continuationTypeHashtable;
 
         private MetadataType _continuationType;

@@ -14158,6 +14158,36 @@ BOOL LoadDynamicInfoEntry(Module *currentModule,
         }
         break;
 
+    case READYTORUN_FIXUP_Continuation_Layout:
+        {
+
+            ModuleBase* continuationModule = currentModule->GetModuleFromIndex(CorSigUncompressData(pBlob));
+            DWORD size = CorSigUncompressData(pBlob);
+            // allocate bools of size 'size', rounded up to pointer size
+
+            byte* data = (byte*)pBlob;
+
+            size_t dataSize = size;
+            BOOL* objRefs = data;
+            size_t objRefsSize = (dataSize + (TARGET_POINTER_SIZE - 1)) / TARGET_POINTER_SIZE;
+            MethodTable* continuationType = nullptr;
+            {
+                _ASSERTE(objRefsSize == (dataSize + (TARGET_POINTER_SIZE - 1)) / TARGET_POINTER_SIZE);
+                LoaderAllocator* allocator = continuationModule->GetLoaderAllocator();
+                AsyncContinuationsManager* asyncConts = allocator->GetAsyncContinuationsManager();
+                result = asyncConts->LookupOrCreateContinuationMethodTable((unsigned)dataSize, objRefs, m_pMethodBeingCompiled);
+
+#ifdef DEBUG
+                size_t result2 = asyncConts->LookupOrCreateContinuationMethodTable((unsigned)dataSize, objRefs, m_pMethodBeingCompiled);
+                _ASSERTE(result2 == result);
+#endif
+            }
+            //CEEInfo::GetContinuationType(size, pBlob, size + TARGET_POINTER_SIZE - 1)
+
+            result = continuationType.AsTypeHandle();
+        }
+        break;
+
     case READYTORUN_FIXUP_Check_FieldOffset:
         {
             DWORD dwExpectedOffset = CorSigUncompressData(pBlob);

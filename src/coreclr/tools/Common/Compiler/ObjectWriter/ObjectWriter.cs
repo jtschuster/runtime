@@ -346,13 +346,6 @@ namespace ILCompiler.ObjectWriter
             List<ChecksumsToCalculate> checksumRelocations = [];
             foreach (DependencyNode depNode in nodes)
             {
-#if READYTORUN
-                if (depNode is DependencyAnalysis.ReadyToRun.MethodWithGCInfo { Method: MethodDesc method } && (method.IsAsyncVariant() || method is AsyncResumptionStub))
-                {
-                    continue;
-                }
-#endif
-
                 if (depNode is ISymbolRangeNode symbolRange)
                 {
                     symbolRangeNodes.Add(symbolRange);

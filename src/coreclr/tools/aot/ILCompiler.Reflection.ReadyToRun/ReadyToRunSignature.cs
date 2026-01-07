@@ -1353,6 +1353,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
                 case ReadyToRunFixupKind.Check_TypeLayout:
                 case ReadyToRunFixupKind.Verify_TypeLayout:
+                case ReadyToRunFixupKind.ContinuationLayout:
                     ParseType(builder);
                     ReadyToRunTypeLayoutFlags layoutFlags = (ReadyToRunTypeLayoutFlags)ReadUInt();
                     builder.Append($" Flags {layoutFlags}");
@@ -1377,18 +1378,24 @@ namespace ILCompiler.Reflection.ReadyToRun
                         if (!layoutFlags.HasFlag(ReadyToRunTypeLayoutFlags.READYTORUN_LAYOUT_GCLayout_Empty))
                         {
                             int cbGCRefMap = (actualSize / _contextReader.TargetPointerSize + 7) / 8;
-                            builder.Append(" GCLayout ");
+                            builder.Append(" GCLayout 0x");
                             for (int i = 0; i < cbGCRefMap; i++)
                             {
                                 builder.Append(ReadByte().ToString("X"));
                             }
                         }
                     }
-
-                    if (fixupType == ReadyToRunFixupKind.Check_TypeLayout)
-                        builder.Append(" (CHECK_TYPE_LAYOUT)");
-                    else
-                        builder.Append(" (VERIFY_TYPE_LAYOUT)");
+                    builder.Append(fixupType switch
+                    {
+                        ReadyToRunFixupKind.Check_TypeLayout => " (CHECK_TYPE_LAYOUT)",
+                        ReadyToRunFixupKind.Verify_TypeLayout => " (VERIFY_TYPE_LAYOUT)",
+                        ReadyToRunFixupKind.ContinuationLayout => " (CONTINUATION_LAYOUT)",
+                        _ => throw new BadImageFormatException()
+                    });
+                    //if (fixupType == ReadyToRunFixupKind.Check_TypeLayout)
+                    //    builder.Append(" (CHECK_TYPE_LAYOUT)");
+                    //else
+                    //    builder.Append(" (VERIFY_TYPE_LAYOUT)");
                     break;
 
                 case ReadyToRunFixupKind.Check_VirtualFunctionOverride:
@@ -1474,6 +1481,16 @@ namespace ILCompiler.Reflection.ReadyToRun
                         builder.Append(" (VERIFY_IL_BODY)");
                     break;
 
+                    //uint size = ReadUInt();
+                    //SkipBytes(size);
+                    //uint typeCount = ReadUInt();
+                    //if (typeCount != 1)
+                    //{
+                    //    throw new NotImplementedException();
+                    //}
+                    //ParseType(builder);
+                    //builder.Append("(ContinuationLayout)");
+                    //break;
                 default:
                     throw new BadImageFormatException();
             }
@@ -2006,8 +2023,12 @@ namespace ILCompiler.Reflection.ReadyToRun
                     builder.Append("STACK_PROBE");
                     break;
 
+                case ReadyToRunHelper.AllocContinuation:
+                    builder.Append("ALLOC_CONTINUATION");
+                    break;
+
                 default:
-                    throw new BadImageFormatException();
+                    throw new BadImageFormatException(helperType.ToString());
             }
         }
 

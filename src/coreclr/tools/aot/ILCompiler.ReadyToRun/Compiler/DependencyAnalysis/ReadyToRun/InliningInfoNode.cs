@@ -67,6 +67,10 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             foreach (MethodWithGCInfo methodNode in factory.EnumerateCompiledMethods(_module, CompiledMethodCategory.All))
             {
                 MethodDesc[] inlinees = methodNode.InlinedMethods;
+                if (inlinees.Length == 0)
+                {
+                    continue;
+                }
                 MethodDesc inliner = methodNode.Method;
                 EcmaMethod inlinerDefinition = (EcmaMethod)inliner.GetTypicalMethodDefinition();
 

@@ -1196,14 +1196,10 @@ PCODE ReadyToRunInfo::GetEntryPoint(MethodDesc * pMD, PrepareCodeConfig* pConfig
     if (ReadyToRunCodeDisabled())
         goto done;
 
-    // TODO: (async) R2R support for async variants (https://github.com/dotnet/runtime/issues/121559)
-    if (pMD->IsAsyncVariantMethod())
-        goto done;
-
     ETW::MethodLog::GetR2RGetEntryPointStart(pMD);
 
     uint offset;
-    if (pMD->HasClassOrMethodInstantiation())
+    if (pMD->HasClassOrMethodInstantiation() || pMD->IsAsyncVariantMethod())
     {
         if (m_instMethodEntryPoints.IsNull())
             goto done;

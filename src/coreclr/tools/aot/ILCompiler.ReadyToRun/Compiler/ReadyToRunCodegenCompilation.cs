@@ -110,7 +110,7 @@ namespace ILCompiler
                 }
             }
 
-            if (callee.IsAsyncThunk())
+            if (callee.IsAsyncThunk() || callee.IsAsync)
             {
                 // Async thunks require special handling in the compiler and should not be inlined
                 return false;
@@ -724,10 +724,11 @@ namespace ILCompiler
                                     asyncHelpers.GetKnownMethod("CaptureContexts"u8, null),
                                     asyncHelpers.GetKnownMethod("RestoreContexts"u8, null),
                                     asyncHelpers.GetKnownMethod("RestoreContextsOnSuspension"u8, null),
+                                    asyncHelpers.GetKnownMethod("AllocContinuation"u8, null),
                                 };
                                 requiredMutableModuleReferences = asyncInfoEntities;
                             }
-                            _nodeFactory.ManifestMetadataTable._mutableModule.ModuleThatIsCurrentlyTheSourceOfNewReferences = ((EcmaMethod)method.GetTypicalMethodDefinition().GetPrimaryMethodDesc()).Module;
+                            _nodeFactory.ManifestMetadataTable._mutableModule.ModuleThatIsCurrentlyTheSourceOfNewReferences = ((EcmaMethod)method.GetPrimaryMethodDesc().GetTypicalMethodDefinition()).Module;
                             if (method.IsAsyncThunk() || method is AsyncResumptionStub)
                             {
                                 var methodIL = GetMethodIL(method);
@@ -744,7 +745,7 @@ namespace ILCompiler
                                             if (md.IsAsyncVariant())
                                             {
                                                 Debug.Assert(md.GetTargetOfAsyncVariant() == method || method is AsyncResumptionStub);
-                                                Debug.Assert(!_nodeFactory.Resolver.GetModuleTokenForMethod(method, allowDynamicallyCreatedReference: false, throwIfNotFound: true).IsNull || method is AsyncResumptionStub);
+                                                Debug.Assert(method is AsyncResumptionStub || !_nodeFactory.Resolver.GetModuleTokenForMethod(method, allowDynamicallyCreatedReference: false, throwIfNotFound: true).IsNull);
                                             }
                                             else if (_nodeFactory.Resolver.GetModuleTokenForMethod(md, allowDynamicallyCreatedReference: true, throwIfNotFound: false).IsNull)
                                             {
