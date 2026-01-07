@@ -16,6 +16,8 @@ using Internal.TypeSystem.Interop;
 using Debug = System.Diagnostics.Debug;
 using Internal.ReadyToRunConstants;
 using Internal.JitInterface;
+using System.Reflection.Metadata.Ecma335;
+using System.Reflection.Metadata;
 
 namespace ILCompiler
 {
@@ -612,18 +614,18 @@ namespace ILCompiler
                         case ILOpcode.ldfld:
                         case ILOpcode.ldflda:
                         case ILOpcode.stfld:
-                            {
-                                int token = ilReader.ReadILToken();
-                                FieldDesc field = methodIL.GetObject(token) as FieldDesc;
-                                if (field == null)
-                                    return false;
-                                if (field.IsStatic)
-                                    return false;
-                                MetadataType owningMetadataType = field.OwningType;
-                                if (!owningMetadataType.IsNonVersionable())
-                                    return false;
-                                break;
-                            }
+                        {
+                            int token = ilReader.ReadILToken();
+                            FieldDesc field = methodIL.GetObject(token) as FieldDesc;
+                            if (field == null)
+                                return false;
+                            if (field.IsStatic)
+                                return false;
+                            MetadataType owningMetadataType = field.OwningType;
+                            if (!owningMetadataType.IsNonVersionable())
+                                return false;
+                            break;
+                        }
 
                         case ILOpcode.ldelem:
                         case ILOpcode.ldelema:
@@ -632,37 +634,37 @@ namespace ILCompiler
                         case ILOpcode.initobj:
                         case ILOpcode.cpobj:
                         case ILOpcode.sizeof_:
-                            {
-                                int token = ilReader.ReadILToken();
-                                TypeDesc type = methodIL.GetObject(token) as TypeDesc;
-                                if (type == null)
-                                    return false;
-
-                                MetadataType metadataType = type as MetadataType;
-                                if (metadataType == null)
-                                    continue; // Types which are not metadata types are all well defined in size
-
-                                if (!metadataType.IsValueType)
-                                    continue; // Reference types are all well defined in size for the sizeof instruction
-
-                                if (metadataType.IsNonVersionable())
-                                    continue;
+                        {
+                            int token = ilReader.ReadILToken();
+                            TypeDesc type = methodIL.GetObject(token) as TypeDesc;
+                            if (type == null)
                                 return false;
-                            }
+
+                            MetadataType metadataType = type as MetadataType;
+                            if (metadataType == null)
+                                continue; // Types which are not metadata types are all well defined in size
+
+                            if (!metadataType.IsValueType)
+                                continue; // Reference types are all well defined in size for the sizeof instruction
+
+                            if (metadataType.IsNonVersionable())
+                                continue;
+                            return false;
+                        }
 
                         case ILOpcode.stelem:
-                            {
-                                int token = ilReader.ReadILToken();
-                                MetadataType type = methodIL.GetObject(token) as MetadataType;
-                                if (type == null)
-                                    return false;
+                        {
+                            int token = ilReader.ReadILToken();
+                            MetadataType type = methodIL.GetObject(token) as MetadataType;
+                            if (type == null)
+                                return false;
 
-                                if (!type.IsValueType)
-                                    return false;
-                                if (!type.IsNonVersionable())
-                                    return false;
-                                break;
-                            }
+                            if (!type.IsValueType)
+                                return false;
+                            if (!type.IsNonVersionable())
+                                return false;
+                            break;
+                        }
 
                         // IL instructions which refer to tokens which are not safe for NonVersionable methods
                         case ILOpcode.box:
@@ -721,7 +723,7 @@ namespace ILCompiler
 
             if (_typeRefsInCompilationModuleSet == null)
             {
-                lock(_compilationModuleSet)
+                lock (_compilationModuleSet)
                 {
                     if (_typeRefsInCompilationModuleSet == null)
                     {
@@ -729,7 +731,7 @@ namespace ILCompiler
 
                         foreach (var module in _compilationModuleSet)
                         {
-                            EcmaModule ecmaModule = (EcmaModule)module;
+                            EcmaModule ecmaModule = module;
                             foreach (var typeRefHandle in ecmaModule.MetadataReader.TypeReferences)
                             {
                                 try
@@ -742,6 +744,21 @@ namespace ILCompiler
                                 }
                                 catch (TypeSystemException) { }
                             }
+                            // Get row count for TypeSpec table
+                            var reader = ecmaModule.MetadataReader;
+                            int typeSpecCount = reader.GetTableRowCount(TableIndex.TypeSpec);
+
+                            // Iterate through all TypeSpecs (rows are 1-based)
+                            for (int row = 1; row <= typeSpecCount; row++)
+                            {
+                                TypeSpecificationHandle handle = MetadataTokens.TypeSpecificationHandle(row);
+                                TypeSpecification typeSpec = reader.GetTypeSpecification(handle);
+
+                                // Decode the signature
+                                BlobReader sigReader = reader.GetBlobReader(typeSpec.Signature);
+                                // ... process signature
+                            }
+
                         }
                         Volatile.Write(ref _typeRefsInCompilationModuleSet, typeRefsInCompilationModuleSet);
                     }

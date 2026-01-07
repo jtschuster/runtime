@@ -25,6 +25,8 @@ namespace ILCompiler
             _owningType = owningType;
         }
 
+        public MethodDesc TargetMethod => _targetMethod;
+
         public override ReadOnlySpan<byte> Name => _targetMethod.Name;
         public override string DiagnosticName => _targetMethod.DiagnosticName;
 

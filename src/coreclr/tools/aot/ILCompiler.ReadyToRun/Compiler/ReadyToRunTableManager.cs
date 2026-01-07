@@ -79,13 +79,14 @@ namespace ILCompiler
                 {
                     Debug.Assert(!_sortedMethods);
                     MethodDesc method = methodNode.Method;
-                    EcmaModule module = (EcmaModule)((EcmaMethod)method.GetTypicalMethodDefinition().GetPrimaryMethodDesc()).Module;
+                    EcmaMethod methodDef = (EcmaMethod)method.GetTypicalMethodDefinition().GetPrimaryMethodDesc();
+                    EcmaModule module = methodDef.Module;
                     if (!_methodsGenerated.TryGetValue(module, out var perModuleData))
                     {
                         perModuleData = new PerModuleMethodsGenerated(module);
                         _methodsGenerated[module] = perModuleData;
                     }
-                    if (method.HasInstantiation || method.OwningType.HasInstantiation)
+                    if (method.HasInstantiation || method.OwningType.HasInstantiation || method.IsAsyncVariant() || method is AsyncResumptionStub)
                     {
                         perModuleData.GenericMethodsGenerated.Add(methodNode);
                     }

@@ -61,7 +61,6 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                 {
                     return new ModuleToken(ecmaType.Module, (mdToken)MetadataTokens.GetToken(ecmaType.Handle));
                 }
-
                 if (_typeToRefTokens.TryGetValue(ecmaType, out token))
                 {
                     return token;
@@ -96,9 +95,9 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             }
         }
 
-        public ModuleToken GetModuleTokenForMethod(MethodDesc method, bool allowDynamicallyCreatedReference, bool throwIfNotFound)
+        public ModuleToken GetModuleTokenForMethod(EcmaMethod method, bool allowDynamicallyCreatedReference, bool throwIfNotFound)
         {
-            method = method.GetCanonMethodTarget(CanonicalFormKind.Specific);
+            //method = method.GetCanonMethodTarget(CanonicalFormKind.Specific);
 
             if (method.GetTypicalMethodDefinition() is EcmaMethod ecmaMethod)
             {
@@ -153,6 +152,38 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                 DecodeMethodSignatureToDiscoverUsedTypeTokens(methodDef.Signature, token);
             }
         }
+
+        public ModuleToken GetModuleTokenForField(FieldDesc field, bool allowDynamicallyCreatedReference, bool throwIfNotFound)
+        {
+            if (field.GetTypicalFieldDefinition() is EcmaField ecmaField)
+            {
+                if (_compilationModuleGroup.VersionsWithType(ecmaField.OwningType))
+                {
+                    return new ModuleToken(ecmaField.Module, ecmaField.Handle);
+                }
+
+                // If that didn't work, it may be in the manifest module used for version resilient cross module inlining
+                if (allowDynamicallyCreatedReference)
+                {
+                    var handle = _manifestMutableModule.TryGetExistingEntityHandle(ecmaField);
+                    if (handle.HasValue)
+                    {
+                        return new ModuleToken(_manifestMutableModule, handle.Value);
+                    }
+                }
+            }
+
+            // Reverse lookup failed
+            if (throwIfNotFound)
+            {
+                throw new NotImplementedException(field.ToString());
+            }
+            else
+            {
+                return default(ModuleToken);
+            }
+        }
+
 
         private void DecodeMethodSpecificationSignatureToDiscoverUsedTypeTokens(BlobHandle signatureHandle, ModuleToken token)
         {

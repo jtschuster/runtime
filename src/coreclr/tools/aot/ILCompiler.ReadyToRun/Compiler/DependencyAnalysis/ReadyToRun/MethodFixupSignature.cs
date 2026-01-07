@@ -130,6 +130,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
             SignatureContext innerContext = dataBuilder.EmitFixup(factory, fixupKind, method.Token.Module, factory.SignatureContext);
 
+            // We should emit AsyncVariants and ResumptionStubs differently even if the ModuleToken is a Def or Ref
             if (optimized && method.Token.TokenType == CorTokenType.mdtMethodDef)
             {
                 dataBuilder.EmitMethodDefToken(method.Token);

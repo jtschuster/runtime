@@ -352,6 +352,10 @@ namespace Internal.ReadyToRunConstants
 
         GetCurrentManagedThreadId   = 0x112,
 
+        AllocContinuation,
+        AllocContinuationMethod,
+        AllocContinuationClass,
+
         // **********************************************************************************************
         //
         // These are not actually part of the R2R file format. We have them here because it's convenient.

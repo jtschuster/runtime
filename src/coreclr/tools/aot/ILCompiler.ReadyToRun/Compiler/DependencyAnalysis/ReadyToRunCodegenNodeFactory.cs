@@ -477,6 +477,8 @@ namespace ILCompiler.DependencyAnalysis
             {
                 MethodDesc method = methodNode.Method;
                 MethodWithGCInfo methodCodeNode = methodNode as MethodWithGCInfo;
+                if (methodCodeNode.Method is AsyncResumptionStub || methodCodeNode.Method.IsAsyncVariant())
+                    continue;
 #if DEBUG
                 if ((!methodCodeNode.IsEmpty || CompilationModuleGroup.VersionsWithMethodBody(method)) && method.IsPrimaryMethodDesc())
                 {

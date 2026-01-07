@@ -14,6 +14,7 @@ using Internal.IL.Stubs;
 using System.Buffers.Binary;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
+using ILCompiler.ReadyToRun.TypeSystem;
 
 namespace Internal.IL
 {
@@ -165,7 +166,7 @@ namespace Internal.IL
                         return result;
                 }
 
-                if (method.IsAsync)
+                if (ecmaMethod.IsAsync)
                 {
                     if (ecmaMethod.Signature.ReturnsTaskOrValueTask())
                     {
@@ -209,6 +210,21 @@ namespace Internal.IL
                 if (methodDefinitionIL == null)
                     return null;
                 return new InstantiatedMethodIL(method, methodDefinitionIL);
+            }
+            else if (method.IsAsyncVariant())
+            {
+                if (method.IsAsyncThunk())
+                {
+                    return AsyncThunkILEmitter.EmitAsyncMethodThunk(method, method.GetTargetOfAsyncVariant());
+                }
+                else
+                {
+                    return new AsyncEcmaMethodIL((AsyncMethodVariant)method, EcmaMethodIL.Create((EcmaMethod)method.GetTargetOfAsyncVariant()));
+                }
+            }
+            else if (method is AsyncResumptionStub ars)
+            {
+                return ars.EmitIL();
             }
             else
             {
@@ -319,6 +335,29 @@ namespace Internal.IL
 
                 return _mutableModule.GetObject(System.Reflection.Metadata.Ecma335.MetadataTokens.EntityHandle(token), notFoundBehavior);
             }
+        }
+
+        public sealed class AsyncEcmaMethodIL : MethodIL, IEcmaMethodIL
+        {
+            private readonly AsyncMethodVariant _variant;
+            private readonly EcmaMethodIL _ecmaIL;
+
+            public AsyncEcmaMethodIL(AsyncMethodVariant variant, EcmaMethodIL ecmaIL)
+                => (_variant, _ecmaIL) = (variant, ecmaIL);
+
+            // This is the reason we need this class - the method that owns the IL is the variant.
+            public override MethodDesc OwningMethod => _variant;
+
+            // Everything else dispatches to EcmaMethodIL
+            public override MethodDebugInformation GetDebugInfo() => _ecmaIL.GetDebugInfo();
+            public override ILExceptionRegion[] GetExceptionRegions() => _ecmaIL.GetExceptionRegions();
+            public override byte[] GetILBytes() => _ecmaIL.GetILBytes();
+            public override LocalVariableDefinition[] GetLocals() => _ecmaIL.GetLocals();
+            public override object GetObject(int token, NotFoundBehavior notFoundBehavior = NotFoundBehavior.Throw) => _ecmaIL.GetObject(token, notFoundBehavior);
+            public override bool IsInitLocals => _ecmaIL.IsInitLocals;
+            public override int MaxStack => _ecmaIL.MaxStack;
+
+            public IEcmaModule Module => _ecmaIL.Module;
         }
     }
 }

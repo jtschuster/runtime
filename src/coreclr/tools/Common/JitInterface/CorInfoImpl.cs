@@ -27,6 +27,7 @@ using ILCompiler;
 using ILCompiler.DependencyAnalysis;
 
 #if READYTORUN
+using ILCompiler.ReadyToRun.TypeSystem;
 using System.Reflection.Metadata.Ecma335;
 using ILCompiler.DependencyAnalysis.ReadyToRun;
 #endif
@@ -1124,7 +1125,7 @@ namespace Internal.JitInterface
             }
             else if (method.IsAggressiveInlining)
             {
-                result |= CorInfoFlag.CORINFO_FLG_FORCEINLINE;
+                //result |= CorInfoFlag.CORINFO_FLG_FORCEINLINE;
             }
 
             if (method.OwningType.IsDelegate && method.Name.SequenceEqual("Invoke"u8))
@@ -1817,14 +1818,14 @@ namespace Internal.JitInterface
 
 #if READYTORUN
             TypeDesc owningType = methodIL.OwningMethod.GetTypicalMethodDefinition().OwningType;
-            bool recordToken;
+            bool recordToken = owningType is EcmaType && !methodIL.OwningMethod.IsAsyncThunk();
             if (!_compilation.CompilationModuleGroup.VersionsWithMethodBody(methodIL.OwningMethod.GetTypicalMethodDefinition()))
             {
-                recordToken = (methodIL.GetMethodILScopeDefinition() is IMethodTokensAreUseableInCompilation) && owningType is EcmaType;
+                recordToken &= (methodIL.GetMethodILScopeDefinition() is IMethodTokensAreUseableInCompilation);
             }
             else
             {
-                recordToken = (_compilation.CompilationModuleGroup.VersionsWithType(owningType) || _compilation.CompilationModuleGroup.CrossModuleInlineableType(owningType)) && owningType is EcmaType;
+                recordToken &= _compilation.CompilationModuleGroup.VersionsWithType(owningType) || _compilation.CompilationModuleGroup.CrossModuleInlineableType(owningType);
             }
 #endif
 
@@ -3409,7 +3410,7 @@ namespace Internal.JitInterface
         {
             Debug.Assert(objRefsSize == (dataSize + (nuint)(PointerSize - 1)) / (nuint)PointerSize);
 #if READYTORUN
-            throw new NotImplementedException("getContinuationType");
+            return ObjectToHandle(MethodBeingCompiled.Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "Continuation"u8));
 #else
             GCPointerMapBuilder gcMapBuilder = new GCPointerMapBuilder((int)dataSize, PointerSize);
             ReadOnlySpan<bool> bools = MemoryMarshal.CreateReadOnlySpan(ref objRefs, (int)objRefsSize);
@@ -3768,7 +3769,11 @@ namespace Internal.JitInterface
 #pragma warning restore CA1822 // Mark members as static
         {
 #if READYTORUN
-            throw new NotImplementedException("Crossgen2 does not support runtime-async yet");
+            var resumptionStub = new AsyncResumptionStub(MethodBeingCompiled, MethodBeingCompiled.OwningType);
+            var tokenSource = MethodBeingCompiled.GetTypicalMethodDefinition().GetPrimaryMethodDesc();
+            entryPoint = (void*)ObjectToHandle(_compilation.NodeFactory.MethodEntrypoint(new MethodWithToken(resumptionStub, _compilation.NodeFactory.Resolver.GetModuleTokenForMethod(tokenSource, false, true), MethodBeingCompiled.OwningType, false, MethodBeingCompiled), false, false, false));
+            return ObjectToHandle(resumptionStub);
+
 #else
             _asyncResumptionStub ??= new AsyncResumptionStub(MethodBeingCompiled, _compilation.TypeSystemContext.GeneratedAssembly.GetGlobalModuleType());
 
