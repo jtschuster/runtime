@@ -170,12 +170,13 @@ namespace Internal.IL
                 {
                     if (ecmaMethod.Signature.ReturnsTaskOrValueTask())
                     {
-                        return AsyncThunkILEmitter.EmitTaskReturningThunk(ecmaMethod, ((CompilerTypeSystemContext)ecmaMethod.Context).GetAsyncVariantMethod(ecmaMethod));
+                        return AsyncThunkILEmitter.EmitTaskReturningThunk(ecmaMethod, ((CompilerTypeSystemContext)ecmaMethod.Context).GetAsyncVariantMethod(ecmaMethod), useFilterBasedCatch: true);
                     }
                     else if (ecmaMethod.OwningType.Module != ecmaMethod.Context.SystemModule)
                     {
                         // We only allow non-Task returning runtime async methods in CoreLib
-                        ThrowHelper.ThrowBadImageFormatException();
+                        // Skip this method
+                        return null;
                     }
                 }
 
@@ -205,6 +206,11 @@ namespace Internal.IL
                     if (methodIL != null)
                         return methodIL;
                 }
+
+                // Generic async thunks are not yet implemented. They require additional
+                // MutableModule support for MethodRef and MethodSpec tokens
+                if (method.IsAsyncThunk())
+                    return null;
 
                 var methodDefinitionIL = GetMethodIL(method.GetTypicalMethodDefinition());
                 if (methodDefinitionIL == null)
