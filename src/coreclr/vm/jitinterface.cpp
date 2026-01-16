@@ -13661,6 +13661,70 @@ void ComputeGCRefMap(MethodTable * pMT, BYTE * pGCRefMap, size_t cbGCRefMap)
     } while (cur >= last);
 }
 
+
+MethodTable* getContinuationTypeFixup(MethodDesc* asyncMethod, size_t dataSize, bool* objRefs, size_t objRefsSize)
+{
+    STANDARD_VM_CONTRACT;
+
+    LoaderAllocator* allocator = asyncMethod->GetLoaderAllocator();
+    AsyncContinuationsManager* asyncConts = allocator->GetAsyncContinuationsManager();
+    MethodTable* result = asyncConts->LookupOrCreateContinuationMethodTable((unsigned)dataSize, objRefs, asyncMethod);
+    return result;
+}
+
+MethodTable* GetContinuationTypeFromLayout(MethodDesc* asyncMethod, PCCOR_SIGNATURE pBlob)
+{
+    STANDARD_VM_CONTRACT;
+
+    SigPointer p(pBlob);
+    // Skip Continuation type signature
+    IfFailThrow(p.SkipExactlyOne());
+
+    uint32_t dwFlags;
+    IfFailThrow(p.GetData(&dwFlags));
+
+    uint32_t dwExpectedSize;
+    IfFailThrow(p.GetData(&dwExpectedSize));
+
+    if (!(dwFlags & READYTORUN_LAYOUT_GCLayout))
+    {
+        return nullptr;
+    }
+
+    size_t objRefsSize = 0;
+    bool* objRefs = nullptr;
+    if (!(dwFlags & READYTORUN_LAYOUT_GCLayout_Empty))
+    {
+        uint8_t* pGCRefMapBlob = (uint8_t*)p.GetPtr();
+        size_t objRefsSize = (dwExpectedSize / TARGET_POINTER_SIZE);
+        bool* objRefs = (bool*)_alloca(objRefsSize * sizeof(bool));
+        size_t bytesInBlob = (objRefsSize + 7) / 8;
+        // Read bitmap from blob
+        for(int byteIndex = 0; byteIndex < bytesInBlob; byteIndex++)
+        {
+            uint8_t b = pGCRefMapBlob[byteIndex];
+            for (int bit = 0; bit < 8 && byteIndex * 8 + bit < objRefsSize; bit++)
+            {
+                objRefs[byteIndex * 8 + bit] = (b & (1 << bit)) != 0;
+            }
+        }
+        return getContinuationTypeFixup(
+            asyncMethod,
+            dwExpectedSize, // size_t dataSize,
+            objRefs, // bool* objRefs,
+            objRefsSize // size_t objRefsSize
+            );
+    }
+    return getContinuationTypeFixup(
+        asyncMethod,
+        dwExpectedSize, // size_t dataSize,
+        objRefs, // bool* objRefs,
+        objRefsSize // size_t objRefsSize
+        );
+
+}
+
+
 //
 // Type layout check verifies that there was no incompatible change in the value type layout.
 // If there was one, we will fall back to JIT instead of using the pre-generated code from the ready to run image.
@@ -14134,31 +14198,14 @@ BOOL LoadDynamicInfoEntry(Module *currentModule,
 
     case READYTORUN_FIXUP_Continuation_Layout:
         {
-
-            ModuleBase* continuationModule = currentModule->GetModuleFromIndex(CorSigUncompressData(pBlob));
-            DWORD size = CorSigUncompressData(pBlob);
-            // allocate bools of size 'size', rounded up to pointer size
-
-            byte* data = (byte*)pBlob;
-
-            size_t dataSize = size;
-            BOOL* objRefs = data;
-            size_t objRefsSize = (dataSize + (TARGET_POINTER_SIZE - 1)) / TARGET_POINTER_SIZE;
-            MethodTable* continuationType = nullptr;
-            {
-                _ASSERTE(objRefsSize == (dataSize + (TARGET_POINTER_SIZE - 1)) / TARGET_POINTER_SIZE);
-                LoaderAllocator* allocator = continuationModule->GetLoaderAllocator();
-                AsyncContinuationsManager* asyncConts = allocator->GetAsyncContinuationsManager();
-                result = asyncConts->LookupOrCreateContinuationMethodTable((unsigned)dataSize, objRefs, m_pMethodBeingCompiled);
-
-#ifdef DEBUG
-                size_t result2 = asyncConts->LookupOrCreateContinuationMethodTable((unsigned)dataSize, objRefs, m_pMethodBeingCompiled);
-                _ASSERTE(result2 == result);
-#endif
-            }
-            //CEEInfo::GetContinuationType(size, pBlob, size + TARGET_POINTER_SIZE - 1)
-
-            result = continuationType.AsTypeHandle();
+            PCCOR_SIGNATURE pBlobNext = NULL;
+            SigTypeContext typeContext;    // empty context is OK: encoding should not contain type variables.
+            ZapSig::Context zapSigContext(pInfoModule, (void *)currentModule, ZapSig::NormalTokens);
+            MethodDesc* pOwningMethod = ZapSig::DecodeMethod(pInfoModule, pBlob, &typeContext, &zapSigContext, NULL, NULL, NULL, &pBlobNext, TRUE);
+            //_ASSERTE(pOwningMethod->IsAsyncMethod()); //pMD = ZapSig::DecodeMethod(currentModule, pInfoModule, pBlob, CLASS_LOADED, &pBlobNext);
+            MethodTable* continuationTypeMethodTable = GetContinuationTypeFromLayout(pOwningMethod, pBlobNext);
+            TypeHandle th = TypeHandle(continuationTypeMethodTable);
+            result = (size_t)th.AsPtr();
         }
         break;
 
