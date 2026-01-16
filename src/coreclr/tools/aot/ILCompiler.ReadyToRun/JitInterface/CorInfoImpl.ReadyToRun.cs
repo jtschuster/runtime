@@ -1524,7 +1524,14 @@ namespace Internal.JitInterface
             {
                 ref CORINFO_EH_CLAUSE clause = ref _ehClauses[i];
                 int clauseOffset = (int)EHInfoFields.Length * sizeof(uint) * i;
-                Array.Copy(BitConverter.GetBytes((uint)clause.Flags), 0, ehInfoData, clauseOffset + (int)EHInfoFields.Flags * sizeof(uint), sizeof(uint));
+                CORINFO_EH_CLAUSE_FLAGS flags = clause.Flags;
+                if (clause.Flags == CORINFO_EH_CLAUSE_FLAGS.CORINFO_EH_CLAUSE_NONE
+                    && MethodBeingCompiled.IsAsyncThunk()
+                    && ((TypeDesc)ResolveTokenInScope(_compilation.GetMethodIL(MethodBeingCompiled), MethodBeingCompiled, (mdToken)clause.ClassTokenOrOffset)).IsWellKnownType(WellKnownType.Exception))
+                {
+                    flags |= CORINFO_EH_CLAUSE_FLAGS.CORINFO_EH_CLAUSE_R2R_SYSTEM_EXCEPTION;
+                }
+                Array.Copy(BitConverter.GetBytes((uint)flags), 0, ehInfoData, clauseOffset + (int)EHInfoFields.Flags * sizeof(uint), sizeof(uint));
                 Array.Copy(BitConverter.GetBytes((uint)clause.TryOffset), 0, ehInfoData, clauseOffset + (int)EHInfoFields.TryOffset * sizeof(uint), sizeof(uint));
                 // JIT in fact returns the end offset in the length field
                 Array.Copy(BitConverter.GetBytes((uint)(clause.TryLength)), 0, ehInfoData, clauseOffset + (int)EHInfoFields.TryEnd * sizeof(uint), sizeof(uint));
@@ -3258,7 +3265,7 @@ namespace Internal.JitInterface
                     // sure we generate the CheckILBodyFixupSignature for the actual runtime-async body in which case I think the typicalMethod will be an AsyncVariantMethod, which doesn't appear
                     // to be handled here. This check is here in the place where I believe we actually would behave incorrectly, but we also have a check in CrossModuleInlineable which disallows
                     // the cross module inline of async methods currently.
-                    throw new Exception("Inlining async methods is not supported in ReadyToRun compilation. Notably, we don't correctly create the ILBodyFixupSignature for the runtime-async logic");
+                    throw new Exception("Inlining async methods is not supported in ReadyToRun compilation.");
                 }
 
                 MethodIL methodIL = _compilation.GetMethodIL(typicalMethod);
