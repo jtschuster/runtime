@@ -183,12 +183,6 @@ namespace ILCompiler.DependencyAnalysis
                     _codegenNodeFactory,
                     _codegenNodeFactory.TypeSignature(ReadyToRunFixupKind.ContinuationLayout, key)
                 );
-                //return new DelayLoadHelperImport(
-                //    _codegenNodeFactory,
-                //    _codegenNodeFactory.PrecodeImports,
-                //    ReadyToRunHelper.DelayLoad_Helper,
-                //    _codegenNodeFactory.TypeSignature(ReadyToRunFixupKind.ContinuationLayout, key)
-                //);
             });
         }
 
@@ -419,7 +413,7 @@ namespace ILCompiler.DependencyAnalysis
             return new PrecodeHelperImport(
                 _codegenNodeFactory,
                 _codegenNodeFactory.MethodSignature(
-                    ReadyToRunFixupKind.MethodDictionary, 
+                    ReadyToRunFixupKind.MethodDictionary,
                     method,
                     isInstantiatingStub: true));
         }

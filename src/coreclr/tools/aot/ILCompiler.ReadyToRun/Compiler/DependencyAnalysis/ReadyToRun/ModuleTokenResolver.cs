@@ -12,6 +12,7 @@ using Internal.TypeSystem;
 using Internal.TypeSystem.Ecma;
 using Internal.CorConstants;
 using System.Diagnostics;
+using ILCompiler.ReadyToRun.TypeSystem;
 
 namespace ILCompiler.DependencyAnalysis.ReadyToRun
 {
@@ -99,7 +100,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
         {
             method = method.GetCanonMethodTarget(CanonicalFormKind.Specific);
 
-            if (method.GetTypicalMethodDefinition() is EcmaMethod ecmaMethod)
+            if (method.GetTypicalMethodDefinition().GetPrimaryMethodDesc() is EcmaMethod ecmaMethod)
             {
                 if (_compilationModuleGroup.VersionsWithMethodBody(ecmaMethod))
                 {

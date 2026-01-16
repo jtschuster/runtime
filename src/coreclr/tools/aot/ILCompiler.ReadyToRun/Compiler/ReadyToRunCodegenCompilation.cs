@@ -110,9 +110,8 @@ namespace ILCompiler
                 }
             }
 
-            if (callee.IsAsyncThunk() || callee.IsAsync)
+            if (callee.IsAsyncThunk() || callee.IsAsyncCall() || caller.IsAsyncThunk() || caller.IsAsyncCall())
             {
-                // Async thunks require special handling in the compiler and should not be inlined
                 return false;
             }
 
@@ -303,7 +302,7 @@ namespace ILCompiler
 
         private readonly ProfileDataManager _profileData;
         private readonly FileLayoutOptimizer _fileLayoutOptimizer;
-        private readonly HashSet<EcmaMethod> _methodsWhichNeedMutableILBodies = new HashSet<EcmaMethod>();
+        private readonly HashSet<MethodDesc> _methodsWhichNeedMutableILBodies = new HashSet<MethodDesc>();
         private readonly HashSet<MethodWithGCInfo> _methodsToRecompile = new HashSet<MethodWithGCInfo>();
 
         public ProfileDataManager ProfileData => _profileData;
@@ -695,12 +694,97 @@ namespace ILCompiler
                     if (dependency is MethodWithGCInfo methodCodeNodeNeedingCode)
                     {
                         var method = methodCodeNodeNeedingCode.Method;
-                        if (method.GetTypicalMethodDefinition() is EcmaMethod ecmaMethod)
+                        var typicalDef = method.GetTypicalMethodDefinition();
+                        if (typicalDef is EcmaMethod or AsyncMethodVariant)
                         {
-                            if (ilProvider.NeedsCrossModuleInlineableTokens(ecmaMethod) &&
-                                !_methodsWhichNeedMutableILBodies.Contains(ecmaMethod) &&
-                                CorInfoImpl.IsMethodCompilable(this, methodCodeNodeNeedingCode.Method))
-                                _methodsWhichNeedMutableILBodies.Add(ecmaMethod);
+                            if (ilProvider.NeedsCrossModuleInlineableTokens(typicalDef) &&
+                                !_methodsWhichNeedMutableILBodies.Contains(typicalDef) &&
+                                CorInfoImpl.IsMethodCompilable(this, method))
+                            {
+                                _methodsWhichNeedMutableILBodies.Add(typicalDef);
+                            }
+                        }
+                        if (!CorInfoImpl.ShouldCodeNotBeCompiledIntoFinalImage(InstructionSetSupport, method))
+                        {
+                            if (method.IsAsyncThunk() || method.IsAsyncCall() || method is AsyncResumptionStub)
+                            {
+                                // The synthetic async thunks require references to methods/types that may not have existing methodRef entries in the version bubble.
+                                // These references need to be added to the mutable module if they don't exist.
+                                IEnumerable<TypeSystemEntity> requiredMutableModuleReferences = [];
+                                if (method.IsAsyncCall())
+                                {
+                                    DefType continuation = TypeSystemContext.ContinuationType;
+                                    var asyncHelpers = TypeSystemContext.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8);
+                                    var asyncInfoEntities = new TypeSystemEntity[] {
+                                    continuation,
+                                    continuation.GetKnownField("Next"u8),
+                                    continuation.GetKnownField("ResumeInfo"u8),
+                                    continuation.GetKnownField("State"u8),
+                                    continuation.GetKnownField("Flags"u8),
+                                    asyncHelpers,
+                                    asyncHelpers.GetKnownMethod("CaptureExecutionContext"u8, null),
+                                    asyncHelpers.GetKnownMethod("RestoreExecutionContext"u8, null),
+                                    asyncHelpers.GetKnownMethod("CaptureContinuationContext"u8, null),
+                                    asyncHelpers.GetKnownMethod("CaptureContexts"u8, null),
+                                    asyncHelpers.GetKnownMethod("RestoreContexts"u8, null),
+                                    asyncHelpers.GetKnownMethod("RestoreContextsOnSuspension"u8, null),
+                                    asyncHelpers.GetKnownMethod("AllocContinuation"u8, null),
+                                };
+                                    requiredMutableModuleReferences = asyncInfoEntities;
+                                }
+
+                                _nodeFactory.ManifestMetadataTable._mutableModule.ModuleThatIsCurrentlyTheSourceOfNewReferences = ((EcmaMethod)method.GetPrimaryMethodDesc().GetTypicalMethodDefinition()).Module;
+                                try
+                                {
+                                    foreach (var entity in requiredMutableModuleReferences)
+                                    {
+                                        switch (entity)
+                                        {
+                                            case MethodDesc md:
+                                            {
+                                                if (md.IsAsyncVariant())
+                                                {
+                                                    Debug.Assert(md.GetTargetOfAsyncVariant() == method || method is AsyncResumptionStub);
+                                                    Debug.Assert(method is AsyncResumptionStub || !_nodeFactory.Resolver.GetModuleTokenForMethod(method, allowDynamicallyCreatedReference: false, throwIfNotFound: true).IsNull);
+                                                }
+                                                else if (_nodeFactory.Resolver.GetModuleTokenForMethod(md, allowDynamicallyCreatedReference: true, throwIfNotFound: false).IsNull)
+                                                {
+                                                    _nodeFactory.ManifestMetadataTable._mutableModule.TryGetEntityHandle(md);
+                                                    Debug.Assert(!_nodeFactory.Resolver.GetModuleTokenForMethod(md, allowDynamicallyCreatedReference: true, throwIfNotFound: true).IsNull);
+                                                }
+                                                break;
+                                            }
+                                            case TypeDesc td:
+                                            {
+                                                if (_nodeFactory.Resolver.GetModuleTokenForType(td, allowDynamicallyCreatedReference: true, throwIfNotFound: false).IsNull)
+                                                {
+                                                    _nodeFactory.ManifestMetadataTable._mutableModule.TryGetEntityHandle(td);
+                                                }
+                                                Debug.Assert(!_nodeFactory.Resolver.GetModuleTokenForType(td, allowDynamicallyCreatedReference: true, throwIfNotFound: true).IsNull);
+                                                break;
+                                            }
+                                            case FieldDesc fd:
+                                            {
+                                                if (_nodeFactory.Resolver.GetModuleTokenForField(fd, allowDynamicallyCreatedReference: true, throwIfNotFound: false).IsNull)
+                                                {
+                                                    _nodeFactory.ManifestMetadataTable._mutableModule.TryGetEntityHandle(fd);
+                                                }
+                                                Debug.Assert(!_nodeFactory.Resolver.GetModuleTokenForField(fd, allowDynamicallyCreatedReference: true, throwIfNotFound: true).IsNull);
+                                                // TODO
+                                                break;
+                                            }
+                                            default:
+                                            {
+                                                throw new NotImplementedException($"Unexpected entity type in Async thunk: '{entity.GetDisplayName()}'");
+                                            }
+                                        }
+                                    }
+                                }
+                                finally
+                                {
+                                    _nodeFactory.ManifestMetadataTable._mutableModule.ModuleThatIsCurrentlyTheSourceOfNewReferences = null;
+                                }
+                            }
                         }
 
                         if (!_nodeFactory.CompilationModuleGroup.VersionsWithMethodBody(method))
@@ -790,11 +874,11 @@ namespace ILCompiler
 
             void ProcessMutableMethodBodiesList()
             {
-                EcmaMethod[] mutableMethodBodyNeedList = new EcmaMethod[_methodsWhichNeedMutableILBodies.Count];
+                MethodDesc[] mutableMethodBodyNeedList = new MethodDesc[_methodsWhichNeedMutableILBodies.Count];
                 _methodsWhichNeedMutableILBodies.CopyTo(mutableMethodBodyNeedList);
                 _methodsWhichNeedMutableILBodies.Clear();
                 TypeSystemComparer comparer = TypeSystemComparer.Instance;
-                Comparison<EcmaMethod> comparison = (EcmaMethod a, EcmaMethod b) => comparer.Compare(a, b);
+                Comparison<MethodDesc> comparison = (MethodDesc a, MethodDesc b) => comparer.Compare(a, b);
                 Array.Sort(mutableMethodBodyNeedList, comparison);
                 var ilProvider = (ReadyToRunILProvider)_methodILCache.ILProvider;
 

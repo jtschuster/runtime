@@ -24,10 +24,6 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
         {
             _fixupKind = fixupKind;
             _typeDesc = typeDesc;
-            if (_typeDesc is AsyncContinuationType && fixupKind is not ReadyToRunFixupKind.ContinuationLayout)
-            {
-                ;
-            }
 
             // Ensure types in signature are loadable and resolvable, otherwise we'll fail later while emitting the signature
             ((CompilerTypeSystemContext)typeDesc.Context).EnsureLoadableType(typeDesc);
@@ -67,7 +63,6 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                     // Emit EcmaType Continuation type
                     dataBuilder.EmitTypeSignature(act.BaseType, innerContext);
                     EncodeTypeLayout(dataBuilder, act);
-                    //EncodeContinuationTypeLayout(dataBuilder, _typeDesc);
                 }
                 else
                 {
@@ -78,56 +73,6 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             return dataBuilder.ToObjectData();
         }
 
-        private static void EncodeContinuationTypeLayout(ObjectDataSignatureBuilder dataBuilder, TypeDesc type)
-        {
-            //EmitUInt((uint)type.PointerMap.Size);
-
-            //byte currentByte = 0;
-            //int bitIndex = 0;
-            //for (int i = 0; i < type.PointerMap.Size; i++) 
-            //{
-            //    bool bit = type.PointerMap[i];
-            //    if (bit)
-            //    {
-            //        currentByte |= (byte)(1 << bitIndex);
-            //    }
-
-            //    if (++bitIndex == 8)
-            //    {
-            //        EmitByte(currentByte);
-            //        currentByte = 0;
-            //        bitIndex = 0;
-            //    }
-            //}
-
-            //// Emit any remaining bits in the final partial byte
-            //if (bitIndex > 0)
-            //{
-            //    EmitByte(currentByte);
-            //}
-
-            
-
-            if (type is not AsyncContinuationType act)
-                throw new InvalidOperationException();
-
-            GCPointerMap gcMap = ((AsyncContinuationType)type).PointerMap;
-            int size = gcMap.Size;
-            dataBuilder.EmitUInt((uint)(size));
-            byte[] encodedGCRefMap = new byte[size];
-            int bitIndex = 0;
-            foreach (bool bit in gcMap)
-            {
-                if (bit)
-                {
-                    encodedGCRefMap[bitIndex / 8] |= (byte)(1 << (bitIndex & 7));
-                }
-
-                ++bitIndex;
-            }
-
-            dataBuilder.EmitBytes(encodedGCRefMap);
-        }
 
         private static void EncodeTypeLayout(ObjectDataSignatureBuilder dataBuilder, TypeDesc type)
         {
