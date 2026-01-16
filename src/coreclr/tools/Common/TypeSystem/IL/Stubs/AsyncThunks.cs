@@ -20,6 +20,7 @@ namespace Internal.IL.Stubs
             TypeSystemContext context = taskReturningMethod.Context;
 
             var emitter = new ILEmitter();
+            emitter.SetHasGeneratedTokens();
             var codestream = emitter.NewCodeStream();
 
             MethodSignature sig = taskReturningMethod.Signature;
@@ -246,6 +247,8 @@ namespace Internal.IL.Stubs
             TypeSystemContext context = asyncMethod.Context;
 
             var emitter = new ILEmitter();
+            emitter.SetHasGeneratedTokens();
+
             var codestream = emitter.NewCodeStream();
 
             if (taskReturningMethod.OwningType.HasInstantiation)
