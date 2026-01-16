@@ -179,12 +179,16 @@ namespace ILCompiler.DependencyAnalysis
 
             _continuationTypeFixups = new NodeCache<AsyncContinuationType, ISymbolNode>((key) =>
             {
-                return new DelayLoadHelperImport(
+                return new PrecodeHelperImport(
                     _codegenNodeFactory,
-                    _codegenNodeFactory.HelperImports,
-                    ReadyToRunHelper.DelayLoad_Helper,
                     _codegenNodeFactory.TypeSignature(ReadyToRunFixupKind.ContinuationLayout, key)
                 );
+                //return new DelayLoadHelperImport(
+                //    _codegenNodeFactory,
+                //    _codegenNodeFactory.PrecodeImports,
+                //    ReadyToRunHelper.DelayLoad_Helper,
+                //    _codegenNodeFactory.TypeSignature(ReadyToRunFixupKind.ContinuationLayout, key)
+                //);
             });
         }
 

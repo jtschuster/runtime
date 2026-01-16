@@ -3421,8 +3421,7 @@ namespace Internal.JitInterface
             }
 
 #if READYTORUN
-            EcmaModule module = (MethodBeingCompiled.GetMethodDefinition().GetPrimaryMethodDesc() as EcmaMethod).Module;
-            return ObjectToHandle(_compilation.TypeSystemContext.GetContinuationType(gcMapBuilder.ToGCMap(), module));
+            return ObjectToHandle(_compilation.TypeSystemContext.GetContinuationType(gcMapBuilder.ToGCMap(), MethodBeingCompiled));
 #else
             return ObjectToHandle(_compilation.TypeSystemContext.GetContinuationType(gcMapBuilder.ToGCMap()));
 #endif

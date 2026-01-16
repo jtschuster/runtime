@@ -180,37 +180,6 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             EmitByte((byte)elementType);
         }
 
-        public void EmitContinuationType(AsyncContinuationType type, SignatureContext context)
-        {
-            uint moduleIndex = (uint)context.Resolver.GetModuleIndex(type.OwningModule);
-            EmitUInt(moduleIndex);
-            EmitUInt((uint)type.PointerMap.Size);
-
-            byte currentByte = 0;
-            int bitIndex = 0;
-            for (int i = 0; i < type.PointerMap.Size; i++) 
-            {
-                bool bit = type.PointerMap[i];
-                if (bit)
-                {
-                    currentByte |= (byte)(1 << bitIndex);
-                }
-
-                if (++bitIndex == 8)
-                {
-                    EmitByte(currentByte);
-                    currentByte = 0;
-                    bitIndex = 0;
-                }
-            }
-
-            // Emit any remaining bits in the final partial byte
-            if (bitIndex > 0)
-            {
-                EmitByte(currentByte);
-            }
-        }
-
         public void EmitTypeSignature(TypeDesc typeDesc, SignatureContext context)
         {
             if (typeDesc is RuntimeDeterminedType runtimeDeterminedType)

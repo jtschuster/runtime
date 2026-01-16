@@ -10,6 +10,7 @@ using Internal.TypeSystem.Ecma;
 using Internal.TypeSystem.Interop;
 using Internal.ReadyToRunConstants;
 using Internal.CorConstants;
+using Internal.JitInterface;
 
 namespace ILCompiler.DependencyAnalysis.ReadyToRun
 {
@@ -23,6 +24,10 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
         {
             _fixupKind = fixupKind;
             _typeDesc = typeDesc;
+            if (_typeDesc is AsyncContinuationType && fixupKind is not ReadyToRunFixupKind.ContinuationLayout)
+            {
+                ;
+            }
 
             // Ensure types in signature are loadable and resolvable, otherwise we'll fail later while emitting the signature
             ((CompilerTypeSystemContext)typeDesc.Context).EnsureLoadableType(typeDesc);
@@ -50,11 +55,23 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                     (fixupKind == ReadyToRunFixupKind.Verify_TypeLayout))
                 {
                     dataBuilder.EmitTypeSignature(_typeDesc, innerContext);
+                    Debug.Assert(_typeDesc.IsValueType);
                     EncodeTypeLayout(dataBuilder, _typeDesc);
                 }
                 else if (fixupKind == ReadyToRunFixupKind.ContinuationLayout)
                 {
-                    dataBuilder.EmitContinuationType((AsyncContinuationType)_typeDesc, innerContext);
+                    var act = _typeDesc as AsyncContinuationType;
+                    ModuleToken asyncMethodToken = innerContext.Resolver.GetModuleTokenForMethod(act.OwningMethod.GetTargetOfAsyncVariant(), allowDynamicallyCreatedReference: true, throwIfNotFound: true);
+                    MethodWithToken asyncMethodWithToken = new MethodWithToken(act.OwningMethod, asyncMethodToken, null, false, null);
+                    dataBuilder.EmitMethodSignature(asyncMethodWithToken, false, false, innerContext, false);
+                    // Emit EcmaType Continuation type
+                    dataBuilder.EmitTypeSignature(act.BaseType, innerContext);
+                    EncodeTypeLayout(dataBuilder, act);
+                    //EncodeContinuationTypeLayout(dataBuilder, _typeDesc);
+                }
+                else
+                {
+                    dataBuilder.EmitTypeSignature(_typeDesc, innerContext);
                 }
             }
 
@@ -63,6 +80,34 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
         private static void EncodeContinuationTypeLayout(ObjectDataSignatureBuilder dataBuilder, TypeDesc type)
         {
+            //EmitUInt((uint)type.PointerMap.Size);
+
+            //byte currentByte = 0;
+            //int bitIndex = 0;
+            //for (int i = 0; i < type.PointerMap.Size; i++) 
+            //{
+            //    bool bit = type.PointerMap[i];
+            //    if (bit)
+            //    {
+            //        currentByte |= (byte)(1 << bitIndex);
+            //    }
+
+            //    if (++bitIndex == 8)
+            //    {
+            //        EmitByte(currentByte);
+            //        currentByte = 0;
+            //        bitIndex = 0;
+            //    }
+            //}
+
+            //// Emit any remaining bits in the final partial byte
+            //if (bitIndex > 0)
+            //{
+            //    EmitByte(currentByte);
+            //}
+
+            
+
             if (type is not AsyncContinuationType act)
                 throw new InvalidOperationException();
 
@@ -86,7 +131,6 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
         private static void EncodeTypeLayout(ObjectDataSignatureBuilder dataBuilder, TypeDesc type)
         {
-            Debug.Assert(type.IsValueType);
             MetadataType defType = (MetadataType)type;
 
             int pointerSize = type.Context.Target.PointerSize;
@@ -133,7 +177,16 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             if (defType.ContainsGCPointers)
             {
                 // Encode the GC pointer map
-                GCPointerMap gcMap = GCPointerMap.FromInstanceLayout(defType);
+                GCPointerMap gcMap;
+                if (defType is AsyncContinuationType)
+                {
+                    gcMap = ((AsyncContinuationType)defType).PointerMap;
+
+                }
+                else
+                {
+                    gcMap = GCPointerMap.FromInstanceLayout(defType);
+                }
 
                 byte[] encodedGCRefMap = new byte[(size / pointerSize + 7) / 8];
                 int bitIndex = 0;
