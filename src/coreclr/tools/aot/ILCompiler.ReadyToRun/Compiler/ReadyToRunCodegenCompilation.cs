@@ -673,6 +673,7 @@ namespace ILCompiler
         private int _finishedThreadCount;
         private ManualResetEventSlim _compilationSessionComplete = new ManualResetEventSlim();
         private bool _hasCreatedCompilationThreads = false;
+        private bool _hasAddedAsyncReferences = false;
 
         protected override void ComputeDependencyNodeDependencies(List<DependencyNodeCore<NodeFactory>> obj)
         {
@@ -704,86 +705,58 @@ namespace ILCompiler
                                 _methodsWhichNeedMutableILBodies.Add(typicalDef);
                             }
                         }
-                        if (!CorInfoImpl.ShouldCodeNotBeCompiledIntoFinalImage(InstructionSetSupport, method))
+                        if (!CorInfoImpl.ShouldCodeNotBeCompiledIntoFinalImage(InstructionSetSupport, method)
+                            && method.IsAsyncCall()
+                            && !_hasAddedAsyncReferences)
                         {
-                            if (method.IsAsyncThunk() || method.IsAsyncCall() || method is AsyncResumptionStub)
+                            // Keep in sync with CorInfoImpl.getAsyncInfo()
+                            DefType continuation = TypeSystemContext.ContinuationType;
+                            var asyncHelpers = TypeSystemContext.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8);
+                            // AsyncHelpers should already be referenced in the module for the call to Await()
+                            Debug.Assert(!_nodeFactory.Resolver.GetModuleTokenForType(asyncHelpers, allowDynamicallyCreatedReference: true, throwIfNotFound: true).IsNull);
+                            TypeDesc[] requiredTypes = [
+                                continuation,
+                            ];
+                            FieldDesc[] requiredFields = [
+                                continuation.GetKnownField("Next"u8),
+                                continuation.GetKnownField("ResumeInfo"u8),
+                                continuation.GetKnownField("State"u8),
+                                continuation.GetKnownField("Flags"u8),
+                            ];
+                            MethodDesc[] requiredMethods = [
+                                asyncHelpers.GetKnownMethod("CaptureExecutionContext"u8, null),
+                                asyncHelpers.GetKnownMethod("RestoreExecutionContext"u8, null),
+                                asyncHelpers.GetKnownMethod("CaptureContinuationContext"u8, null),
+                                asyncHelpers.GetKnownMethod("CaptureContexts"u8, null),
+                                asyncHelpers.GetKnownMethod("RestoreContexts"u8, null),
+                                asyncHelpers.GetKnownMethod("RestoreContextsOnSuspension"u8, null),
+                                asyncHelpers.GetKnownMethod("AllocContinuation"u8, null),
+                            ];
+                            _nodeFactory.ManifestMetadataTable._mutableModule.ModuleThatIsCurrentlyTheSourceOfNewReferences = ((EcmaMethod)method.GetPrimaryMethodDesc().GetTypicalMethodDefinition()).Module;
+                            try
                             {
-                                // The synthetic async thunks require references to methods/types that may not have existing methodRef entries in the version bubble.
-                                // These references need to be added to the mutable module if they don't exist.
-                                IEnumerable<TypeSystemEntity> requiredMutableModuleReferences = [];
-                                if (method.IsAsyncCall())
+                                // Unconditionally add references to the MutableModule. These members are internal / private and
+                                // shouldn't be referenced already,and this lets us avoid doing this more than once
+                                foreach (var td in requiredTypes)
                                 {
-                                    DefType continuation = TypeSystemContext.ContinuationType;
-                                    var asyncHelpers = TypeSystemContext.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8);
-                                    var asyncInfoEntities = new TypeSystemEntity[] {
-                                    continuation,
-                                    continuation.GetKnownField("Next"u8),
-                                    continuation.GetKnownField("ResumeInfo"u8),
-                                    continuation.GetKnownField("State"u8),
-                                    continuation.GetKnownField("Flags"u8),
-                                    asyncHelpers,
-                                    asyncHelpers.GetKnownMethod("CaptureExecutionContext"u8, null),
-                                    asyncHelpers.GetKnownMethod("RestoreExecutionContext"u8, null),
-                                    asyncHelpers.GetKnownMethod("CaptureContinuationContext"u8, null),
-                                    asyncHelpers.GetKnownMethod("CaptureContexts"u8, null),
-                                    asyncHelpers.GetKnownMethod("RestoreContexts"u8, null),
-                                    asyncHelpers.GetKnownMethod("RestoreContextsOnSuspension"u8, null),
-                                    asyncHelpers.GetKnownMethod("AllocContinuation"u8, null),
-                                };
-                                    requiredMutableModuleReferences = asyncInfoEntities;
+                                    _nodeFactory.ManifestMetadataTable._mutableModule.TryGetEntityHandle(td);
+                                    Debug.Assert(!_nodeFactory.Resolver.GetModuleTokenForType(td, allowDynamicallyCreatedReference: true, throwIfNotFound: true).IsNull);
                                 }
-
-                                _nodeFactory.ManifestMetadataTable._mutableModule.ModuleThatIsCurrentlyTheSourceOfNewReferences = ((EcmaMethod)method.GetPrimaryMethodDesc().GetTypicalMethodDefinition()).Module;
-                                try
+                                foreach (var fd in requiredFields)
                                 {
-                                    foreach (var entity in requiredMutableModuleReferences)
-                                    {
-                                        switch (entity)
-                                        {
-                                            case MethodDesc md:
-                                            {
-                                                if (md.IsAsyncVariant())
-                                                {
-                                                    Debug.Assert(md.GetTargetOfAsyncVariant() == method || method is AsyncResumptionStub);
-                                                    Debug.Assert(method is AsyncResumptionStub || !_nodeFactory.Resolver.GetModuleTokenForMethod(method, allowDynamicallyCreatedReference: false, throwIfNotFound: true).IsNull);
-                                                }
-                                                else if (_nodeFactory.Resolver.GetModuleTokenForMethod(md, allowDynamicallyCreatedReference: true, throwIfNotFound: false).IsNull)
-                                                {
-                                                    _nodeFactory.ManifestMetadataTable._mutableModule.TryGetEntityHandle(md);
-                                                    Debug.Assert(!_nodeFactory.Resolver.GetModuleTokenForMethod(md, allowDynamicallyCreatedReference: true, throwIfNotFound: true).IsNull);
-                                                }
-                                                break;
-                                            }
-                                            case TypeDesc td:
-                                            {
-                                                if (_nodeFactory.Resolver.GetModuleTokenForType(td, allowDynamicallyCreatedReference: true, throwIfNotFound: false).IsNull)
-                                                {
-                                                    _nodeFactory.ManifestMetadataTable._mutableModule.TryGetEntityHandle(td);
-                                                }
-                                                Debug.Assert(!_nodeFactory.Resolver.GetModuleTokenForType(td, allowDynamicallyCreatedReference: true, throwIfNotFound: true).IsNull);
-                                                break;
-                                            }
-                                            case FieldDesc fd:
-                                            {
-                                                if (_nodeFactory.Resolver.GetModuleTokenForField(fd, allowDynamicallyCreatedReference: true, throwIfNotFound: false).IsNull)
-                                                {
-                                                    _nodeFactory.ManifestMetadataTable._mutableModule.TryGetEntityHandle(fd);
-                                                }
-                                                Debug.Assert(!_nodeFactory.Resolver.GetModuleTokenForField(fd, allowDynamicallyCreatedReference: true, throwIfNotFound: true).IsNull);
-                                                // TODO
-                                                break;
-                                            }
-                                            default:
-                                            {
-                                                throw new NotImplementedException($"Unexpected entity type in Async thunk: '{entity.GetDisplayName()}'");
-                                            }
-                                        }
-                                    }
+                                    _nodeFactory.ManifestMetadataTable._mutableModule.TryGetEntityHandle(fd);
+                                    Debug.Assert(!_nodeFactory.Resolver.GetModuleTokenForField(fd, allowDynamicallyCreatedReference: true, throwIfNotFound: true).IsNull);
                                 }
-                                finally
+                                foreach (var md in requiredMethods)
                                 {
-                                    _nodeFactory.ManifestMetadataTable._mutableModule.ModuleThatIsCurrentlyTheSourceOfNewReferences = null;
+                                    _nodeFactory.ManifestMetadataTable._mutableModule.TryGetEntityHandle(md);
+                                    Debug.Assert(!_nodeFactory.Resolver.GetModuleTokenForMethod(md, allowDynamicallyCreatedReference: true, throwIfNotFound: true).IsNull);
                                 }
+                                _hasAddedAsyncReferences = true;
+                            }
+                            finally
+                            {
+                                _nodeFactory.ManifestMetadataTable._mutableModule.ModuleThatIsCurrentlyTheSourceOfNewReferences = null;
                             }
                         }
 
