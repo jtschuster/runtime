@@ -50,19 +50,22 @@ namespace ILCompiler
 
         private sealed class ContinuationTypeHashtable : LockFreeReaderHashtable<ContinuationTypeHashtableKey, AsyncContinuationType>
         {
-            private readonly CompilerTypeSystemContext _parent;
+            private readonly CompilerTypeSystemContext _context;
 
-            public ContinuationTypeHashtable(CompilerTypeSystemContext parent)
-                => _parent = parent;
+            public ContinuationTypeHashtable(CompilerTypeSystemContext context)
+                => _context = context;
 
-            protected override int GetKeyHashCode(ContinuationTypeHashtableKey key) => HashCode.Combine(key.PointerMap.GetHashCode(), key.OwningMethod.GetHashCode());
-            protected override int GetValueHashCode(AsyncContinuationType value) => value.PointerMap.GetHashCode();
-            protected override bool CompareKeyToValue(ContinuationTypeHashtableKey key, AsyncContinuationType value) => key.PointerMap.Equals(value.PointerMap) && key.OwningMethod.Equals(value);
+            protected override int GetKeyHashCode(ContinuationTypeHashtableKey key)
+                => HashCode.Combine(key.PointerMap.GetHashCode(), key.OwningMethod.GetHashCode());
+            protected override int GetValueHashCode(AsyncContinuationType value)
+                => HashCode.Combine(value.PointerMap.GetHashCode(), value.OwningMethod.GetHashCode());
+            protected override bool CompareKeyToValue(ContinuationTypeHashtableKey key, AsyncContinuationType value)
+                => key.PointerMap.Equals(value.PointerMap) && key.OwningMethod.Equals(value.OwningMethod);
             protected override bool CompareValueToValue(AsyncContinuationType value1, AsyncContinuationType value2)
-                => value1.PointerMap.Equals(value2.PointerMap);
+                => value1.PointerMap.Equals(value2.PointerMap) && value1.OwningMethod.Equals(value2.OwningMethod);
             protected override AsyncContinuationType CreateValueFromKey(ContinuationTypeHashtableKey key)
             {
-                return new AsyncContinuationType(_parent.ContinuationType, key.PointerMap, key.OwningMethod);
+                return new AsyncContinuationType(_context.ContinuationType, key.PointerMap, key.OwningMethod);
             }
         }
     }

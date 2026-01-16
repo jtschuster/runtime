@@ -38,16 +38,15 @@ public class AwaitNotAsync
     {
         // static field
         sField = GetTask(5);
-        // Assert.Equal(5, await sField);
+        Assert.Equal(5, await sField);
 
-        // // property
-        // Assert.Equal(6, await sProp);
+        // property
+        Assert.Equal(6, await sProp);
 
-        // // generic identity
-        // Assert.Equal(6, await sIdentity(sProp));
+        // generic identity
+        Assert.Equal(6, await sIdentity(sProp));
 
-        // // await(await ...))
-        // Assert.Equal(7, await await await GetTask(GetTask(GetTask(7))));
-
+        // await(await ...))
+        Assert.Equal(7, await await await GetTask(GetTask(GetTask(7))));
     }
 }

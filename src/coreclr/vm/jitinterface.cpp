@@ -2482,7 +2482,7 @@ bool CEEInfo::getSystemVAmd64PassStructInRegisterDescriptor(
 #if defined(UNIX_AMD64_ABI)
                 SystemVStructRegisterPassingHelper helper((unsigned int)th.GetSize());
                 bool result = methodTablePtr->ClassifyEightBytes(&helper, useNativeLayout);
-                
+
                 // The answer must be true at this point.
                 _ASSERTE(result);
 #endif // UNIX_AMD64_ABI
@@ -8818,13 +8818,13 @@ bool CEEInfo::resolveVirtualMethodHelper(CORINFO_DEVIRTUALIZATION_INFO * info)
     {
         pExactMT = pDevirtMD->GetExactDeclaringType(pObjMT);
     }
-    
+
     // This is generic virtual method devirtualization.
     if (!isArray && pBaseMD->HasMethodInstantiation())
     {
         pDevirtMD = pDevirtMD->FindOrCreateAssociatedMethodDesc(
             pDevirtMD, pExactMT, pExactMT->IsValueType() && !pDevirtMD->IsStatic(), pBaseMD->GetMethodInstantiation(), true);
-        
+
         // We still can't handle shared generic methods because we don't have
         // the right generic context for runtime lookup.
         // TODO: Remove this limitation.
@@ -13752,8 +13752,6 @@ MethodTable* GetContinuationTypeFromLayout(MethodDesc* asyncMethod, PCCOR_SIGNAT
         return nullptr;
     }
 
-    size_t objRefsSize = 0;
-    bool* objRefs = nullptr;
     if (!(dwFlags & READYTORUN_LAYOUT_GCLayout_Empty))
     {
         uint8_t* pGCRefMapBlob = (uint8_t*)p.GetPtr();
@@ -13776,13 +13774,16 @@ MethodTable* GetContinuationTypeFromLayout(MethodDesc* asyncMethod, PCCOR_SIGNAT
             objRefsSize // size_t objRefsSize
             );
     }
-    return getContinuationTypeFixup(
-        asyncMethod,
-        dwExpectedSize, // size_t dataSize,
-        objRefs, // bool* objRefs,
-        objRefsSize // size_t objRefsSize
-        );
-
+    else{
+        size_t objRefsSize = 0;
+        bool* objRefs = nullptr;
+        return getContinuationTypeFixup(
+            asyncMethod,
+            dwExpectedSize, // size_t dataSize,
+            objRefs, // bool* objRefs,
+            objRefsSize // size_t objRefsSize
+            );
+    }
 }
 
 

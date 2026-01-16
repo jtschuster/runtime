@@ -1486,7 +1486,6 @@ namespace Internal.JitInterface
                         throw new NotImplementedException($"Unsupported token resolution for {resultDef.GetType()}");
                 }
             }
-            ;
         }
 
         private InfoAccessType constructStringLiteral(CORINFO_MODULE_STRUCT_* module, mdToken metaTok, ref void* ppValue)
