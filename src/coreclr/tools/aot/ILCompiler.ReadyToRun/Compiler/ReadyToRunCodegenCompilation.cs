@@ -736,7 +736,7 @@ namespace ILCompiler
                             try
                             {
                                 // Unconditionally add references to the MutableModule. These members are internal / private and
-                                // shouldn't be referenced already,and this lets us avoid doing this more than once
+                                // shouldn't be referenced already, and this lets us avoid doing this more than once
                                 foreach (var td in requiredTypes)
                                 {
                                     _nodeFactory.ManifestMetadataTable._mutableModule.TryGetEntityHandle(td);
