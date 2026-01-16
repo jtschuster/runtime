@@ -332,13 +332,13 @@ namespace ILCompiler
                     break;
 
                 case ReadyToRunHelper.AllocContinuation:
-                    methodDesc = context.GetCoreLibEntryPoint("System.Runtime.InteropServices"u8, "AsyncHelpers"u8, "AllocContinuation"u8, null);
+                    methodDesc = context.GetCoreLibEntryPoint("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8, "AllocContinuation"u8, null);
                     break;
                 case ReadyToRunHelper.AllocContinuationMethod:
-                    methodDesc = context.GetCoreLibEntryPoint("System.Runtime.InteropServices"u8, "AsyncHelpers"u8, "AllocContinuationMethod"u8, null);
+                    methodDesc = context.GetCoreLibEntryPoint("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8, "AllocContinuationMethod"u8, null);
                     break;
                 case ReadyToRunHelper.AllocContinuationClass:
-                    methodDesc = context.GetCoreLibEntryPoint("System.Runtime.InteropServices"u8, "AsyncHelpers"u8, "AllocContinuationClass"u8, null);
+                    methodDesc = context.GetCoreLibEntryPoint("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8, "AllocContinuationClass"u8, null);
                     break;
 
                 case ReadyToRunHelper.GetCurrentManagedThreadId:
