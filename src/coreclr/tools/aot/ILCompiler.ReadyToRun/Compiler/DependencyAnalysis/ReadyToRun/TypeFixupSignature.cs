@@ -73,7 +73,6 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             return dataBuilder.ToObjectData();
         }
 
-
         private static void EncodeTypeLayout(ObjectDataSignatureBuilder dataBuilder, TypeDesc type)
         {
             MetadataType defType = (MetadataType)type;

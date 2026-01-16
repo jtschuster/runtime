@@ -748,21 +748,6 @@ namespace ILCompiler
                                 }
                                 catch (TypeSystemException) { }
                             }
-                            // Get row count for TypeSpec table
-                            var reader = ecmaModule.MetadataReader;
-                            int typeSpecCount = reader.GetTableRowCount(TableIndex.TypeSpec);
-
-                            // Iterate through all TypeSpecs (rows are 1-based)
-                            for (int row = 1; row <= typeSpecCount; row++)
-                            {
-                                TypeSpecificationHandle handle = MetadataTokens.TypeSpecificationHandle(row);
-                                TypeSpecification typeSpec = reader.GetTypeSpecification(handle);
-
-                                // Decode the signature
-                                BlobReader sigReader = reader.GetBlobReader(typeSpec.Signature);
-                                // ... process signature
-                            }
-
                         }
                         Volatile.Write(ref _typeRefsInCompilationModuleSet, typeRefsInCompilationModuleSet);
                     }

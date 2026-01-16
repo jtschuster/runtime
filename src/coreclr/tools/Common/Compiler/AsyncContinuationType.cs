@@ -13,7 +13,7 @@ namespace ILCompiler
 {
     /// <summary>
     /// An async continuation type. The code generator will request this to store local state
-    /// through an async suspension/resumption. We only identify these using a <see cref="GCPointerMap"/> (and owning module for R2R for LoaderAllocator purposes),
+    /// through an async suspension/resumption. We only identify these using a <see cref="GCPointerMap"/> (and owning method for R2R for LoaderAllocator purposes),
     /// since that's all the code generator cares about - size of the type, and where the GC pointers are.
     /// </summary>
     public sealed partial class AsyncContinuationType : MetadataType
@@ -22,6 +22,7 @@ namespace ILCompiler
         public GCPointerMap PointerMap { get; }
 
 #if READYTORUN
+        // CoreCLR R2R needs to know the owning method to associate the type with the right LoaderAllocator
         public MethodDesc OwningMethod { get; }
 #endif
 

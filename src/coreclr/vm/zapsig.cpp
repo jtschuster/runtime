@@ -144,8 +144,6 @@ BOOL ZapSig::GetSignatureForTypeHandle(TypeHandle      handle,
     }
     CONTRACTL_END
 
-    // Can we encode an AsyncContinuation type?
-
     if (handle.IsTypeDesc())
         return GetSignatureForTypeDesc(handle.AsTypeDesc(), pSigBuilder);
 

@@ -203,8 +203,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
             if (typeDesc.HasInstantiation && !typeDesc.IsGenericDefinition)
             {
-                Debug.Assert(typeDesc is InstantiatedType /* or AsyncContinuationType */);
-                EmitInstantiatedTypeSignature(typeDesc, context);
+                EmitInstantiatedTypeSignature((InstantiatedType)typeDesc, context);
                 return;
             }
 
@@ -306,11 +305,8 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                     }
                     else if (typeDesc is AsyncContinuationType act)
                     {
-                        throw new NotImplementedException();
-                        //ModuleToken token = context.GetModuleTokenForType((EcmaType)typeDesc.BaseType);
-                        //EmitModuleOverride(token.Module, context);
-                        //EmitElementType(CorElementType.ELEMENT_TYPE_CLASS);
-                        //EmitToken(token.Token);
+                        // We should never try to encode a continuation on this path
+                        throw new InvalidOperationException();
                     }
                     else
                     {
@@ -359,7 +355,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             EmitToken(token.Token);
         }
 
-        private void EmitInstantiatedTypeSignature(TypeDesc type, SignatureContext context)
+        private void EmitInstantiatedTypeSignature(InstantiatedType type, SignatureContext context)
         {
             IEcmaModule targetModule = context.GetTargetModule(type);
             EmitModuleOverride(targetModule, context);

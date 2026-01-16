@@ -94,7 +94,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
             foreach (MethodWithGCInfo method in _nodeFactory.EnumerateCompiledMethods())
             {
-                if (method.Method.IsAsyncVariant() || method.Method is AsyncResumptionStub)
+                if (method.Method is AsyncResumptionStub)
                 {
                     continue;
                 }

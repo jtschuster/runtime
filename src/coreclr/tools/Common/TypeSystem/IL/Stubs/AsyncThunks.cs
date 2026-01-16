@@ -377,28 +377,5 @@ namespace Internal.IL.Stubs
 
             return emitter.Link(asyncMethod);
         }
-
-
-        private static MethodDesc InstantiateAsOpen(MethodDesc method)
-        {
-            var context = method.Context;
-            if (method.OwningType.HasInstantiation)
-            {
-                var instantiatedType = (InstantiatedType)TypeSystemHelpers.InstantiateAsOpen((TypeDesc)method.OwningType);
-                method = context.GetMethodForInstantiatedType(method, instantiatedType);
-            }
-
-            if (method.HasInstantiation)
-            {
-                var inst = new TypeDesc[method.Instantiation.Length];
-                for (int i = 0; i < inst.Length; i++)
-                {
-                    inst[i] = context.GetSignatureVariable(i, true);
-                }
-                method = method.MakeInstantiatedMethod(new Instantiation(inst));
-            }
-
-            return method;
-        }
     }
 }

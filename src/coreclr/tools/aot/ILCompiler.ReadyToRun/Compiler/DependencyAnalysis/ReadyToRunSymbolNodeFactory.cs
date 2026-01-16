@@ -188,7 +188,7 @@ namespace ILCompiler.DependencyAnalysis
 
         private NodeCache<AsyncContinuationType, ISymbolNode> _continuationTypeFixups;
 
-        public ISymbolNode ContinuationDelayLoadHelper(AsyncContinuationType key)
+        public ISymbolNode ContinuationTypeSymbol(AsyncContinuationType key)
         {
             return _continuationTypeFixups.GetOrAdd(key);
         }

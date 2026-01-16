@@ -1125,7 +1125,7 @@ namespace Internal.JitInterface
             }
             else if (method.IsAggressiveInlining)
             {
-                //result |= CorInfoFlag.CORINFO_FLG_FORCEINLINE;
+                result |= CorInfoFlag.CORINFO_FLG_FORCEINLINE;
             }
 
             if (method.OwningType.IsDelegate && method.Name.SequenceEqual("Invoke"u8))
@@ -1818,7 +1818,7 @@ namespace Internal.JitInterface
 
 #if READYTORUN
             TypeDesc owningType = methodIL.OwningMethod.GetTypicalMethodDefinition().OwningType;
-            bool recordToken = owningType is EcmaType && !methodIL.OwningMethod.IsAsyncThunk();
+            bool recordToken = owningType is EcmaType;
             if (!_compilation.CompilationModuleGroup.VersionsWithMethodBody(methodIL.OwningMethod.GetTypicalMethodDefinition()))
             {
                 recordToken &= (methodIL.GetMethodILScopeDefinition() is IMethodTokensAreUseableInCompilation);
@@ -3409,9 +3409,6 @@ namespace Internal.JitInterface
         private CORINFO_CLASS_STRUCT_* getContinuationType(nuint dataSize, ref bool objRefs, nuint objRefsSize)
         {
             Debug.Assert(objRefsSize == (dataSize + (nuint)(PointerSize - 1)) / (nuint)PointerSize);
-//#if READYTORUN
-//            return ObjectToHandle(MethodBeingCompiled.Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "Continuation"u8));
-//#else
             GCPointerMapBuilder gcMapBuilder = new GCPointerMapBuilder((int)dataSize, PointerSize);
             ReadOnlySpan<bool> bools = MemoryMarshal.CreateReadOnlySpan(ref objRefs, (int)objRefsSize);
             for (int i = 0; i < bools.Length; i++)
@@ -3425,7 +3422,6 @@ namespace Internal.JitInterface
 #else
             return ObjectToHandle(_compilation.TypeSystemContext.GetContinuationType(gcMapBuilder.ToGCMap()));
 #endif
-//#endif
         }
 
         private mdToken getMethodDefFromMethod(CORINFO_METHOD_STRUCT_* hMethod)
