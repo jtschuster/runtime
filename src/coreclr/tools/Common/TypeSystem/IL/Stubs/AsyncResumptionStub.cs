@@ -36,6 +36,8 @@ namespace ILCompiler
 
         public override TypeSystemContext Context => _targetMethod.Context;
 
+        public MethodDesc TargetMethod => _targetMethod;
+
         private MethodSignature InitializeSignature()
         {
             TypeDesc objectType = Context.GetWellKnownType(WellKnownType.Object);

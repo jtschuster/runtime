@@ -1530,11 +1530,13 @@ namespace Internal.JitInterface
                 ref CORINFO_EH_CLAUSE clause = ref _ehClauses[i];
                 int clauseOffset = (int)EHInfoFields.Length * sizeof(uint) * i;
                 CORINFO_EH_CLAUSE_FLAGS flags = clause.Flags;
-                if (clause.Flags == CORINFO_EH_CLAUSE_FLAGS.CORINFO_EH_CLAUSE_NONE
+                uint classTokenOrOffset = clause.ClassTokenOrOffset;
+                if (flags == CORINFO_EH_CLAUSE_FLAGS.CORINFO_EH_CLAUSE_NONE
                     && MethodBeingCompiled.IsAsyncThunk()
-                    && ((TypeDesc)ResolveTokenInScope(_compilation.GetMethodIL(MethodBeingCompiled), MethodBeingCompiled, (mdToken)clause.ClassTokenOrOffset)).IsWellKnownType(WellKnownType.Exception))
+                    && ((TypeDesc)ResolveTokenInScope(_compilation.GetMethodIL(MethodBeingCompiled), MethodBeingCompiled, (mdToken)classTokenOrOffset)).IsWellKnownType(WellKnownType.Exception))
                 {
                     flags |= CORINFO_EH_CLAUSE_FLAGS.CORINFO_EH_CLAUSE_R2R_SYSTEM_EXCEPTION;
+                    classTokenOrOffset = 0;
                 }
                 Array.Copy(BitConverter.GetBytes((uint)flags), 0, ehInfoData, clauseOffset + (int)EHInfoFields.Flags * sizeof(uint), sizeof(uint));
                 Array.Copy(BitConverter.GetBytes((uint)clause.TryOffset), 0, ehInfoData, clauseOffset + (int)EHInfoFields.TryOffset * sizeof(uint), sizeof(uint));
@@ -1542,7 +1544,7 @@ namespace Internal.JitInterface
                 Array.Copy(BitConverter.GetBytes((uint)(clause.TryLength)), 0, ehInfoData, clauseOffset + (int)EHInfoFields.TryEnd * sizeof(uint), sizeof(uint));
                 Array.Copy(BitConverter.GetBytes((uint)clause.HandlerOffset), 0, ehInfoData, clauseOffset + (int)EHInfoFields.HandlerOffset * sizeof(uint), sizeof(uint));
                 Array.Copy(BitConverter.GetBytes((uint)(clause.HandlerLength)), 0, ehInfoData, clauseOffset + (int)EHInfoFields.HandlerEnd * sizeof(uint), sizeof(uint));
-                Array.Copy(BitConverter.GetBytes((uint)clause.ClassTokenOrOffset), 0, ehInfoData, clauseOffset + (int)EHInfoFields.ClassTokenOrOffset * sizeof(uint), sizeof(uint));
+                Array.Copy(BitConverter.GetBytes(classTokenOrOffset), 0, ehInfoData, clauseOffset + (int)EHInfoFields.ClassTokenOrOffset * sizeof(uint), sizeof(uint));
             }
             return new ObjectNode.ObjectData(ehInfoData, Array.Empty<Relocation>(), alignment: 1, definedSymbols: Array.Empty<ISymbolDefinitionNode>());
         }
@@ -3302,7 +3304,6 @@ namespace Internal.JitInterface
                     // 2. If at any time, the set of methods that are inlined includes a method which has an IL body without
                     //    tokens that are useable in compilation, record that information, and once the multi-threaded portion
                     //    of the build finishes, it will then compute the IL bodies for those methods, then run the compilation again.
-
                     if (needsTokenTranslation && !(methodIL is IMethodTokensAreUseableInCompilation) && methodIL is EcmaMethodIL)
                     {
                         // We may have already acquired the right type of MethodIL here, or be working with a method that is an IL Intrinsic
