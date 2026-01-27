@@ -84,6 +84,13 @@
     <UseLocalAppHostPack>true</UseLocalAppHostPack>
   </PropertyGroup>
 
+  <!-- Runtime-async requires compile-time feature flag and preview features enabled for both libs and tests -->
+  <PropertyGroup Condition="'$(UseRuntimeAsync)' == 'true'">
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
+    <Features>$(Features);runtime-async=on</Features>
+    <NoWarn>$(NoWarn);SYSLIB5007</NoWarn>
+  </PropertyGroup>
+
   <!-- To enable the interpreter for mono desktop, we need to pass an env switch -->
   <PropertyGroup>
     <MonoEnvOptions Condition="'$(MonoEnvOptions)' == '' and '$(TargetsMobile)' != 'true' and '$(MonoForceInterpreter)' == 'true'">--interpreter</MonoEnvOptions>
