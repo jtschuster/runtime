@@ -100,7 +100,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
         {
             method = method.GetCanonMethodTarget(CanonicalFormKind.Specific);
 
-            if (method.GetTypicalMethodDefinition().GetPrimaryMethodDesc() is EcmaMethod ecmaMethod)
+            if (method.GetPrimaryMethodDesc().GetTypicalMethodDefinition() is EcmaMethod ecmaMethod)
             {
                 if (_compilationModuleGroup.VersionsWithMethodBody(ecmaMethod))
                 {
@@ -331,6 +331,10 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                 {
                     SetModuleTokenForTypeSystemEntity(_typeToRefTokens, ecmaType, token);
                 }
+            }
+            else if (type.IsCanonicalDefinitionType(CanonicalFormKind.Specific))
+            {
+                return;
             }
             else if (!specialTypeFound)
             {

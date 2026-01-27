@@ -53,7 +53,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
         public static byte[] BuildSignatureForMethodDefinedInModule(MethodDesc method, NodeFactory factory)
         {
-            EcmaMethod ecmaMethod = (EcmaMethod)method.GetTypicalMethodDefinition().GetPrimaryMethodDesc();
+            EcmaMethod ecmaMethod = (EcmaMethod)method.GetPrimaryMethodDesc().GetTypicalMethodDefinition();
 
             ModuleToken moduleToken;
             if (factory.CompilationModuleGroup.VersionsWithMethodBody(ecmaMethod))
@@ -102,7 +102,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
             foreach (MethodWithGCInfo method in factory.EnumerateCompiledMethods(null, CompiledMethodCategory.Instantiated))
             {
-                Debug.Assert(method.Method.HasInstantiation || method.Method.OwningType.HasInstantiation || method.Method.IsAsyncVariant());
+                Debug.Assert(method.Method.HasInstantiation || method.Method.OwningType.HasInstantiation || method.Method.IsAsyncVariant() || method.Method is AsyncResumptionStub);
 
                 int methodIndex = factory.RuntimeFunctionsTable.GetIndex(method);
 

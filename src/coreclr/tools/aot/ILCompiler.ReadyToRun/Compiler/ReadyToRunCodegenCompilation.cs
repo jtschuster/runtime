@@ -705,18 +705,23 @@ namespace ILCompiler
                                 _methodsWhichNeedMutableILBodies.Add(typicalDef);
                             }
                         }
+                        if (method is AsyncResumptionStub)
+                        {
+                            GetMethodIL(method);
+                        }
                         if (!CorInfoImpl.ShouldCodeNotBeCompiledIntoFinalImage(InstructionSetSupport, method)
-                            && method.IsAsyncCall()
+                            && (method.IsAsyncCall() || method is AsyncResumptionStub)
                             && !_hasAddedAsyncReferences)
                         {
                             // Keep in sync with CorInfoImpl.getAsyncInfo()
                             DefType continuation = TypeSystemContext.ContinuationType;
+                            var runtimeHelpers = TypeSystemContext.SystemModule.GetKnownType(
+                                "System.Runtime.CompilerServices"u8, "RuntimeHelpers"u8);
+
                             var asyncHelpers = TypeSystemContext.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "AsyncHelpers"u8);
                             // AsyncHelpers should already be referenced in the module for the call to Await()
                             Debug.Assert(!_nodeFactory.Resolver.GetModuleTokenForType(asyncHelpers, allowDynamicallyCreatedReference: true, throwIfNotFound: true).IsNull);
-                            TypeDesc[] requiredTypes = [
-                                continuation,
-                            ];
+                            TypeDesc[] requiredTypes = [continuation];
                             FieldDesc[] requiredFields = [
                                 continuation.GetKnownField("Next"u8),
                                 continuation.GetKnownField("ResumeInfo"u8),
@@ -731,6 +736,9 @@ namespace ILCompiler
                                 asyncHelpers.GetKnownMethod("RestoreContexts"u8, null),
                                 asyncHelpers.GetKnownMethod("RestoreContextsOnSuspension"u8, null),
                                 asyncHelpers.GetKnownMethod("AllocContinuation"u8, null),
+                                //asyncHelpers.GetKnownMethod("AsyncCallContinuation"u8, null),
+                                //runtimeHelpers.GetKnownMethod("SetNextCallGenericContext"u8, null),
+                                //runtimeHelpers.GetKnownMethod("SetNextCallAsyncContinuation"u8, null),
                             ];
                             _nodeFactory.ManifestMetadataTable._mutableModule.ModuleThatIsCurrentlyTheSourceOfNewReferences = ((EcmaMethod)method.GetPrimaryMethodDesc().GetTypicalMethodDefinition()).Module;
                             try

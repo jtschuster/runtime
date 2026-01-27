@@ -155,6 +155,20 @@ namespace Internal.IL
                     wrappedMethodIL = null;
                 }
             }
+            else if (method is AsyncResumptionStub ars)
+            {
+                if (!wrappedMethodIL.Initialize(
+                    _manifestMutableModule,
+                    ars.EmitIL(),
+                    (EcmaMethod)ars.TargetMethod.GetPrimaryMethodDesc().GetTypicalMethodDefinition(),
+                    false))
+                {
+                    // If we could not initialize the wrapped method IL, we should store a null.
+                    // That will result in the IL code for the method being unavailable for use in
+                    // the compilation, which is version safe.
+                    wrappedMethodIL = null;
+                }
+            }
             else
             {
                 Debug.Assert(!_compilationModuleGroup.VersionsWithMethodBody(method) &&
@@ -177,7 +191,7 @@ namespace Internal.IL
         {
             if (((!_compilationModuleGroup.VersionsWithMethodBody(method)
                     && _compilationModuleGroup.CrossModuleInlineable(method))
-                || (NeedsTaskReturningThunk(method) || NeedsAsyncThunk(method)))
+                || (NeedsTaskReturningThunk(method) || NeedsAsyncThunk(method) || method is AsyncResumptionStub))
                 && !_manifestModuleWrappedMethods.ContainsKey(method))
             {
                 return true;
@@ -272,7 +286,10 @@ namespace Internal.IL
             }
             else if (method is AsyncResumptionStub ars)
             {
-                return ars.EmitIL();
+                if (_manifestModuleWrappedMethods.TryGetValue(ars, out var methodil))
+                    return methodil;
+                CreateCrossModuleInlineableTokensForILBody(ars);
+                return _manifestModuleWrappedMethods[ars];
             }
             else
             {

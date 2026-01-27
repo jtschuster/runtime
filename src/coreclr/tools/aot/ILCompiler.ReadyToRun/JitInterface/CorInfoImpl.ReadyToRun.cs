@@ -143,9 +143,13 @@ namespace Internal.JitInterface
             OwningType = GetMethodTokenOwningType(this, constrainedType, context, devirtualizedMethodOwner, out OwningTypeNotDerivedFromToken);
             if (method.IsAsync && method.IsAsyncVariant() && token.Module is MutableModule)
             {
-                var ecmaMethod = (EcmaMethod)method.GetTypicalMethodDefinition().GetPrimaryMethodDesc();
-                Token = new (ecmaMethod.Module, ecmaMethod.Handle);
-                OwningTypeNotDerivedFromToken = true;
+                var ecmaMethod = (EcmaMethod)method.GetPrimaryMethodDesc().GetTypicalMethodDefinition();
+                var newToken = new ModuleToken(ecmaMethod.Module, ecmaMethod.Handle);
+                Token = newToken;
+                if (Token.Module.GetObject((EntityHandle)Token.Handle) != newToken.Module.GetObject((EntityHandle)newToken.Handle))
+                {
+                    OwningTypeNotDerivedFromToken = true;
+                }
             }
         }
 
@@ -330,7 +334,7 @@ namespace Internal.JitInterface
                 && Unboxing == methodWithToken.Unboxing;
             if (equals)
             {
-                Debug.Assert(OwningTypeNotDerivedFromToken == methodWithToken.OwningTypeNotDerivedFromToken);
+                //Debug.Assert(OwningTypeNotDerivedFromToken == methodWithToken.OwningTypeNotDerivedFromToken);
                 Debug.Assert(OwningType == methodWithToken.OwningType);
             }
 
@@ -563,14 +567,14 @@ namespace Internal.JitInterface
 
         public static bool ShouldCodeNotBeCompiledIntoFinalImage(InstructionSetSupport instructionSetSupport, MethodDesc method)
         {
-            if (method is AsyncResumptionStub)
-                return true;
+            //if (method is AsyncResumptionStub)
+            //    return true;
             // Implementation limitations around tokens mean we cannot implement non-canonical async variants of (Value)Task<T>-returning methods
-            if (method.IsAsyncVariant() && !method.Signature.ReturnType.IsVoid && !method.Signature.ReturnType.IsCanonicalDefinitionType(CanonicalFormKind.Any))
-                return true;
+            //if (method.IsAsyncVariant() && !method.Signature.ReturnType.IsVoid && !method.Signature.ReturnType.IsCanonicalDefinitionType(CanonicalFormKind.Any))
+            //    return true;
 
-            MethodDesc methodDef = method.GetTypicalMethodDefinition();
-            EcmaMethod ecmaMethod = (EcmaMethod)(methodDef.GetPrimaryMethodDesc());
+            //MethodDesc methodDef = method.GetTypicalMethodDefinition();
+            EcmaMethod ecmaMethod = (EcmaMethod)(method.GetPrimaryMethodDesc().GetTypicalMethodDefinition());
             var metadataReader = ecmaMethod.MetadataReader;
             var stringComparer = metadataReader.StringComparer;
 
@@ -993,8 +997,10 @@ namespace Internal.JitInterface
             switch (ftnNum)
             {
                 case CorInfoHelpFunc.CORINFO_HELP_THROW:
-                case CorInfoHelpFunc.CORINFO_HELP_THROWEXACT: // todo
                     id = ReadyToRunHelper.Throw;
+                    break;
+                case CorInfoHelpFunc.CORINFO_HELP_THROWEXACT:
+                    id = ReadyToRunHelper.ThrowExact;
                     break;
                 case CorInfoHelpFunc.CORINFO_HELP_RETHROW:
                     id = ReadyToRunHelper.Rethrow;
@@ -1434,7 +1440,7 @@ namespace Internal.JitInterface
                     // It's okay to strip the instantiation away because we don't need a MethodSpec
                     // token - SignatureBuilder will generate the generic method signature
                     // using instantiation parameters from the MethodDesc entity.
-                    resultMethod = resultMethod.GetTypicalMethodDefinition().GetPrimaryMethodDesc();
+                    resultMethod = resultMethod.GetPrimaryMethodDesc().GetTypicalMethodDefinition();
 
                     if (!_compilation.NodeFactory.CompilationModuleGroup.VersionsWithType(resultMethod.OwningType))
                     {
@@ -1938,7 +1944,7 @@ namespace Internal.JitInterface
                 throw new RequiresRuntimeJitException(callerMethod.ToString() + " -> " + originalMethod.ToString());
             }
 
-            callerModule = ((EcmaMethod)callerMethod.GetTypicalMethodDefinition().GetPrimaryMethodDesc()).Module;
+            callerModule = ((EcmaMethod)callerMethod.GetPrimaryMethodDesc().GetTypicalMethodDefinition()).Module;
             bool isCallVirt = (flags & CORINFO_CALLINFO_FLAGS.CORINFO_CALLINFO_CALLVIRT) != 0;
             bool isLdftn = (flags & CORINFO_CALLINFO_FLAGS.CORINFO_CALLINFO_LDFTN) != 0;
             bool isStaticVirtual = (originalMethod.Signature.IsStatic && originalMethod.IsVirtual);

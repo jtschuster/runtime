@@ -3783,8 +3783,8 @@ namespace Internal.JitInterface
         {
 #if READYTORUN
             var resumptionStub = new AsyncResumptionStub(MethodBeingCompiled, MethodBeingCompiled.OwningType);
-            var tokenSource = MethodBeingCompiled.GetTypicalMethodDefinition().GetPrimaryMethodDesc();
-            entryPoint = (void*)ObjectToHandle(_compilation.NodeFactory.MethodEntrypoint(new MethodWithToken(resumptionStub, _compilation.NodeFactory.Resolver.GetModuleTokenForMethod(tokenSource, false, true), MethodBeingCompiled.OwningType, false, MethodBeingCompiled), false, false, false));
+            var tokenSource = MethodBeingCompiled.GetPrimaryMethodDesc().GetTypicalMethodDefinition();
+            entryPoint = (void*)ObjectToHandle(_compilation.NodeFactory.MethodEntrypoint(new MethodWithToken(resumptionStub, _compilation.NodeFactory.Resolver.GetModuleTokenForMethod(tokenSource, false, true), MethodBeingCompiled.OwningType, false, MethodBeingCompiled), false, true, false));
             return ObjectToHandle(resumptionStub);
 
 #else

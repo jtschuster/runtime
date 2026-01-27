@@ -11,6 +11,7 @@ using Internal.TypeSystem.Interop;
 using Internal.ReadyToRunConstants;
 using Internal.CorConstants;
 using Internal.JitInterface;
+using System.Security.Cryptography;
 
 namespace ILCompiler.DependencyAnalysis.ReadyToRun
 {
@@ -78,7 +79,15 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             MetadataType defType = (MetadataType)type;
 
             int pointerSize = type.Context.Target.PointerSize;
-            int size = defType.InstanceFieldSize.AsInt;
+            int size;
+            if (defType is AsyncContinuationType)
+            {
+                size = defType.InstanceByteCount.AsInt;
+            }
+            else
+            {
+                size = defType.InstanceFieldSize.AsInt;
+            }
             int alignment = Internal.JitInterface.CorInfoImpl.GetClassAlignmentRequirementStatic(defType);
             ReadyToRunTypeLayoutFlags flags = ReadyToRunTypeLayoutFlags.READYTORUN_LAYOUT_Alignment | ReadyToRunTypeLayoutFlags.READYTORUN_LAYOUT_GCLayout;
             if (alignment == pointerSize)
@@ -132,7 +141,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                     gcMap = GCPointerMap.FromInstanceLayout(defType);
                 }
 
-                byte[] encodedGCRefMap = new byte[(size / pointerSize + 7) / 8];
+                byte[] encodedGCRefMap = new byte[((size + 7) / pointerSize + 7) / 8];
                 int bitIndex = 0;
                 foreach (bool bit in gcMap)
                 {

@@ -445,6 +445,11 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             {
                 flags |= (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_AsyncVariant;
             }
+            if (method.Method is AsyncResumptionStub)
+            {
+                flags |= (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_ResumptionStub;
+            }
+
 
             EmitMethodSpecificationSignature(method, flags, enforceDefEncoding, enforceOwningType, context);
 

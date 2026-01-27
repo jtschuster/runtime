@@ -1024,6 +1024,10 @@ namespace ILCompiler.Reflection.ReadyToRun
                 {
                     builder.Append("[ASYNC] ");
                 }
+                if ((flags & ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_ResumptionStub) != 0)
+                {
+                    builder.Append("[RESUME] ");
+                }
                 builder.Append(method);
                 return builder.ToString();
             }
@@ -1673,6 +1677,10 @@ namespace ILCompiler.Reflection.ReadyToRun
                 // Exception handling helpers
                 case ReadyToRunHelper.Throw:
                     builder.Append("THROW");
+                    break;
+
+                case ReadyToRunHelper.ThrowExact:
+                    builder.Append("THROW_EXACT");
                     break;
 
                 case ReadyToRunHelper.Rethrow:

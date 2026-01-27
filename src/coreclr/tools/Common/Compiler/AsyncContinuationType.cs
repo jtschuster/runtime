@@ -17,6 +17,9 @@ namespace ILCompiler
     /// since that's all the code generator cares about - size of the type, and where the GC pointers are.
     /// </summary>
     public sealed partial class AsyncContinuationType : MetadataType
+#if READYTORUN
+        , IPrefixMangledType
+#endif
     {
         private readonly MetadataType _continuationBaseType;
         public GCPointerMap PointerMap { get; }
@@ -45,24 +48,34 @@ namespace ILCompiler
         public override bool IsAbstract => false;
         public override MetadataType ContainingType => null;
         public override PInvokeStringFormat PInvokeStringFormat => default;
-        public override string DiagnosticName => $"ContinuationType_{PointerMap}";
         public override string DiagnosticNamespace => "";
         protected override int ClassCode => 0x528741a;
         public override TypeSystemContext Context => _continuationBaseType.Context;
+        public override string DiagnosticName => $"ContinuationType_{PointerMap}";
 
 #if READYTORUN
+        TypeDesc IPrefixMangledType.BaseType => BaseType;
+        public ReadOnlySpan<byte> Prefix => Encoding.UTF8.GetBytes($"GCLayout: {PointerMap} for {OwningMethod.GetDisplayName()}");
+
+
         public AsyncContinuationType(MetadataType continuationBaseType, GCPointerMap pointerMap, MethodDesc owningMethod)
             => (_continuationBaseType, PointerMap, OwningMethod) = (continuationBaseType, pointerMap, owningMethod);
+
+        protected override int CompareToImpl(TypeDesc other, TypeSystemComparer comparer)
+        {
+            Debug.Assert(_continuationBaseType == ((AsyncContinuationType)other)._continuationBaseType);
+            AsyncContinuationType act = (AsyncContinuationType)other;
+            GCPointerMap otherPointerMap = ((AsyncContinuationType)other).PointerMap;
+            var pointerMapComparison = PointerMap.CompareTo(otherPointerMap);
+            if (0 != pointerMapComparison)
+                return pointerMapComparison;
+            return comparer.Compare(this.OwningMethod, act.OwningMethod);
+        }
+
+        public override int GetHashCode() => HashCode.Combine(PointerMap.GetHashCode(), OwningMethod.GetHashCode());
 #else
         public AsyncContinuationType(MetadataType continuationBaseType, GCPointerMap pointerMap)
             => (_continuationBaseType, PointerMap) = (continuationBaseType, pointerMap);
-#endif
-
-        public override bool HasCustomAttribute(string attributeNamespace, string attributeName) => false;
-        public override IEnumerable<MetadataType> GetNestedTypes() => [];
-        public override MetadataType GetNestedType(ReadOnlySpan<byte> name) => null;
-        protected override MethodImplRecord[] ComputeVirtualMethodImplsForType() => [];
-        public override MethodImplRecord[] FindMethodsImplWithMatchingDeclName(ReadOnlySpan<byte> name) => [];
 
         protected override int CompareToImpl(TypeDesc other, TypeSystemComparer comparer)
         {
@@ -72,6 +85,13 @@ namespace ILCompiler
         }
 
         public override int GetHashCode() => PointerMap.GetHashCode();
+#endif
+
+        public override bool HasCustomAttribute(string attributeNamespace, string attributeName) => false;
+        public override IEnumerable<MetadataType> GetNestedTypes() => [];
+        public override MetadataType GetNestedType(ReadOnlySpan<byte> name) => null;
+        protected override MethodImplRecord[] ComputeVirtualMethodImplsForType() => [];
+        public override MethodImplRecord[] FindMethodsImplWithMatchingDeclName(ReadOnlySpan<byte> name) => [];
 
         protected override TypeFlags ComputeTypeFlags(TypeFlags mask)
         {
@@ -119,17 +139,19 @@ namespace ILCompiler
         public override ComputedInstanceFieldLayout ComputeInstanceLayout(DefType type, InstanceLayoutKind layoutKind)
         {
             AsyncContinuationType act = (AsyncContinuationType)type;
+            if (layoutKind != InstanceLayoutKind.TypeOnly)
+                throw new InvalidOperationException();
             return new ComputedInstanceFieldLayout()
             {
                 IsAutoLayoutOrHasAutoLayoutFields = false,
                 IsInt128OrHasInt128Fields = false,
                 IsVectorTOrHasVectorTFields = false,
                 LayoutAbiStable = true,
-                FieldSize = new LayoutInt(act.PointerMap.Size * act.Context.Target.PointerSize),
+                FieldSize = new LayoutInt(act.Context.Target.PointerSize),
                 FieldAlignment = new LayoutInt(act.Context.Target.PointerSize),
                 ByteCountAlignment = new LayoutInt(act.Context.Target.PointerSize),
-                ByteCountUnaligned = new LayoutInt(act.PointerMap.Size * act.Context.Target.PointerSize),
-                Offsets = [],
+                ByteCountUnaligned = new LayoutInt(act.BaseType.InstanceByteCount.AsInt + act.PointerMap.Size * act.Context.Target.PointerSize),
+                Offsets = null,
             };
         }
 
