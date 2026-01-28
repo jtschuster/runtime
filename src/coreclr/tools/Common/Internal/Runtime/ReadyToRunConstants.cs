@@ -188,7 +188,7 @@ namespace Internal.ReadyToRunConstants
         Check_IL_Body              = 0x35, /* Check to see if an IL method is defined the same at runtime as at compile time. A failed match will cause code not to be used. */
         Verify_IL_Body             = 0x36, /* Verify an IL body is defined the same at compile time and runtime. A failed match will cause a hard runtime failure. */
 
-        ContinuationLayout = 0x37,
+        ContinuationLayout = 0x37, /* Layout of an async method continuation type */
 
         ModuleOverride = 0x80,
         // followed by sig-encoded UInt with assemblyref index into either the assemblyref
@@ -356,9 +356,9 @@ namespace Internal.ReadyToRunConstants
 
         GetCurrentManagedThreadId   = 0x112,
 
-        AllocContinuation,
-        AllocContinuationMethod,
-        AllocContinuationClass,
+        AllocContinuation           = 0x113,
+        AllocContinuationMethod     = 0x114,
+        AllocContinuationClass      = 0x115,
 
         // **********************************************************************************************
         //

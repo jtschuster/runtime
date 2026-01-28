@@ -10317,6 +10317,33 @@ void CEEInfo::getAsyncInfo(CORINFO_ASYNC_INFO* pAsyncInfoOut)
     EE_TO_JIT_TRANSITION();
 }
 
+MethodTable* getContinuationType(
+    size_t dataSize,
+    bool* objRefs,
+    size_t objRefsSize,
+    Module* loaderModule)
+{
+    CONTRACTL {
+        THROWS;
+        GC_TRIGGERS;
+        MODE_PREEMPTIVE;
+    } CONTRACTL_END;
+
+    CORINFO_CLASS_HANDLE result = NULL;
+
+    _ASSERTE(objRefsSize == (dataSize + (TARGET_POINTER_SIZE - 1)) / TARGET_POINTER_SIZE);
+    LoaderAllocator* allocator = loaderModule->GetLoaderAllocator();
+    AsyncContinuationsManager* asyncConts = allocator->GetAsyncContinuationsManager();
+    MethodTable* mt = asyncConts->LookupOrCreateContinuationMethodTable((unsigned)dataSize, objRefs, loaderModule);
+
+#ifdef DEBUG
+    MethodTable* mt2 = asyncConts->LookupOrCreateContinuationMethodTable((unsigned)dataSize, objRefs, loaderModule);
+    _ASSERTE(mt2 == mt);
+#endif
+
+    return mt;
+}
+
 CORINFO_CLASS_HANDLE CEEInfo::getContinuationType(
     size_t dataSize,
     bool* objRefs,
@@ -10332,15 +10359,7 @@ CORINFO_CLASS_HANDLE CEEInfo::getContinuationType(
 
     JIT_TO_EE_TRANSITION();
 
-    _ASSERTE(objRefsSize == (dataSize + (TARGET_POINTER_SIZE - 1)) / TARGET_POINTER_SIZE);
-    LoaderAllocator* allocator = m_pMethodBeingCompiled->GetLoaderAllocator();
-    AsyncContinuationsManager* asyncConts = allocator->GetAsyncContinuationsManager();
-    result = (CORINFO_CLASS_HANDLE)asyncConts->LookupOrCreateContinuationMethodTable((unsigned)dataSize, objRefs, m_pMethodBeingCompiled);
-
-#ifdef DEBUG
-    CORINFO_CLASS_HANDLE result2 = (CORINFO_CLASS_HANDLE)asyncConts->LookupOrCreateContinuationMethodTable((unsigned)dataSize, objRefs, m_pMethodBeingCompiled);
-    _ASSERTE(result2 == result);
-#endif
+    result = (CORINFO_CLASS_HANDLE)::getContinuationType(dataSize, objRefs, objRefsSize, m_pMethodBeingCompiled->GetLoaderModule());
 
     EE_TO_JIT_TRANSITION();
 
@@ -13723,17 +13742,7 @@ void ComputeGCRefMap(MethodTable * pMT, BYTE * pGCRefMap, size_t cbGCRefMap)
 }
 
 
-MethodTable* getContinuationTypeFixup(MethodDesc* asyncMethod, size_t dataSize, bool* objRefs, size_t objRefsSize)
-{
-    STANDARD_VM_CONTRACT;
-
-    LoaderAllocator* allocator = asyncMethod->GetLoaderAllocator();
-    AsyncContinuationsManager* asyncConts = allocator->GetAsyncContinuationsManager();
-    MethodTable* result = asyncConts->LookupOrCreateContinuationMethodTable((unsigned)dataSize, objRefs, asyncMethod);
-    return result;
-}
-
-MethodTable* GetContinuationTypeFromLayout(MethodDesc* asyncMethod, PCCOR_SIGNATURE pBlob)
+MethodTable* GetContinuationTypeFromLayout(PCCOR_SIGNATURE pBlob, Module* currentModule)
 {
     STANDARD_VM_CONTRACT;
 
@@ -13752,14 +13761,27 @@ MethodTable* GetContinuationTypeFromLayout(MethodDesc* asyncMethod, PCCOR_SIGNAT
         return nullptr;
     }
 
-    if (!(dwFlags & READYTORUN_LAYOUT_GCLayout_Empty))
+    if ((dwExpectedSize % TARGET_POINTER_SIZE) != 0)
+    {
+        COMPlusThrowHR(COR_E_BADIMAGEFORMAT);
+    }
+
+    LoaderAllocator* allocator = currentModule->GetLoaderAllocator();
+    AsyncContinuationsManager* asyncConts = allocator->GetAsyncContinuationsManager();
+
+    if (dwFlags & READYTORUN_LAYOUT_GCLayout_Empty)
+    {
+        // No GC references, don't read a bitmap
+        return ::getContinuationType(dwExpectedSize, nullptr, 0, currentModule);
+    }
+    else
     {
         uint8_t* pGCRefMapBlob = (uint8_t*)p.GetPtr();
         size_t objRefsSize = (dwExpectedSize / TARGET_POINTER_SIZE);
         bool* objRefs = (bool*)_alloca(objRefsSize * sizeof(bool));
         size_t bytesInBlob = (objRefsSize + 7) / 8;
         // Read bitmap from blob
-        for(int byteIndex = 0; byteIndex < bytesInBlob; byteIndex++)
+        for(size_t byteIndex = 0; byteIndex < bytesInBlob; byteIndex++)
         {
             uint8_t b = pGCRefMapBlob[byteIndex];
             for (int bit = 0; bit < 8 && byteIndex * 8 + bit < objRefsSize; bit++)
@@ -13767,22 +13789,7 @@ MethodTable* GetContinuationTypeFromLayout(MethodDesc* asyncMethod, PCCOR_SIGNAT
                 objRefs[byteIndex * 8 + bit] = (b & (1 << bit)) != 0;
             }
         }
-        return getContinuationTypeFixup(
-            asyncMethod,
-            dwExpectedSize, // size_t dataSize,
-            objRefs, // bool* objRefs,
-            objRefsSize // size_t objRefsSize
-            );
-    }
-    else{
-        size_t objRefsSize = 0;
-        bool* objRefs = nullptr;
-        return getContinuationTypeFixup(
-            asyncMethod,
-            dwExpectedSize, // size_t dataSize,
-            objRefs, // bool* objRefs,
-            objRefsSize // size_t objRefsSize
-            );
+        return ::getContinuationType(dwExpectedSize, objRefs, objRefsSize, currentModule);
     }
 }
 
@@ -14260,14 +14267,16 @@ BOOL LoadDynamicInfoEntry(Module *currentModule,
 
     case READYTORUN_FIXUP_Continuation_Layout:
         {
-            PCCOR_SIGNATURE pBlobNext = NULL;
-            SigTypeContext typeContext;    // empty context is OK: encoding should not contain type variables.
-            ZapSig::Context zapSigContext(pInfoModule, (void *)currentModule, ZapSig::NormalTokens);
-            MethodDesc* pOwningMethod = ZapSig::DecodeMethod(pInfoModule, pBlob, &typeContext, &zapSigContext, NULL, NULL, NULL, &pBlobNext, TRUE);
-            //_ASSERTE(pOwningMethod->IsAsyncMethod()); //pMD = ZapSig::DecodeMethod(currentModule, pInfoModule, pBlob, CLASS_LOADED, &pBlobNext);
-            MethodTable* continuationTypeMethodTable = GetContinuationTypeFromLayout(pOwningMethod, pBlobNext);
-            TypeHandle th = TypeHandle(continuationTypeMethodTable);
-            result = (size_t)th.AsPtr();
+            MethodTable* continuationTypeMethodTable = GetContinuationTypeFromLayout(pBlob, currentModule);
+            if (continuationTypeMethodTable != NULL)
+            {
+                TypeHandle th = TypeHandle(continuationTypeMethodTable);
+                result = (size_t)th.AsPtr();
+            }
+            else
+            {
+                result = 0;
+            }
         }
         break;
 

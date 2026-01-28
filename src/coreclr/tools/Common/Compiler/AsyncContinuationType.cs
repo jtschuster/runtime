@@ -13,7 +13,7 @@ namespace ILCompiler
 {
     /// <summary>
     /// An async continuation type. The code generator will request this to store local state
-    /// through an async suspension/resumption. We only identify these using a <see cref="GCPointerMap"/> (and owning method for R2R for LoaderAllocator purposes),
+    /// through an async suspension/resumption. We only identify these using a <see cref="GCPointerMap"/>,
     /// since that's all the code generator cares about - size of the type, and where the GC pointers are.
     /// </summary>
     public sealed partial class AsyncContinuationType : MetadataType
@@ -111,72 +111,6 @@ namespace ILCompiler
             flags |= TypeFlags.AttributeCacheComputed;
 
             return flags;
-        }
-    }
-
-    internal sealed class AsyncContinuationLayoutAlgorithm : FieldLayoutAlgorithm
-    {
-        public override bool ComputeContainsByRefs(DefType type)
-        {
-            ValidateType(type);
-            return false;
-        }
-
-        public override bool ComputeContainsGCPointers(DefType type)
-        {
-            AsyncContinuationType act = (AsyncContinuationType)type;
-            foreach (var bit in act.PointerMap)
-            {
-                if (bit)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        public override ComputedInstanceFieldLayout ComputeInstanceLayout(DefType type, InstanceLayoutKind layoutKind)
-        {
-            AsyncContinuationType act = (AsyncContinuationType)type;
-            if (layoutKind != InstanceLayoutKind.TypeOnly)
-                throw new InvalidOperationException();
-            return new ComputedInstanceFieldLayout()
-            {
-                IsAutoLayoutOrHasAutoLayoutFields = false,
-                IsInt128OrHasInt128Fields = false,
-                IsVectorTOrHasVectorTFields = false,
-                LayoutAbiStable = true,
-                FieldSize = new LayoutInt(act.Context.Target.PointerSize),
-                FieldAlignment = new LayoutInt(act.Context.Target.PointerSize),
-                ByteCountAlignment = new LayoutInt(act.Context.Target.PointerSize),
-                ByteCountUnaligned = new LayoutInt(act.BaseType.InstanceByteCount.AsInt + act.PointerMap.Size * act.Context.Target.PointerSize),
-                Offsets = null,
-            };
-        }
-
-        public override bool ComputeIsUnsafeValueType(DefType type)
-        {
-            ValidateType(type);
-            return false;
-        }
-
-        private static void ValidateType(DefType type)
-        {
-            if (type is not AsyncContinuationType)
-                throw new InvalidOperationException();
-        }
-
-        public override ComputedStaticFieldLayout ComputeStaticFieldLayout(DefType type, StaticLayoutKind layoutKind)
-        {
-            ValidateType(type);
-            return default;
-        }
-
-        public override ValueTypeShapeCharacteristics ComputeValueTypeShapeCharacteristics(DefType type)
-        {
-            ValidateType(type);
-            return default;
         }
     }
 }

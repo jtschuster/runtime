@@ -1476,12 +1476,11 @@ namespace ILCompiler.Reflection.ReadyToRun
                     else
                         builder.Append(" (VERIFY_IL_BODY)");
                     break;
+
                 case ReadyToRunFixupKind.ContinuationLayout:
-                    var methodBuilder = new StringBuilder();
-                    ParseMethod(methodBuilder);
                     var typeBuilder = new StringBuilder();
                     ParseType(typeBuilder);
-                    builder.Append($"{typeBuilder.ToString()} for '{methodBuilder.ToString()}'");
+                    builder.Append($"{typeBuilder.ToString()}");
                     ReadyToRunTypeLayoutFlags layoutFlags2 = (ReadyToRunTypeLayoutFlags)ReadUInt();
                     builder.Append($" Flags {layoutFlags2}");
                     int actualSize2 = (int)ReadUInt();
@@ -1514,6 +1513,7 @@ namespace ILCompiler.Reflection.ReadyToRun
                     }
                     builder.Append(" (ContinuationLayout)");
                     break;
+
                 default:
                     throw new BadImageFormatException();
             }
@@ -2001,6 +2001,14 @@ namespace ILCompiler.Reflection.ReadyToRun
 
                 case ReadyToRunHelper.AllocContinuation:
                     builder.Append("ALLOC_CONTINUATION");
+                    break;
+
+                case ReadyToRunHelper.AllocContinuationMethod:
+                    builder.Append("ALLOC_CONTINUATION_METHOD");
+                    break;
+
+                case ReadyToRunHelper.AllocContinuationClass:
+                    builder.Append("ALLOC_CONTINUATION_CLASS");
                     break;
 
                 //
