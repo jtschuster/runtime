@@ -3430,9 +3430,6 @@ namespace Internal.JitInterface
                     gcMapBuilder.MarkGCPointer(i * PointerSize);
             }
 
-#if READYTORUN
-            return ObjectToHandle(_compilation.TypeSystemContext.GetContinuationType(gcMapBuilder.ToGCMap(), MethodBeingCompiled));
-#else
             return ObjectToHandle(_compilation.TypeSystemContext.GetContinuationType(gcMapBuilder.ToGCMap()));
         }
 

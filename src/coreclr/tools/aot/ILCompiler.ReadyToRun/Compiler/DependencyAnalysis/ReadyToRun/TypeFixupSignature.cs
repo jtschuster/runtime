@@ -75,15 +75,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             MetadataType defType = (MetadataType)type;
 
             int pointerSize = type.Context.Target.PointerSize;
-            int size;
-            if (defType is AsyncContinuationType)
-            {
-                size = defType.InstanceByteCount.AsInt;
-            }
-            else
-            {
-                size = defType.InstanceFieldSize.AsInt;
-            }
+            int size = defType.InstanceFieldSize.AsInt;
             int alignment = Internal.JitInterface.CorInfoImpl.GetClassAlignmentRequirementStatic(defType);
             ReadyToRunTypeLayoutFlags flags = ReadyToRunTypeLayoutFlags.READYTORUN_LAYOUT_Alignment | ReadyToRunTypeLayoutFlags.READYTORUN_LAYOUT_GCLayout;
             if (alignment == pointerSize)
@@ -126,22 +118,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             if (defType.ContainsGCPointers)
             {
                 // Encode the GC pointer map
-                GCPointerMap gcMap;
-                if (defType is AsyncContinuationType)
-                {
-                    gcMap = ((AsyncContinuationType)defType).PointerMap;
-
-                }
-                else
-                {
-                    gcMap = GCPointerMap.FromInstanceLayout(defType);
-                }
-
-                }
-                else
-                {
-                    gcMap = GCPointerMap.FromInstanceLayout(defType);
-                }
+                GCPointerMap gcMap = GCPointerMap.FromInstanceLayout(defType);
 
                 byte[] encodedGCRefMap = new byte[((size + 7) / pointerSize + 7) / 8];
                 int bitIndex = 0;
