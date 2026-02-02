@@ -27,6 +27,7 @@ using ILCompiler;
 using ILCompiler.DependencyAnalysis;
 
 #if READYTORUN
+using ILCompiler.ReadyToRun.TypeSystem;
 using System.Reflection.Metadata.Ecma335;
 using ILCompiler.DependencyAnalysis.ReadyToRun;
 #endif
@@ -1822,14 +1823,14 @@ namespace Internal.JitInterface
 
 #if READYTORUN
             TypeDesc owningType = methodIL.OwningMethod.GetTypicalMethodDefinition().OwningType;
-            bool recordToken;
+            bool recordToken = owningType is EcmaType;
             if (!_compilation.CompilationModuleGroup.VersionsWithMethodBody(methodIL.OwningMethod.GetTypicalMethodDefinition()))
             {
-                recordToken = (methodIL.GetMethodILScopeDefinition() is IMethodTokensAreUseableInCompilation) && owningType is EcmaType;
+                recordToken &= (methodIL.GetMethodILScopeDefinition() is IMethodTokensAreUseableInCompilation);
             }
             else
             {
-                recordToken = (_compilation.CompilationModuleGroup.VersionsWithType(owningType) || _compilation.CompilationModuleGroup.CrossModuleInlineableType(owningType)) && owningType is EcmaType;
+                recordToken &= _compilation.CompilationModuleGroup.VersionsWithType(owningType) || _compilation.CompilationModuleGroup.CrossModuleInlineableType(owningType);
             }
 #endif
 
@@ -3432,9 +3433,6 @@ namespace Internal.JitInterface
         private CORINFO_CLASS_STRUCT_* getContinuationType(nuint dataSize, ref bool objRefs, nuint objRefsSize)
         {
             Debug.Assert(objRefsSize == (dataSize + (nuint)(PointerSize - 1)) / (nuint)PointerSize);
-#if READYTORUN
-            throw new NotImplementedException("getContinuationType");
-#else
             GCPointerMapBuilder gcMapBuilder = new GCPointerMapBuilder((int)dataSize, PointerSize);
             ReadOnlySpan<bool> bools = MemoryMarshal.CreateReadOnlySpan(ref objRefs, (int)objRefsSize);
             for (int i = 0; i < bools.Length; i++)
@@ -3444,7 +3442,6 @@ namespace Internal.JitInterface
             }
 
             return ObjectToHandle(_compilation.TypeSystemContext.GetContinuationType(gcMapBuilder.ToGCMap()));
-#endif
         }
 
         private mdToken getMethodDefFromMethod(CORINFO_METHOD_STRUCT_* hMethod)
@@ -3792,7 +3789,11 @@ namespace Internal.JitInterface
 #pragma warning restore CA1822 // Mark members as static
         {
 #if READYTORUN
-            throw new NotImplementedException("Crossgen2 does not support runtime-async yet");
+            var resumptionStub = new AsyncResumptionStub(MethodBeingCompiled, MethodBeingCompiled.OwningType);
+            var tokenSource = MethodBeingCompiled.GetPrimaryMethodDesc().GetTypicalMethodDefinition();
+            entryPoint = (void*)ObjectToHandle(_compilation.NodeFactory.MethodEntrypoint(new MethodWithToken(resumptionStub, _compilation.NodeFactory.Resolver.GetModuleTokenForMethod(tokenSource, false, true), MethodBeingCompiled.OwningType, false, MethodBeingCompiled), false, true, false));
+            return ObjectToHandle(resumptionStub);
+
 #else
             _asyncResumptionStub ??= new AsyncResumptionStub(MethodBeingCompiled, _compilation.TypeSystemContext.GeneratedAssembly.GetGlobalModuleType());
 
@@ -4157,6 +4158,13 @@ namespace Internal.JitInterface
                     if (targetObject is RequiresRuntimeJitIfUsedSymbol requiresRuntimeSymbol)
                     {
                         throw new RequiresRuntimeJitException(requiresRuntimeSymbol.Message);
+                    }
+                    if (targetObject is PrecodeMethodImport import && import.Method is AsyncResumptionStub)
+                    {
+                        // This reloc is filling in a resume table entry.
+                        // We'll just point directly at the resume method.
+                        relocTarget = import.MethodCodeNode;
+                        break;
                     }
 #endif
 

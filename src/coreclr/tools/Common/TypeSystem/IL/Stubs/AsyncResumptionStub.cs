@@ -2,7 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
-
+using System.Collections.Immutable;
 using Internal.IL;
 using Internal.IL.Stubs;
 using Internal.TypeSystem;
@@ -25,16 +25,16 @@ namespace ILCompiler
             _owningType = owningType;
         }
 
-        public override ReadOnlySpan<byte> Name => _targetMethod.Name;
-        public override string DiagnosticName => _targetMethod.DiagnosticName;
+        public MethodDesc TargetMethod => _targetMethod;
+
+        public override ReadOnlySpan<byte> Name => "RESUME_"u8.Append(_targetMethod.Name).ToImmutableArray().AsSpan();
+        public override string DiagnosticName => "RESUME_" + _targetMethod.DiagnosticName;
 
         public override TypeDesc OwningType => _owningType;
 
         public override MethodSignature Signature => _signature ??= InitializeSignature();
 
         public override TypeSystemContext Context => _targetMethod.Context;
-
-        public MethodDesc TargetMethod => _targetMethod;
 
         private MethodSignature InitializeSignature()
         {
@@ -109,6 +109,7 @@ namespace ILCompiler
             }
             ilStream.EmitLdLoc(newContinuationLocal);
             ilStream.Emit(ILOpcode.ret);
+            ilEmitter.SetHasGeneratedTokens();
 
             return ilEmitter.Link(this);
         }

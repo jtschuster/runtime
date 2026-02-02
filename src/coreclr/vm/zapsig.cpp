@@ -923,6 +923,11 @@ MethodDesc *ZapSig::DecodeMethod(ModuleBase *pInfoModule,
     BOOL isUnboxingStub = (methodFlags & ENCODE_METHOD_SIG_UnboxingStub);
     bool isAsyncVariant = (methodFlags & ENCODE_METHOD_SIG_AsyncVariant) != 0;
 
+    if (methodFlags & ENCODE_METHOD_SIG_ResumptionStub)
+    {
+        COMPlusThrow(kNotSupportedException, W("Found it!!"));
+    }
+
     pMethod = MethodDesc::FindOrCreateAssociatedMethodDesc(pMethod, thOwner.GetMethodTable(),
                                                             isUnboxingStub,
                                                             inst,

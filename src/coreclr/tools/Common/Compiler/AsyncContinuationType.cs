@@ -7,12 +7,13 @@ using System.Diagnostics;
 using System.Text;
 
 using Internal.TypeSystem;
+using Internal.TypeSystem.Ecma;
 
 namespace ILCompiler
 {
     /// <summary>
     /// An async continuation type. The code generator will request this to store local state
-    /// through an async suspension/resumption. We only identify these using a <see cref="GCPointerMap"/>
+    /// through an async suspension/resumption. We only identify these using a <see cref="GCPointerMap"/>,
     /// since that's all the code generator cares about - size of the type, and where the GC pointers are.
     /// </summary>
     public sealed partial class AsyncContinuationType : MetadataType
@@ -39,19 +40,13 @@ namespace ILCompiler
         public override bool IsAbstract => false;
         public override MetadataType ContainingType => null;
         public override PInvokeStringFormat PInvokeStringFormat => default;
-        public override string DiagnosticName => $"ContinuationType_{PointerMap}";
         public override string DiagnosticNamespace => "";
         protected override int ClassCode => 0x528741a;
         public override TypeSystemContext Context => _continuationBaseType.Context;
+        public override string DiagnosticName => $"ContinuationType_{PointerMap}";
 
         public AsyncContinuationType(MetadataType continuationBaseType, GCPointerMap pointerMap)
             => (_continuationBaseType, PointerMap) = (continuationBaseType, pointerMap);
-
-        public override bool HasCustomAttribute(string attributeNamespace, string attributeName) => false;
-        public override IEnumerable<MetadataType> GetNestedTypes() => [];
-        public override MetadataType GetNestedType(ReadOnlySpan<byte> name) => null;
-        protected override MethodImplRecord[] ComputeVirtualMethodImplsForType() => [];
-        public override MethodImplRecord[] FindMethodsImplWithMatchingDeclName(ReadOnlySpan<byte> name) => [];
 
         protected override int CompareToImpl(TypeDesc other, TypeSystemComparer comparer)
         {
@@ -61,6 +56,11 @@ namespace ILCompiler
         }
 
         public override int GetHashCode() => PointerMap.GetHashCode();
+        public override bool HasCustomAttribute(string attributeNamespace, string attributeName) => false;
+        public override IEnumerable<MetadataType> GetNestedTypes() => [];
+        public override MetadataType GetNestedType(ReadOnlySpan<byte> name) => null;
+        protected override MethodImplRecord[] ComputeVirtualMethodImplsForType() => [];
+        public override MethodImplRecord[] FindMethodsImplWithMatchingDeclName(ReadOnlySpan<byte> name) => [];
 
         protected override TypeFlags ComputeTypeFlags(TypeFlags mask)
         {

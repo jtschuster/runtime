@@ -1010,8 +1010,6 @@ static bool SigMatchesMethodDesc(MethodDesc* pMD, SigPointer &sig, ModuleBase * 
 {
     STANDARD_VM_CONTRACT;
 
-    _ASSERTE(!pMD->IsAsyncVariantMethod());
-
     ModuleBase *pOrigModule = pModule;
     ZapSig::Context    zapSigContext(pModule, (void *)pModule, ZapSig::NormalTokens);
     ZapSig::Context *  pZapSigContext = &zapSigContext;
@@ -1098,6 +1096,18 @@ static bool SigMatchesMethodDesc(MethodDesc* pMD, SigPointer &sig, ModuleBase * 
 
             IfFailThrow(sig.SkipExactlyOne());
         }
+    }
+    bool sigIsAsync = (methodFlags & ENCODE_METHOD_SIG_AsyncVariant) != 0;
+    if (sigIsAsync != pMD->IsAsyncVariantMethod())
+    {
+        return false;
+    }
+
+    bool sigIsResume = (methodFlags & ENCODE_METHOD_SIG_ResumptionStub) != 0;
+    bool methodIsResume = pMD->IsDynamicMethod() && ((DynamicMethodDesc*)pMD)->IsILStub() && ((DynamicMethodDesc*)pMD)->IsAsyncResumptionStub();
+    if (sigIsResume != methodIsResume)
+    {
+        return false;
     }
 
     return true;
@@ -1196,14 +1206,14 @@ PCODE ReadyToRunInfo::GetEntryPoint(MethodDesc * pMD, PrepareCodeConfig* pConfig
     if (ReadyToRunCodeDisabled())
         goto done;
 
-    // TODO: (async) R2R support for async variants (https://github.com/dotnet/runtime/issues/121559)
-    if (pMD->IsAsyncVariantMethod())
-        goto done;
-
     ETW::MethodLog::GetR2RGetEntryPointStart(pMD);
 
     uint offset;
-    if (pMD->HasClassOrMethodInstantiation())
+    // Async variants and resumption stubs are stored in the instance methods table
+    if (pMD->HasClassOrMethodInstantiation()
+        || pMD->IsAsyncVariantMethod()
+        || (pMD->IsDynamicMethod() && ((DynamicMethodDesc*)pMD)->IsILStub()
+            && ((DynamicMethodDesc*)pMD)->IsAsyncResumptionStub()))
     {
         if (m_instMethodEntryPoints.IsNull())
             goto done;
