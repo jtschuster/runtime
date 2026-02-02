@@ -361,6 +361,8 @@ namespace Internal.JitInterface
                 sb.Append("; UNBOXING"u8);
             if (Method.IsAsyncVariant())
                 sb.Append("; ASYNC"u8);
+            if (Method is AsyncResumptionStub)
+                sb.Append("; RESUME"u8);
         }
 
         public override string ToString()
@@ -567,13 +569,6 @@ namespace Internal.JitInterface
 
         public static bool ShouldCodeNotBeCompiledIntoFinalImage(InstructionSetSupport instructionSetSupport, MethodDesc method)
         {
-            //if (method is AsyncResumptionStub)
-            //    return true;
-            // Implementation limitations around tokens mean we cannot implement non-canonical async variants of (Value)Task<T>-returning methods
-            //if (method.IsAsyncVariant() && !method.Signature.ReturnType.IsVoid && !method.Signature.ReturnType.IsCanonicalDefinitionType(CanonicalFormKind.Any))
-            //    return true;
-
-            //MethodDesc methodDef = method.GetTypicalMethodDefinition();
             EcmaMethod ecmaMethod = (EcmaMethod)(method.GetPrimaryMethodDesc().GetTypicalMethodDefinition());
             var metadataReader = ecmaMethod.MetadataReader;
             var stringComparer = metadataReader.StringComparer;
@@ -2598,6 +2593,10 @@ namespace Internal.JitInterface
                     MethodDesc canonMethod = targetMethod.GetCanonMethodTarget(CanonicalFormKind.Specific);
                     if (canonMethod.RequiresInstMethodDescArg())
                     {
+                        //if (canonMethod.IsAsyncCall())
+                        //{
+                        //    throw new RequiresRuntimeJitException("");
+                        //}
                         pResult->instParamLookup = CreateConstLookupToSymbol(_compilation.SymbolNodeFactory.CreateReadyToRunHelper(
                             ReadyToRunHelperId.MethodDictionary,
                             ComputeMethodWithToken(targetMethod, ref pResolvedToken, constrainedType: constrainedType, unboxing: false)));

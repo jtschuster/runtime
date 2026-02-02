@@ -4145,6 +4145,13 @@ namespace Internal.JitInterface
                     {
                         throw new RequiresRuntimeJitException(requiresRuntimeSymbol.Message);
                     }
+                    if (targetObject is PrecodeMethodImport import && import.Method is AsyncResumptionStub)
+                    {
+                        // This reloc is filling in a resume table entry.
+                        // We'll just point directly at the resume method.
+                        relocTarget = import.MethodCodeNode;
+                        break;
+                    }
 #endif
 
                     relocTarget = (ISymbolNode)targetObject;

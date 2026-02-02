@@ -1097,6 +1097,18 @@ static bool SigMatchesMethodDesc(MethodDesc* pMD, SigPointer &sig, ModuleBase * 
             IfFailThrow(sig.SkipExactlyOne());
         }
     }
+    bool sigIsAsync = (methodFlags & ENCODE_METHOD_SIG_AsyncVariant) != 0;
+    if (sigIsAsync != pMD->IsAsyncVariantMethod())
+    {
+        return false;
+    }
+
+    bool sigIsResume = (methodFlags & ENCODE_METHOD_SIG_ResumptionStub) != 0;
+    bool methodIsResume = pMD->IsDynamicMethod() && ((DynamicMethodDesc*)pMD)->IsILStub() && ((DynamicMethodDesc*)pMD)->IsAsyncResumptionStub();
+    if (sigIsResume != methodIsResume)
+    {
+        return false;
+    }
 
     return true;
 }
@@ -1197,7 +1209,11 @@ PCODE ReadyToRunInfo::GetEntryPoint(MethodDesc * pMD, PrepareCodeConfig* pConfig
     ETW::MethodLog::GetR2RGetEntryPointStart(pMD);
 
     uint offset;
-    if (pMD->HasClassOrMethodInstantiation() || pMD->IsAsyncVariantMethod())
+    // Async variants and resumption stubs are stored in the instance methods table
+    if (pMD->HasClassOrMethodInstantiation()
+        || pMD->IsAsyncVariantMethod()
+        || (pMD->IsDynamicMethod() && ((DynamicMethodDesc*)pMD)->IsILStub()
+            && ((DynamicMethodDesc*)pMD)->IsAsyncResumptionStub()))
     {
         if (m_instMethodEntryPoints.IsNull())
             goto done;
