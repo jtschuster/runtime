@@ -10729,32 +10729,31 @@ void CodeGen::genFnEpilog(BasicBlock* block)
 
             CORINFO_CONST_LOOKUP addrInfo;
             m_compiler->info.compCompHnd->getFunctionEntryPoint(methHnd, &addrInfo);
+
+            // For R2R, the standard delay-load thunk finds the indirection cell via the
+            // return address. Since jmp doesn't push a return address, we need a jumpable
+            // thunk that gets the cell from rax instead. updateEntryPointForTailCall
+            // upgrades a standard import to a jumpable one (on x64 only).
+            m_compiler->info.compCompHnd->updateEntryPointForTailCall(&addrInfo);
+
             if (addrInfo.accessType != IAT_VALUE && addrInfo.accessType != IAT_PVALUE)
             {
                 NO_WAY("Unsupported JMP indirection");
             }
 
-            // If we have IAT_PVALUE we might need to jump via register indirect, as sometimes the
-            // indirection cell can't be reached by the jump.
             EmitCallParams params;
             params.methHnd = methHnd;
 
             if (addrInfo.accessType == IAT_PVALUE)
             {
-                if (genCodeIndirAddrCanBeEncodedAsPCRelOffset((size_t)addrInfo.addr))
-                {
-                    // 32 bit displacement will work
-                    params.callType = EC_FUNC_TOKEN_INDIR;
-                    params.addr     = addrInfo.addr;
-                }
-                else
-                {
-                    // 32 bit displacement won't work
-                    params.callType = EC_INDIR_ARD;
-                    params.ireg     = REG_RAX;
-                    instGen_Set_Reg_To_Imm(EA_HANDLE_CNS_RELOC, REG_RAX, (ssize_t)addrInfo.addr);
-                    regSet.verifyRegUsed(REG_RAX);
-                }
+                // Always load rax with the cell address so the jumpable delay-load
+                // thunk can find it. We cannot use PC-relative jmp [rip+disp] here
+                // because that doesn't set rax, and the thunk needs rax to resolve
+                // the indirection cell (there is no return address to decode it from).
+                params.callType = EC_INDIR_ARD;
+                params.ireg     = REG_RAX;
+                instGen_Set_Reg_To_Imm(EA_HANDLE_CNS_RELOC, REG_RAX, (ssize_t)addrInfo.addr);
+                regSet.verifyRegUsed(REG_RAX);
             }
             else
             {
