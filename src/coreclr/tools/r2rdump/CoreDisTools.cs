@@ -970,7 +970,8 @@ namespace R2RDump
                 }
                 else
                 {
-                    Debug.Fail("Is this a new pattern that we need to handle?");
+                    // The BL may target a runtime function not associated with the current method,
+                    // e.g. an async resumption stub calling into the main async method body.
                     ReplaceRelativeOffset(ref instruction, blTargetRva, rtf);
                 }
             }

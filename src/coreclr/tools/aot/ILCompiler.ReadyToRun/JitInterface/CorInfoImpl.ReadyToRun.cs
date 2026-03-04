@@ -1267,30 +1267,6 @@ namespace Internal.JitInterface
                     id = ReadyToRunHelper.AllocContinuationClass;
                     break;
 
-                case CorInfoHelpFunc.CORINFO_HELP_ASYNC_CAPTURE_CONTEXTS:
-                    id = ReadyToRunHelper.AsyncCaptureContexts;
-                    break;
-
-                case CorInfoHelpFunc.CORINFO_HELP_ASYNC_RESTORE_CONTEXTS:
-                    id = ReadyToRunHelper.AsyncRestoreContexts;
-                    break;
-
-                case CorInfoHelpFunc.CORINFO_HELP_ASYNC_CAPTURE_EXECUTION_CONTEXT:
-                    id = ReadyToRunHelper.AsyncCaptureExecutionContext;
-                    break;
-
-                case CorInfoHelpFunc.CORINFO_HELP_ASYNC_RESTORE_EXECUTION_CONTEXT:
-                    id = ReadyToRunHelper.AsyncRestoreExecutionContext;
-                    break;
-
-                case CorInfoHelpFunc.CORINFO_HELP_ASYNC_RESTORE_CONTEXTS_ON_SUSPENSION:
-                    id = ReadyToRunHelper.AsyncRestoreContextsOnSuspension;
-                    break;
-
-                case CorInfoHelpFunc.CORINFO_HELP_ASYNC_CAPTURE_CONTINUATION_CONTEXT:
-                    id = ReadyToRunHelper.AsyncCaptureContinuationContext;
-                    break;
-
                 case CorInfoHelpFunc.CORINFO_HELP_INITCLASS:
                     id = ReadyToRunHelper.InitClass;
                     break;
@@ -1326,7 +1302,10 @@ namespace Internal.JitInterface
         private void getFunctionEntryPoint(CORINFO_METHOD_STRUCT_* ftn, ref CORINFO_CONST_LOOKUP pResult, CORINFO_ACCESS_FLAGS accessFlags)
         {
             var method = HandleToObject(ftn);
-            throw new RequiresRuntimeJitException($"getFunctionEntryPoint called for {method} from {MethodBeingCompiled}");
+            var token = _compilation.NodeFactory.Resolver.GetModuleTokenForMethod(method, true, true);
+            var methodWithToken = new MethodWithToken(method, token, null, false, MethodBeingCompiled);
+            var entryPoint = _compilation.NodeFactory.MethodEntrypoint(methodWithToken, false, false, isJumpableImportRequired: false);
+            pResult = CreateConstLookupToSymbol(entryPoint);
         }
 
         private bool canTailCall(CORINFO_METHOD_STRUCT_* callerHnd, CORINFO_METHOD_STRUCT_* declaredCalleeHnd, CORINFO_METHOD_STRUCT_* exactCalleeHnd, bool fIsTailPrefix)
