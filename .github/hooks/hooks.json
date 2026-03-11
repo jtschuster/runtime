@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "./.github/hooks/push-guard.sh",
+        "powershell": "./.github/hooks/push-guard.ps1",
+        "comment": "Require user approval before git push"
+      }
+    ]
+  }
+}
