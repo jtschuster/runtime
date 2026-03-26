@@ -63,18 +63,6 @@ if "%1" == "" goto ArgsDone
 @REM All arguments following this tag will be passed directly to msbuild (as unprocessed arguments)
 if /i "%1" == "--"                       (set processedArgs=!processedArgs! %1&shift&goto ArgsDone)
 
-@REM Handle arguments with embedded values using ':' or '=' separators (e.g. -test:foo, -test=foo)
-set __argWithValue=%~1
-set __argWithValue=%__argWithValue:/=%
-set __argWithValue=%__argWithValue:-=%
-for /f "tokens=1,2 delims=:=" %%a in ("%__argWithValue%") do (
-    if /i "%%a" == "test" if not "%%b" == "" (set __BuildTestProject=!__BuildTestProject!%%b%%3B&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-    if /i "%%a" == "dir" if not "%%b" == "" (set __BuildTestDir=!__BuildTestDir!%%b%%3B&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-    if /i "%%a" == "tree" if not "%%b" == "" (set __BuildTestTree=!__BuildTestTree!%%b%%3B&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-    if /i "%%a" == "log" if not "%%b" == "" (set __BuildLogRootName=%%b&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-    if /i "%%a" == "priority" if not "%%b" == "" (set __Priority=%%b&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-)
-
 @REM The following arguments do not support '/', '-', or '--' prefixes
 if /i "%1" == "x64"                      (set __BuildArch=x64&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 if /i "%1" == "x86"                      (set __BuildArch=x86&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
@@ -99,47 +87,55 @@ set arg=%~1
 set arg=%arg:/=%
 set arg=%arg:-=%
 
-if /i "%arg%" == "?"     goto Usage
-if /i "%arg%" == "h"     goto Usage
-if /i "%arg%" == "help"  goto Usage
+@REM Split into name and optional embedded value (supports name:value and name=value)
+set __argName=%arg%
+set __argValue=
+for /f "tokens=1,2 delims=:=" %%a in ("%arg%") do (
+    set __argName=%%a
+    if not "%%b" == "" set __argValue=%%b
+)
+
+if /i "%__argName%" == "?"     goto Usage
+if /i "%__argName%" == "h"     goto Usage
+if /i "%__argName%" == "help"  goto Usage
 
 @REM Specify this argument to test the argument parsing logic of this script without executing the build
-if /i "%arg%" == "TestArgParsing"        (set __TestArgParsing=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "TestArgParsing"        (set __TestArgParsing=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 
 @REM The following arguments are switches that do not consume any subsequent arguments
-if /i "%arg%" == "Rebuild"               (set __RebuildTests=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-if /i "%arg%" == "SkipRestorePackages"   (set __SkipRestorePackages=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-if /i "%arg%" == "SkipManaged"           (set __SkipManaged=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-if /i "%arg%" == "SkipNative"            (set __SkipNative=1&set __CopyNativeProjectsAfterCombinedTestBuild=false&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-if /i "%arg%" == "SkipGenerateLayout"    (set __SkipGenerateLayout=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "Rebuild"               (set __RebuildTests=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "SkipRestorePackages"   (set __SkipRestorePackages=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "SkipManaged"           (set __SkipManaged=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "SkipNative"            (set __SkipNative=1&set __CopyNativeProjectsAfterCombinedTestBuild=false&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "SkipGenerateLayout"    (set __SkipGenerateLayout=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 
-if /i "%arg%" == "CopyNativeOnly"        (set __CopyNativeTestBinaries=1&set __SkipNative=1&set __CopyNativeProjectsAfterCombinedTestBuild=false&set __SkipGenerateLayout=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-if /i "%arg%" == "GenerateLayoutOnly"    (set __GenerateLayoutOnly=1&set __SkipManaged=1&set __SkipNative=1&set __CopyNativeProjectsAfterCombinedTestBuild=false&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-if /i "%arg%" == "MSBuild"               (set __Ninja=0&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-if /i "%arg%" == "crossgen2"             (set __TestBuildMode=crossgen2&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-if /i "%arg%" == "composite"             (set __CompositeBuildMode=1&set __TestBuildMode=crossgen2&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-if /i "%arg%" == "pdb"                   (set __CreatePdb=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-if /i "%arg%" == "NativeAOT"             (set __TestBuildMode=nativeaot&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-if /i "%arg%" == "Perfmap"               (set __CreatePerfmap=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-if /i "%arg%" == "AllTargets"            (set "__BuildNeedTargetArg=/p:CLRTestBuildAllTargets=allTargets"&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-if /i "%arg%" == "ExcludeMonoFailures"   (set __Mono=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-if /i "%arg%" == "Mono"                  (set __Mono=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-if /i "%arg%" == "CoreCLR"               (set __Mono=0&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "CopyNativeOnly"        (set __CopyNativeTestBinaries=1&set __SkipNative=1&set __CopyNativeProjectsAfterCombinedTestBuild=false&set __SkipGenerateLayout=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "GenerateLayoutOnly"    (set __GenerateLayoutOnly=1&set __SkipManaged=1&set __SkipNative=1&set __CopyNativeProjectsAfterCombinedTestBuild=false&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "MSBuild"               (set __Ninja=0&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "crossgen2"             (set __TestBuildMode=crossgen2&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "composite"             (set __CompositeBuildMode=1&set __TestBuildMode=crossgen2&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "pdb"                   (set __CreatePdb=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "NativeAOT"             (set __TestBuildMode=nativeaot&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "Perfmap"               (set __CreatePerfmap=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "AllTargets"            (set "__BuildNeedTargetArg=/p:CLRTestBuildAllTargets=allTargets"&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "ExcludeMonoFailures"   (set __Mono=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "Mono"                  (set __Mono=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "CoreCLR"               (set __Mono=0&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 
-@REM The following arguments also consume one subsequent argument
-if /i "%arg%" == "test"                  (set __BuildTestProject=!__BuildTestProject!%2%%3B&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
-if /i "%arg%" == "dir"                   (set __BuildTestDir=!__BuildTestDir!%2%%3B&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
-if /i "%arg%" == "tree"                  (set __BuildTestTree=!__BuildTestTree!%2%%3B&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
-if /i "%arg%" == "log"                   (set __BuildLogRootName=%2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
-if /i "%arg%" == "priority1"             (set __Priority=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
-if /i "%arg%" == "priority"              (set __Priority=%2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
-if /i "%arg%" == "fsanitize"             (set __CMakeArgs=%__CMakeArgs% "-DCLR_CMAKE_ENABLE_SANITIZERS=%2"&set __EnableNativeSanitizers=%2&set processedArgs=!processedArgs! %1=%2&shift&shift&goto Arg_Loop)
+@REM The following arguments consume a value via space, ':', or '=' (e.g. -test foo, -test:foo, -test=foo)
+if /i "%__argName%" == "test"       if defined __argValue (set __BuildTestProject=!__BuildTestProject!!__argValue!%%3B&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop) else (set __BuildTestProject=!__BuildTestProject!%2%%3B&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
+if /i "%__argName%" == "dir"        if defined __argValue (set __BuildTestDir=!__BuildTestDir!!__argValue!%%3B&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop) else (set __BuildTestDir=!__BuildTestDir!%2%%3B&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
+if /i "%__argName%" == "tree"       if defined __argValue (set __BuildTestTree=!__BuildTestTree!!__argValue!%%3B&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop) else (set __BuildTestTree=!__BuildTestTree!%2%%3B&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
+if /i "%__argName%" == "log"        if defined __argValue (set __BuildLogRootName=!__argValue!&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop) else (set __BuildLogRootName=%2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
+if /i "%__argName%" == "priority1"             (set __Priority=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%__argName%" == "priority"   if defined __argValue (set __Priority=!__argValue!&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop) else (set __Priority=%2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
+if /i "%__argName%" == "fsanitize"  if defined __argValue (set __CMakeArgs=%__CMakeArgs% "-DCLR_CMAKE_ENABLE_SANITIZERS=!__argValue!"&set __EnableNativeSanitizers=!__argValue!&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop) else (set __CMakeArgs=%__CMakeArgs% "-DCLR_CMAKE_ENABLE_SANITIZERS=%2"&set __EnableNativeSanitizers=%2&set processedArgs=!processedArgs! %1=%2&shift&shift&goto Arg_Loop)
 
 @REM The following arguments also consume two subsequent arguments
-if /i "%arg%" == "CMakeArgs"             (set __CMakeArgs="%2=%3" %__CMakeArgs%&set "processedArgs=!processedArgs! %1 %2 %3"&shift&shift&shift&goto Arg_Loop)
+if /i "%__argName%" == "CMakeArgs"             (set __CMakeArgs="%2=%3" %__CMakeArgs%&set "processedArgs=!processedArgs! %1 %2 %3"&shift&shift&shift&goto Arg_Loop)
 
 @REM Obsolete arguments that now produce errors
-if /i "%arg%" == "BuildAgainstPackages"  (echo error: Remove /BuildAgainstPackages switch&&exit /b 1)
+if /i "%__argName%" == "BuildAgainstPackages"  (echo error: Remove /BuildAgainstPackages switch&&exit /b 1)
 
 @REM If we encounter an unrecognized argument, then all remaining arguments are passed directly to MSBuild
 @REM This allows '/p:LibrariesConfiguration=Release' and other arguments to be passed through without having

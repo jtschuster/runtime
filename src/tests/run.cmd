@@ -54,57 +54,52 @@ if /i "%1" == "debug"                                   (set __BuildType=Debug&s
 if /i "%1" == "release"                                 (set __BuildType=Release&shift&goto Arg_Loop)
 if /i "%1" == "checked"                                 (set __BuildType=Checked&shift&goto Arg_Loop)
 
-@REM Strip /, -, -- prefixes for remaining arguments
+@REM Strip /, -, -- prefixes and split into name and optional embedded value
 set __runArg=%~1
 set __runArg=%__runArg:/=%
 set __runArg=%__runArg:-=%
-
-@REM Handle arguments with embedded values using ':' or '=' separators
+set __argName=%__runArg%
+set __argValue=
 for /f "tokens=1,2 delims=:=" %%a in ("%__runArg%") do (
-    if /i "%%a" == "testenv" if not "%%b" == "" (set __TestEnv=%%b&shift&goto Arg_Loop)
-    if /i "%%a" == "jitstress" if not "%%b" == "" (set DOTNET_JitStress=%%b&shift&goto Arg_Loop)
-    if /i "%%a" == "jitstressregs" if not "%%b" == "" (set DOTNET_JitStressRegs=%%b&shift&goto Arg_Loop)
-    if /i "%%a" == "logsdir" if not "%%b" == "" (set LogsDirArg=%%b&shift&goto Arg_Loop)
-    if /i "%%a" == "gcname" if not "%%b" == "" (set DOTNET_GCName=%%b&shift&goto Arg_Loop)
-    if /i "%%a" == "gcstresslevel" if not "%%b" == "" (set DOTNET_GCStress=%%b&set __TestTimeout=1800000&shift&goto Arg_Loop)
-    if /i "%%a" == "timeout" if not "%%b" == "" (set __TestTimeout=%%b&shift&goto Arg_Loop)
-    if /i "%%a" == "parallel" if not "%%b" == "" (set __ParallelType=%%b&shift&goto Arg_Loop)
-    if /i "%%a" == "corerootdir" if not "%%b" == "" (set CORE_ROOT=%%b&shift&goto Arg_Loop)
-    if /i "%%a" == "testrootdir" if not "%%b" == "" (set __TestRootDir=%%b&shift&goto Arg_Loop)
+    set __argName=%%a
+    if not "%%b" == "" set __argValue=%%b
 )
 
-if /i "%__runArg%" == "testenv"                             (set __TestEnv=%2&shift&shift&goto Arg_Loop)
-if /i "%__runArg%" == "sequential"                          (set __Sequential=1&shift&goto Arg_Loop)
-if /i "%__runArg%" == "parallel"                            (set __ParallelType=%2&shift&shift&goto Arg_Loop)
-if /i "%__runArg%" == "jitstress"                           (set DOTNET_JitStress=%2&shift&shift&goto Arg_Loop)
-if /i "%__runArg%" == "jitstressregs"                       (set DOTNET_JitStressRegs=%2&shift&shift&goto Arg_Loop)
-if /i "%__runArg%" == "jitminopts"                          (set DOTNET_JITMinOpts=1&shift&goto Arg_Loop)
-if /i "%__runArg%" == "jitforcerelocs"                      (set DOTNET_ForceRelocs=1&shift&goto Arg_Loop)
+@REM Boolean arguments (no value needed)
+if /i "%__argName%" == "testenv"                             if not defined __argValue (set __TestEnv=%2&shift&shift&goto Arg_Loop)
+if /i "%__argName%" == "sequential"                          (set __Sequential=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "jitminopts"                          (set DOTNET_JITMinOpts=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "jitforcerelocs"                      (set DOTNET_ForceRelocs=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "printlastresultsonly"                (set __PrintLastResultsOnly=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "runcrossgen2tests"                   (set RunCrossGen2=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "runlargeversionbubblecrossgen2tests" (set RunCrossGen2=1&set CrossgenLargeVersionBubble=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "synthesizepgo"                       (set CrossGen2SynthesizePgo=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "gcsimulator"                         (set __GCSimulatorTests=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "longgc"                              (set __LongGCTests=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "ilasmroundtrip"                      (set __IlasmRoundTrip=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "runincontext"                        (set RunInUnloadableContext=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "tieringtest"                         (set TieringTest=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "runnativeaottests"                   (set RunNativeAot=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "interpreter"                         (set RunInterpreter=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "node"                                (set RunWithNodeJS=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "enableeventlogging"                  (set DOTNET_EnableEventLog=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "useservergc"                         (set DOTNET_gcServer=1&shift&goto Arg_Loop)
+if /i "%__argName%" == "limiteddumpgeneration"               (shift&goto Arg_Loop)
+if /i "%__argName%" == "verbose"                             (shift&goto Arg_Loop)
 
-if /i "%__runArg%" == "printlastresultsonly"                (set __PrintLastResultsOnly=1&shift&goto Arg_Loop)
-if /i "%__runArg%" == "logsdir"                             (set LogsDirArg=%2&shift&shift&goto Arg_Loop)
-if /i "%__runArg%" == "runcrossgen2tests"                   (set RunCrossGen2=1&shift&goto Arg_Loop)
-if /i "%__runArg%" == "runlargeversionbubblecrossgen2tests" (set RunCrossGen2=1&set CrossgenLargeVersionBubble=1&shift&goto Arg_Loop)
-if /i "%__runArg%" == "synthesizepgo"                       (set CrossGen2SynthesizePgo=1&shift&goto Arg_Loop)
-if /i "%__runArg%" == "gcname"                              (set DOTNET_GCName=%2&shift&shift&goto Arg_Loop)
-if /i "%__runArg%" == "gcstresslevel"                       (set DOTNET_GCStress=%2&set __TestTimeout=1800000&shift&shift&goto Arg_Loop)
-if /i "%__runArg%" == "gcsimulator"                         (set __GCSimulatorTests=1&shift&goto Arg_Loop)
-if /i "%__runArg%" == "longgc"                              (set __LongGCTests=1&shift&goto Arg_Loop)
-if /i "%__runArg%" == "ilasmroundtrip"                      (set __IlasmRoundTrip=1&shift&goto Arg_Loop)
-if /i "%__runArg%" == "timeout"                             (set __TestTimeout=%2&shift&shift&goto Arg_Loop)
-if /i "%__runArg%" == "runincontext"                        (set RunInUnloadableContext=1&shift&goto Arg_Loop)
-if /i "%__runArg%" == "tieringtest"                         (set TieringTest=1&shift&goto Arg_Loop)
-if /i "%__runArg%" == "runnativeaottests"                   (set RunNativeAot=1&shift&goto Arg_Loop)
-if /i "%__runArg%" == "interpreter"                         (set RunInterpreter=1&shift&goto Arg_Loop)
-if /i "%__runArg%" == "node"                                (set RunWithNodeJS=1&shift&goto Arg_Loop)
-if /i "%__runArg%" == "corerootdir"                         (set CORE_ROOT=%2&shift&shift&goto Arg_Loop)
-if /i "%__runArg%" == "testrootdir"                         (set __TestRootDir=%2&shift&shift&goto Arg_Loop)
-if /i "%__runArg%" == "enableeventlogging"                  (set DOTNET_EnableEventLog=1&shift&goto Arg_Loop)
-if /i "%__runArg%" == "useservergc"                         (set DOTNET_gcServer=1&shift&goto Arg_Loop)
-if /i "%__runArg%" == "limiteddumpgeneration"               (shift&goto Arg_Loop)
-if /i "%__runArg%" == "verbose"                             (shift&goto Arg_Loop)
+@REM Value arguments - use embedded value (from : or =) if present, otherwise consume next arg
+if /i "%__argName%" == "testenv"        if defined __argValue (set __TestEnv=!__argValue!&shift&goto Arg_Loop)
+if /i "%__argName%" == "parallel"       if defined __argValue (set __ParallelType=!__argValue!&shift&goto Arg_Loop) else (set __ParallelType=%2&shift&shift&goto Arg_Loop)
+if /i "%__argName%" == "jitstress"      if defined __argValue (set DOTNET_JitStress=!__argValue!&shift&goto Arg_Loop) else (set DOTNET_JitStress=%2&shift&shift&goto Arg_Loop)
+if /i "%__argName%" == "jitstressregs"  if defined __argValue (set DOTNET_JitStressRegs=!__argValue!&shift&goto Arg_Loop) else (set DOTNET_JitStressRegs=%2&shift&shift&goto Arg_Loop)
+if /i "%__argName%" == "logsdir"        if defined __argValue (set LogsDirArg=!__argValue!&shift&goto Arg_Loop) else (set LogsDirArg=%2&shift&shift&goto Arg_Loop)
+if /i "%__argName%" == "gcname"         if defined __argValue (set DOTNET_GCName=!__argValue!&shift&goto Arg_Loop) else (set DOTNET_GCName=%2&shift&shift&goto Arg_Loop)
+if /i "%__argName%" == "gcstresslevel"  if defined __argValue (set DOTNET_GCStress=!__argValue!&set __TestTimeout=1800000&shift&goto Arg_Loop) else (set DOTNET_GCStress=%2&set __TestTimeout=1800000&shift&shift&goto Arg_Loop)
+if /i "%__argName%" == "timeout"        if defined __argValue (set __TestTimeout=!__argValue!&shift&goto Arg_Loop) else (set __TestTimeout=%2&shift&shift&goto Arg_Loop)
+if /i "%__argName%" == "corerootdir"    if defined __argValue (set CORE_ROOT=!__argValue!&shift&goto Arg_Loop) else (set CORE_ROOT=%2&shift&shift&goto Arg_Loop)
+if /i "%__argName%" == "testrootdir"    if defined __argValue (set __TestRootDir=!__argValue!&shift&goto Arg_Loop) else (set __TestRootDir=%2&shift&shift&goto Arg_Loop)
 
-if /i not "%__runArg%" == "msbuildargs" goto SkipMsbuildArgs
+if /i not "%__argName%" == "msbuildargs" goto SkipMsbuildArgs
 :: All the rest of the args will be collected and passed directly to msbuild.
 :CollectMsbuildArgs
 shift
