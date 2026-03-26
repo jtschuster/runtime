@@ -148,7 +148,7 @@ usage_list+=("")
 usage_list+=("-crossgen2 - Precompiles the framework managed assemblies in coreroot using the Crossgen2 compiler.")
 usage_list+=("-composite - Use Crossgen2 composite mode (all framework gets compiled into a single native R2R library).")
 usage_list+=("-nativeaot - Builds the tests for Native AOT compilation.")
-usage_list+=("-priority1 - Include priority=1 tests in the build.")
+usage_list+=("-priority <N> - Include priority N tests in the build (e.g. -priority 1). -priority1 is also accepted.")
 usage_list+=("-perfmap - Emit perfmap symbol files when compiling the framework assemblies using Crossgen2.")
 usage_list+=("-allTargets - Build managed tests for all target platforms (including test projects in which CLRTestTargetUnsupported resolves to true).")
 usage_list+=("")
@@ -157,10 +157,10 @@ usage_list+=("-mono, -excludemonofailures - Build the tests for the Mono runtime
 usage_list+=("-mono_aot - Use Mono AOT mode.")
 usage_list+=("-mono_fullaot - Use Mono Full AOT mode.")
 usage_list+=("")
-usage_list+=("-test:xxx - Only build the specified test project ^(relative or absolute project path under src\tests^).");
-usage_list+=("-dir:xxx - Build all test projects in the given directory ^(relative or absolute directory under src\tests^).");
-usage_list+=("-tree:xxx - Build all test projects in the given subtree ^(relative or absolute directory under src\tests^).");
-usage_list+=("-log:xxx - Base file name to use for log files (used in lab pipelines that build tests in multiple steps to retain logs for each step).")
+usage_list+=("-test <xxx> - Only build the specified test project ^(relative or absolute project path under src\tests^). Also accepts -test:xxx and -test=xxx.");
+usage_list+=("-dir <xxx> - Build all test projects in the given directory ^(relative or absolute directory under src\tests^). Also accepts -dir:xxx and -dir=xxx.");
+usage_list+=("-tree <xxx> - Build all test projects in the given subtree ^(relative or absolute directory under src\tests^). Also accepts -tree:xxx and -tree=xxx.");
+usage_list+=("-log <xxx> - Base file name to use for log files (used in lab pipelines that build tests in multiple steps to retain logs for each step). Also accepts -log:xxx and -log=xxx.")
 usage_list+=("")
 usage_list+=("Any unrecognized arguments will be passed directly to MSBuild.")
 
@@ -214,6 +214,11 @@ handle_arguments_local() {
             __Priority=1
             ;;
 
+        priority|-priority)
+            __Priority="$2"
+            __ShiftArgs=1
+            ;;
+
         alltargets|-alltargets)
             __UnprocessedBuildArgs+=("/p:CLRTestBuildAllTargets=allTargets")
             ;;
@@ -224,34 +229,49 @@ handle_arguments_local() {
 
         test*|-test*)
             local arg="$1"
-            local parts=(${arg//:/ })
-            if [[ ${#parts[@]} -eq 1 ]]; then
+            local value=""
+            if [[ "$arg" == *":"* ]]; then
+                value="${arg#*:}"
+            elif [[ "$arg" == *"="* ]]; then
+                value="${arg#*=}"
+            fi
+            if [[ -n "$value" ]]; then
+                __BuildTestProject="$__BuildTestProject${value}%3B"
+            else
                 __BuildTestProject="$__BuildTestProject$2%3B"
                 __ShiftArgs=1
-            else
-                __BuildTestProject="$__BuildTestProject${parts[1]}%3B"
             fi
             ;;
 
         dir*|-dir*)
             local arg="$1"
-            local parts=(${arg//:/ })
-            if [[ ${#parts[@]} -eq 1 ]]; then
+            local value=""
+            if [[ "$arg" == *":"* ]]; then
+                value="${arg#*:}"
+            elif [[ "$arg" == *"="* ]]; then
+                value="${arg#*=}"
+            fi
+            if [[ -n "$value" ]]; then
+                __BuildTestDir="$__BuildTestDir${value}%3B"
+            else
                 __BuildTestDir="$__BuildTestDir$2%3B"
                 __ShiftArgs=1
-            else
-                __BuildTestDir="$__BuildTestDir${parts[1]}%3B"
             fi
             ;;
 
         tree*|-tree*)
             local arg="$1"
-            local parts=(${arg//:/ })
-            if [[ ${#parts[@]} -eq 1 ]]; then
+            local value=""
+            if [[ "$arg" == *":"* ]]; then
+                value="${arg#*:}"
+            elif [[ "$arg" == *"="* ]]; then
+                value="${arg#*=}"
+            fi
+            if [[ -n "$value" ]]; then
+                __BuildTestTree="$__BuildTestTree${value}%3B"
+            else
                 __BuildTestTree="$__BuildTestTree$2%3B"
                 __ShiftArgs=1
-            else
-                __BuildTestTree="$__BuildTestTree${parts[1]}%3B"
             fi
             ;;
 
@@ -295,12 +315,17 @@ handle_arguments_local() {
 
         log*|-log*)
             local arg="$1"
-            local parts=(${arg//:/ })
-            if [[ ${#parts[@]} -eq 1 ]]; then
+            local value=""
+            if [[ "$arg" == *":"* ]]; then
+                value="${arg#*:}"
+            elif [[ "$arg" == *"="* ]]; then
+                value="${arg#*=}"
+            fi
+            if [[ -n "$value" ]]; then
+                __BuildLogRootName="$value"
+            else
                 __BuildLogRootName="$2"
                 __ShiftArgs=1
-            else
-                __BuildLogRootName="${parts[1]}"
             fi
             ;;
 
