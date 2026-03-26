@@ -63,6 +63,18 @@ if "%1" == "" goto ArgsDone
 @REM All arguments following this tag will be passed directly to msbuild (as unprocessed arguments)
 if /i "%1" == "--"                       (set processedArgs=!processedArgs! %1&shift&goto ArgsDone)
 
+@REM Handle arguments with embedded values using ':' or '=' separators (e.g. -test:foo, -test=foo)
+set __argWithValue=%~1
+set __argWithValue=%__argWithValue:/=%
+set __argWithValue=%__argWithValue:-=%
+for /f "tokens=1,2 delims=:=" %%a in ("%__argWithValue%") do (
+    if /i "%%a" == "test" if not "%%b" == "" (set __BuildTestProject=!__BuildTestProject!%%b%%3B&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+    if /i "%%a" == "dir" if not "%%b" == "" (set __BuildTestDir=!__BuildTestDir!%%b%%3B&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+    if /i "%%a" == "tree" if not "%%b" == "" (set __BuildTestTree=!__BuildTestTree!%%b%%3B&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+    if /i "%%a" == "log" if not "%%b" == "" (set __BuildLogRootName=%%b&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+    if /i "%%a" == "priority" if not "%%b" == "" (set __Priority=%%b&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+)
+
 @REM The following arguments do not support '/', '-', or '--' prefixes
 if /i "%1" == "x64"                      (set __BuildArch=x64&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 if /i "%1" == "x86"                      (set __BuildArch=x86&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
@@ -119,6 +131,7 @@ if /i "%arg%" == "test"                  (set __BuildTestProject=!__BuildTestPro
 if /i "%arg%" == "dir"                   (set __BuildTestDir=!__BuildTestDir!%2%%3B&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
 if /i "%arg%" == "tree"                  (set __BuildTestTree=!__BuildTestTree!%2%%3B&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
 if /i "%arg%" == "log"                   (set __BuildLogRootName=%2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
+if /i "%arg%" == "priority1"             (set __Priority=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 if /i "%arg%" == "priority"              (set __Priority=%2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
 if /i "%arg%" == "fsanitize"             (set __CMakeArgs=%__CMakeArgs% "-DCLR_CMAKE_ENABLE_SANITIZERS=%2"&set __EnableNativeSanitizers=%2&set processedArgs=!processedArgs! %1=%2&shift&shift&goto Arg_Loop)
 
@@ -376,14 +389,14 @@ echo -AllTargets: Build managed tests for all target platforms (including test p
 echo -ExcludeMonoFailures, Mono: Build the tests for the Mono runtime honoring mono-specific issues.
 echo.
 echo     Set to "" to disable default exclusion file.
-echo -Priority ^<N^> : specify a set of tests that will be built and run, with priority N.
+echo -Priority ^<N^> : specify a set of tests that will be built and run, with priority N. -Priority1 is also accepted.
 echo     0: Build only priority 0 cases as essential testcases (default).
 echo     1: Build all tests with priority 0 and 1.
 echo     666: Build all tests with priority 0, 1 ... 666.
-echo -Test ^<xxx^>: Only build the specified test project ^(relative or absolute project path under src\tests^).
-echo -Dir ^<xxx^>: Build all test projects in the given directory ^(relative or absolute directory under src\tests^).
-echo -Tree ^<xxx^>: Build all test projects in the given subtree ^(relative or absolute directory under src\tests^).
-echo -Log ^<xxx^>: Base file name to use for log files (used in lab pipelines that build tests in multiple steps to retain logs for each step).
+echo -Test ^<xxx^>: Only build the specified test project. Also accepts -Test:xxx and -Test=xxx.
+echo -Dir ^<xxx^>: Build all test projects in the given directory. Also accepts -Dir:xxx and -Dir=xxx.
+echo -Tree ^<xxx^>: Build all test projects in the given subtree. Also accepts -Tree:xxx and -Tree=xxx.
+echo -Log ^<xxx^>: Base file name to use for log files. Also accepts -Log:xxx and -Log=xxx.
 echo.
 echo -CMakeArgs ^<arg^>=^<value^>: Specify argument values to pass directly to CMake.
 echo     Can be used multiple times to provide multiple CMake arguments.
