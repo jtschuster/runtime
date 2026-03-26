@@ -6,44 +6,48 @@ function print_usage {
     echo ''
     echo 'Typical command line:'
     echo ''
-    echo 'src/tests/run.sh <options>'
+    echo 'src/tests/run.sh <options> [<CORE_ROOT>]'
+    echo ''
+    echo 'All arguments are case-insensitive. The - and -- prefixes are optional.'
+    echo 'Values can use space, =, or : as separators (e.g. --jitstress=2, -jitstress:2, jitstress 2).'
     echo ''
     echo 'Optional arguments:'
-    echo '  -h|--help                        : Show usage information.'
+    echo '  -h, --help                       : Show usage information.'
     echo '  -v, --verbose                    : Show output from each test.'
     echo '  <arch>                           : One of x64, x86, arm, arm64, loongarch64, riscv64, wasm. Defaults to current architecture.'
     echo '  <build configuration>            : One of debug, checked, release. Defaults to debug.'
     echo '  android                          : Set build OS to Android.'
     echo '  wasi                             : Set build OS to WASI.'
-    echo '  --test-env=<path>                : Script to set environment variables for tests'
-    echo '  --testRootDir=<path>             : Root directory of the test build (e.g. runtime/artifacts/tests/windows.x64.Debug).'
-    echo '  --coreRootDir=<path>             : Directory to the CORE_ROOT location.'
-    echo '  --enableEventLogging             : Enable event logging through LTTNG.'
-    echo '  --sequential                     : Run tests sequentially (default is to run in parallel).'
-    echo '  --runcrossgen2tests              : Runs the ReadyToRun tests compiled with Crossgen2'
-    echo '  --synthesizepgo                  : Runs the tests allowing crossgen2 to synthesize PGO data'
-    echo '  --jitstress=<n>                  : Runs the tests with DOTNET_JitStress=n'
-    echo '  --jitstressregs=<n>              : Runs the tests with DOTNET_JitStressRegs=n'
-    echo '  --jitminopts                     : Runs the tests with DOTNET_JITMinOpts=1'
-    echo '  --jitforcerelocs                 : Runs the tests with DOTNET_ForceRelocs=1'
-    echo '  --gcname=<n>                     : Runs the tests with DOTNET_GCName=n'
-    echo '  --gcstresslevel=<n>              : Runs the tests with DOTNET_GCStress=n'
+    echo '  testenv <path>                   : Script to set environment variables for tests. Also accepts --test-env=<path>.'
+    echo '  testRootDir <path>               : Root directory of the test build. Also accepts --testRootDir=<path>.'
+    echo '  coreRootDir <path>               : Directory to the CORE_ROOT location. Also accepts --coreRootDir=<path> or as last positional argument.'
+    echo '  enableEventLogging               : Enable event logging through LTTNG.'
+    echo '  sequential                       : Run tests sequentially (default is to run in parallel).'
+    echo '  runcrossgen2tests                : Runs the ReadyToRun tests compiled with Crossgen2.'
+    echo '  synthesizepgo                    : Runs the tests allowing crossgen2 to synthesize PGO data.'
+    echo '  jitstress <n>                    : Runs the tests with DOTNET_JitStress=n. Also accepts --jitstress=<n>.'
+    echo '  jitstressregs <n>                : Runs the tests with DOTNET_JitStressRegs=n. Also accepts --jitstressregs=<n>.'
+    echo '  jitminopts                       : Runs the tests with DOTNET_JITMinOpts=1.'
+    echo '  jitforcerelocs                   : Runs the tests with DOTNET_ForceRelocs=1.'
+    echo '  gcname <n>                       : Runs the tests with DOTNET_GCName=n. Also accepts --gcname=<n>.'
+    echo '  gcstresslevel <n>                : Runs the tests with DOTNET_GCStress=n (also sets timeout to 1800000).'
     echo '    0: None                                1: GC on all allocs and '"'easy'"' places'
     echo '    2: GC on transitions to preemptive GC  4: GC on every allowable JITed instr'
     echo '    8: GC on every allowable NGEN instr   16: GC only on a unique stack trace'
-    echo '  --gcsimulator                    : Runs the GCSimulator tests'
-    echo '  --long-gc                        : Runs the long GC tests'
-    echo '  --useServerGC                    : Enable server GC for this test run'
-    echo '  --ilasmroundtrip                 : Runs ilasm round trip on the tests'
-    echo '  --link=<ILlink>                  : Runs the tests after linking via ILlink'
-    echo '  --printLastResultsOnly           : Print the results of the last run'
-    echo '  --logsDir=<path>                 : Specify the logs directory (default: artifacts/log)'
-    echo '  --runincontext                   : Run each tests in an unloadable AssemblyLoadContext'
-    echo '  --tieringtest                    : Run each test to encourage tier1 rejitting'
-    echo '  --runnativeaottests              : Run NativeAOT compiled tests'
-    echo '  --interpreter                    : Runs the tests with the interpreter enabled'
-    echo '  --node                           : Runs the tests with NodeJS (wasm only)'
-    echo '  --limitedDumpGeneration          : '
+    echo '  gcsimulator                      : Runs the GCSimulator tests.'
+    echo '  longgc                           : Runs the long GC tests. Also accepts --long-gc.'
+    echo '  useServerGC                      : Enable server GC for this test run.'
+    echo '  ilasmroundtrip                   : Runs ilasm round trip on the tests.'
+    echo '  printLastResultsOnly             : Print the results of the last run.'
+    echo '  logsDir <path>                   : Specify the logs directory (default: artifacts/log). Also accepts --logsDir=<path>.'
+    echo '  runincontext                     : Run each test in an unloadable AssemblyLoadContext.'
+    echo '  tieringtest                      : Run each test to encourage tier1 rejitting.'
+    echo '  runnativeaottests                : Run NativeAOT compiled tests.'
+    echo '  interpreter                      : Runs the tests with the interpreter enabled.'
+    echo '  node                             : Runs the tests with NodeJS (wasm only).'
+    echo '  timeout <n>                      : Sets the per-test timeout in milliseconds.'
+    echo '  limitedDumpGeneration            : Limit core dump generation.'
+    echo '  <CORE_ROOT>                      : Path to the runtime to test (last positional argument).'
 }
 
 # Exit code constants
@@ -74,14 +78,37 @@ runincontext=0
 tieringtest=0
 nativeaottest=0
 
-for i in "$@"
-do
-    case $i in
-        -h|--help)
+# Track the last unrecognized positional argument as potential CORE_ROOT
+__lastPositional=""
+__TestTimeout=""
+
+while [ $# -gt 0 ]; do
+    # Preserve original argument for value extraction
+    __origArg="$1"
+
+    # Extract embedded value if present (from = or : syntax)
+    __embeddedValue=""
+    if [[ "$__origArg" == *"="* ]]; then
+        __embeddedValue="${__origArg#*=}"
+        __origArg="${__origArg%%=*}"
+    elif [[ "$__origArg" == *":"* ]]; then
+        __embeddedValue="${__origArg#*:}"
+        __origArg="${__origArg%%:*}"
+    fi
+
+    # Strip leading -, --, / prefixes and lowercase for matching
+    __normArg="$__origArg"
+    __normArg="${__normArg#--}"
+    __normArg="${__normArg#-}"
+    __normArg="${__normArg#/}"
+    __normArg="$(echo "$__normArg" | tr '[:upper:]' '[:lower:]')"
+
+    case "$__normArg" in
+        h|help|\?)
             print_usage
             exit $EXIT_CODE_SUCCESS
             ;;
-        -v|--verbose)
+        v|verbose)
             verbose=1
             ;;
         x64)
@@ -111,97 +138,159 @@ do
         wasi)
             buildOS="wasi"
             ;;
-        debug|Debug)
+        debug)
             buildConfiguration="Debug"
             ;;
-        checked|Checked)
+        checked)
             buildConfiguration="Checked"
             ;;
-        release|Release)
+        release)
             buildConfiguration="Release"
             ;;
-        --printLastResultsOnly)
+        printlastresultsonly)
             printLastResultsOnly=1
             ;;
-        --jitstress=*)
-            export DOTNET_JitStress=${i#*=}
+        jitstress)
+            if [[ -n "$__embeddedValue" ]]; then
+                export DOTNET_JitStress="$__embeddedValue"
+            else
+                shift
+                export DOTNET_JitStress="$1"
+            fi
             ;;
-        --jitstressregs=*)
-            export DOTNET_JitStressRegs=${i#*=}
+        jitstressregs)
+            if [[ -n "$__embeddedValue" ]]; then
+                export DOTNET_JitStressRegs="$__embeddedValue"
+            else
+                shift
+                export DOTNET_JitStressRegs="$1"
+            fi
             ;;
-        --jitminopts)
+        jitminopts)
             export DOTNET_JITMinOpts=1
             ;;
-        --jitforcerelocs)
+        jitforcerelocs)
             export DOTNET_ForceRelocs=1
             ;;
-        --ilasmroundtrip)
+        ilasmroundtrip)
             ((ilasmroundtrip = 1))
             ;;
-        --testRootDir=*)
-            testRootDir=${i#*=}
+        testrootdir)
+            if [[ -n "$__embeddedValue" ]]; then
+                testRootDir="$__embeddedValue"
+            else
+                shift
+                testRootDir="$1"
+            fi
             ;;
-        --coreRootDir=*)
-            coreRootDir=${i#*=}
+        corerootdir)
+            if [[ -n "$__embeddedValue" ]]; then
+                coreRootDir="$__embeddedValue"
+            else
+                shift
+                coreRootDir="$1"
+            fi
             ;;
-        --logsDir=*)
-            logsDir=${i#*=}
+        logsdir)
+            if [[ -n "$__embeddedValue" ]]; then
+                logsDir="$__embeddedValue"
+            else
+                shift
+                logsDir="$1"
+            fi
             ;;
-        --enableEventLogging)
+        enableeventlogging)
             export DOTNET_EnableEventLog=1
             ;;
-        --runcrossgen2tests)
+        runcrossgen2tests)
             export RunCrossGen2=1
             ;;
-        --synthesizepgo)
+        synthesizepgo)
             export CrossGen2SynthesizePgo=1
             ;;
-        --sequential)
+        sequential)
             runSequential=1
             ;;
-        --useServerGC)
+        useservergc)
             export DOTNET_gcServer=1
             ;;
-        --long-gc)
+        longgc|long-gc)
             ((longgc = 1))
             ;;
-        --gcsimulator)
+        gcsimulator)
             ((gcsimulator = 1))
             ;;
-        --test-env=*)
-            testEnv=${i#*=}
+        test-env|testenv)
+            if [[ -n "$__embeddedValue" ]]; then
+                testEnv="$__embeddedValue"
+            else
+                shift
+                testEnv="$1"
+            fi
             ;;
-        --gcstresslevel=*)
-            export DOTNET_GCStress=${i#*=}
+        gcstresslevel)
+            if [[ -n "$__embeddedValue" ]]; then
+                export DOTNET_GCStress="$__embeddedValue"
+            else
+                shift
+                export DOTNET_GCStress="$1"
+            fi
+            __TestTimeout=1800000
             ;;
-        --gcname=*)
-            export DOTNET_GCName=${i#*=}
+        gcname)
+            if [[ -n "$__embeddedValue" ]]; then
+                export DOTNET_GCName="$__embeddedValue"
+            else
+                shift
+                export DOTNET_GCName="$1"
+            fi
             ;;
-        --limitedDumpGeneration)
+        limiteddumpgeneration)
             limitedCoreDumps=ON
             ;;
-        --runincontext)
+        runincontext)
             runincontext=1
             ;;
-        --tieringtest)
+        tieringtest)
             tieringtest=1
             ;;
-        --runnativeaottests)
+        runnativeaottests)
             nativeaottest=1
             ;;
-        --interpreter)
+        interpreter)
             export RunInterpreter=1
             ;;
-        --node)
+        node)
             export RunWithNodeJS=1
             ;;
+        timeout)
+            if [[ -n "$__embeddedValue" ]]; then
+                __TestTimeout="$__embeddedValue"
+            else
+                shift
+                __TestTimeout="$1"
+            fi
+            ;;
+        parallel)
+            if [[ -n "$__embeddedValue" ]]; then
+                :
+            else
+                shift
+                :
+            fi
+            ;;
         *)
-            echo "Unknown switch: $i"
-            print_usage
-            exit $EXIT_CODE_SUCCESS
+            # Treat unrecognized arguments as potential CORE_ROOT (last positional arg)
+            __lastPositional="$1"
             ;;
     esac
+    shift
 done
+
+# If CORE_ROOT was specified as a positional argument and not via --coreRootDir
+if [[ -z "$coreRootDir" && -n "$__lastPositional" ]]; then
+    coreRootDir="$__lastPositional"
+fi
 
 # Set default for RunWithNodeJS when using wasm architecture
 if [ "$buildArch" = "wasm" ] && [ -z "$RunWithNodeJS" ]; then
@@ -314,6 +403,10 @@ fi
 if [[ -n "$RunWithNodeJS" ]]; then
     echo "Running tests with NodeJS"
     runtestPyArguments+=("--node")
+fi
+
+if [[ -n "$__TestTimeout" ]]; then
+    runtestPyArguments+=("--test_timeout" "$__TestTimeout")
 fi
 
 # Default to python3 if it is installed
