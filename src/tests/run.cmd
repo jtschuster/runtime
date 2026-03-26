@@ -54,33 +54,57 @@ if /i "%1" == "debug"                                   (set __BuildType=Debug&s
 if /i "%1" == "release"                                 (set __BuildType=Release&shift&goto Arg_Loop)
 if /i "%1" == "checked"                                 (set __BuildType=Checked&shift&goto Arg_Loop)
 
-if /i "%1" == "TestEnv"                                 (set __TestEnv=%2&shift&shift&goto Arg_Loop)
-if /i "%1" == "sequential"                              (set __Sequential=1&shift&goto Arg_Loop)
-if /i "%1" == "parallel"                                (set __ParallelType=%2&shift&shift&goto Arg_Loop)
-if /i "%1" == "jitstress"                               (set DOTNET_JitStress=%2&shift&shift&goto Arg_Loop)
-if /i "%1" == "jitstressregs"                           (set DOTNET_JitStressRegs=%2&shift&shift&goto Arg_Loop)
-if /i "%1" == "jitminopts"                              (set DOTNET_JITMinOpts=1&shift&goto Arg_Loop)
-if /i "%1" == "jitforcerelocs"                          (set DOTNET_ForceRelocs=1&shift&goto Arg_Loop)
+@REM Strip /, -, -- prefixes for remaining arguments
+set __runArg=%~1
+set __runArg=%__runArg:/=%
+set __runArg=%__runArg:-=%
 
-if /i "%1" == "printlastresultsonly"                    (set __PrintLastResultsOnly=1&shift&goto Arg_Loop)
-if /i "%1" == "logsdir"                                 (set LogsDirArg=%2&shift&shift&goto Arg_Loop)
-if /i "%1" == "runcrossgen2tests"                       (set RunCrossGen2=1&shift&goto Arg_Loop)
-REM This test feature is currently intentionally undocumented
-if /i "%1" == "runlargeversionbubblecrossgen2tests"     (set RunCrossGen2=1&set CrossgenLargeVersionBubble=1&shift&goto Arg_Loop)
-if /i "%1" == "synthesizepgo"                           (set CrossGen2SynthesizePgo=1&shift&goto Arg_Loop)
-if /i "%1" == "gcname"                                  (set DOTNET_GCName=%2&shift&shift&goto Arg_Loop)
-if /i "%1" == "gcstresslevel"                           (set DOTNET_GCStress=%2&set __TestTimeout=1800000&shift&shift&goto Arg_Loop)
-if /i "%1" == "gcsimulator"                             (set __GCSimulatorTests=1&shift&goto Arg_Loop)
-if /i "%1" == "longgc"                                  (set __LongGCTests=1&shift&goto Arg_Loop)
-if /i "%1" == "ilasmroundtrip"                          (set __IlasmRoundTrip=1&shift&goto Arg_Loop)
-if /i "%1" == "timeout"                                 (set __TestTimeout=%2&shift&shift&goto Arg_Loop)
-if /i "%1" == "runincontext"                            (set RunInUnloadableContext=1&shift&goto Arg_Loop)
-if /i "%1" == "tieringtest"                             (set TieringTest=1&shift&goto Arg_Loop)
-if /i "%1" == "runnativeaottests"                       (set RunNativeAot=1&shift&goto Arg_Loop)
-if /i "%1" == "interpreter"                             (set RunInterpreter=1&shift&goto Arg_Loop)
-if /i "%1" == "node"                                    (set RunWithNodeJS=1&shift&goto Arg_Loop)
+@REM Handle arguments with embedded values using ':' or '=' separators
+for /f "tokens=1,2 delims=:=" %%a in ("%__runArg%") do (
+    if /i "%%a" == "testenv" if not "%%b" == "" (set __TestEnv=%%b&shift&goto Arg_Loop)
+    if /i "%%a" == "jitstress" if not "%%b" == "" (set DOTNET_JitStress=%%b&shift&goto Arg_Loop)
+    if /i "%%a" == "jitstressregs" if not "%%b" == "" (set DOTNET_JitStressRegs=%%b&shift&goto Arg_Loop)
+    if /i "%%a" == "logsdir" if not "%%b" == "" (set LogsDirArg=%%b&shift&goto Arg_Loop)
+    if /i "%%a" == "gcname" if not "%%b" == "" (set DOTNET_GCName=%%b&shift&goto Arg_Loop)
+    if /i "%%a" == "gcstresslevel" if not "%%b" == "" (set DOTNET_GCStress=%%b&set __TestTimeout=1800000&shift&goto Arg_Loop)
+    if /i "%%a" == "timeout" if not "%%b" == "" (set __TestTimeout=%%b&shift&goto Arg_Loop)
+    if /i "%%a" == "parallel" if not "%%b" == "" (set __ParallelType=%%b&shift&goto Arg_Loop)
+    if /i "%%a" == "corerootdir" if not "%%b" == "" (set CORE_ROOT=%%b&shift&goto Arg_Loop)
+    if /i "%%a" == "testrootdir" if not "%%b" == "" (set __TestRootDir=%%b&shift&goto Arg_Loop)
+)
 
-if /i not "%1" == "msbuildargs" goto SkipMsbuildArgs
+if /i "%__runArg%" == "testenv"                             (set __TestEnv=%2&shift&shift&goto Arg_Loop)
+if /i "%__runArg%" == "sequential"                          (set __Sequential=1&shift&goto Arg_Loop)
+if /i "%__runArg%" == "parallel"                            (set __ParallelType=%2&shift&shift&goto Arg_Loop)
+if /i "%__runArg%" == "jitstress"                           (set DOTNET_JitStress=%2&shift&shift&goto Arg_Loop)
+if /i "%__runArg%" == "jitstressregs"                       (set DOTNET_JitStressRegs=%2&shift&shift&goto Arg_Loop)
+if /i "%__runArg%" == "jitminopts"                          (set DOTNET_JITMinOpts=1&shift&goto Arg_Loop)
+if /i "%__runArg%" == "jitforcerelocs"                      (set DOTNET_ForceRelocs=1&shift&goto Arg_Loop)
+
+if /i "%__runArg%" == "printlastresultsonly"                (set __PrintLastResultsOnly=1&shift&goto Arg_Loop)
+if /i "%__runArg%" == "logsdir"                             (set LogsDirArg=%2&shift&shift&goto Arg_Loop)
+if /i "%__runArg%" == "runcrossgen2tests"                   (set RunCrossGen2=1&shift&goto Arg_Loop)
+if /i "%__runArg%" == "runlargeversionbubblecrossgen2tests" (set RunCrossGen2=1&set CrossgenLargeVersionBubble=1&shift&goto Arg_Loop)
+if /i "%__runArg%" == "synthesizepgo"                       (set CrossGen2SynthesizePgo=1&shift&goto Arg_Loop)
+if /i "%__runArg%" == "gcname"                              (set DOTNET_GCName=%2&shift&shift&goto Arg_Loop)
+if /i "%__runArg%" == "gcstresslevel"                       (set DOTNET_GCStress=%2&set __TestTimeout=1800000&shift&shift&goto Arg_Loop)
+if /i "%__runArg%" == "gcsimulator"                         (set __GCSimulatorTests=1&shift&goto Arg_Loop)
+if /i "%__runArg%" == "longgc"                              (set __LongGCTests=1&shift&goto Arg_Loop)
+if /i "%__runArg%" == "ilasmroundtrip"                      (set __IlasmRoundTrip=1&shift&goto Arg_Loop)
+if /i "%__runArg%" == "timeout"                             (set __TestTimeout=%2&shift&shift&goto Arg_Loop)
+if /i "%__runArg%" == "runincontext"                        (set RunInUnloadableContext=1&shift&goto Arg_Loop)
+if /i "%__runArg%" == "tieringtest"                         (set TieringTest=1&shift&goto Arg_Loop)
+if /i "%__runArg%" == "runnativeaottests"                   (set RunNativeAot=1&shift&goto Arg_Loop)
+if /i "%__runArg%" == "interpreter"                         (set RunInterpreter=1&shift&goto Arg_Loop)
+if /i "%__runArg%" == "node"                                (set RunWithNodeJS=1&shift&goto Arg_Loop)
+if /i "%__runArg%" == "corerootdir"                         (set CORE_ROOT=%2&shift&shift&goto Arg_Loop)
+if /i "%__runArg%" == "testrootdir"                         (set __TestRootDir=%2&shift&shift&goto Arg_Loop)
+if /i "%__runArg%" == "enableeventlogging"                  (set DOTNET_EnableEventLog=1&shift&goto Arg_Loop)
+if /i "%__runArg%" == "useservergc"                         (set DOTNET_gcServer=1&shift&goto Arg_Loop)
+if /i "%__runArg%" == "limiteddumpgeneration"               (shift&goto Arg_Loop)
+if /i "%__runArg%" == "verbose"                             (shift&goto Arg_Loop)
+
+if /i not "%__runArg%" == "msbuildargs" goto SkipMsbuildArgs
 :: All the rest of the args will be collected and passed directly to msbuild.
 :CollectMsbuildArgs
 shift
@@ -226,6 +250,9 @@ echo.
 echo Usage:
 echo   %0 [options] [^<CORE_ROOT^>]
 echo.
+echo All arguments are case-insensitive. The - and -- prefixes are optional.
+echo Values can use space, =, or : as separators (e.g. jitstress 2, --jitstress=2, -jitstress:2).
+echo.
 echo where:
 echo.
 echo./? -? /h -h /help -help   - View this message.
@@ -234,33 +261,31 @@ echo ^<build_type^>              - Specifies build type: Debug, Release, or Chec
 echo TestEnv ^<test_env_script^> - Run a custom script before every test to set custom test environment settings.
 echo sequential                - Run tests sequentially ^(no parallelism^).
 echo parallel ^<type^>           - Run tests with given level of parallelism: none, collections, assemblies, all. Default: collections.
-echo RunCrossgen2Tests         - Runs ReadytoRun tests compiled with Crossgen2
-echo synthesizepgo             - Enabled synthesizing PGO data in CrossGen2
-echo jitstress ^<n^>             - Runs the tests with DOTNET_JitStress=n
-echo jitstressregs ^<n^>         - Runs the tests with DOTNET_JitStressRegs=n
-echo jitminopts                - Runs the tests with DOTNET_JITMinOpts=1
-echo jitforcerelocs            - Runs the tests with DOTNET_ForceRelocs=1
-echo gcname ^<name^>             - Runs the tests with DOTNET_GCName=name
+echo RunCrossgen2Tests         - Runs ReadytoRun tests compiled with Crossgen2.
+echo synthesizepgo             - Enabled synthesizing PGO data in CrossGen2.
+echo jitstress ^<n^>             - Runs the tests with DOTNET_JitStress=n.
+echo jitstressregs ^<n^>         - Runs the tests with DOTNET_JitStressRegs=n.
+echo jitminopts                - Runs the tests with DOTNET_JITMinOpts=1.
+echo jitforcerelocs            - Runs the tests with DOTNET_ForceRelocs=1.
+echo gcname ^<name^>             - Runs the tests with DOTNET_GCName=name.
 echo gcstresslevel ^<n^>         - Runs the tests with DOTNET_GCStress=n. n=0 means no GC Stress. Otherwise, n is a bitmask of the following:
 echo                               1: GC on all allocations and 'easy' places
 echo                               2: GC on transitions to preemptive GC
 echo                               4: GC on every allowable JITed instruction
 echo                               8: GC on every allowable NGEN instruction
 echo                              16: GC only on a unique stack trace
-echo                              (Note that the value must be expresed in hex.)
-echo gcsimulator               - Run the GC Simulator tests
-echo longgc                    - Run the long-running GC tests
-echo ilasmroundtrip            - Runs ilasm round trip on the tests
-echo link ^<ILlink^>             - Runs the tests after linking via the IL linker ^<ILlink^>.
+echo gcsimulator               - Run the GC Simulator tests.
+echo longgc                    - Run the long-running GC tests. Also accepts long-gc.
+echo ilasmroundtrip            - Runs ilasm round trip on the tests.
 echo printlastresultsonly      - Print the last test results without running tests.
-echo runincontext              - Run each tests in an unloadable AssemblyLoadContext
-echo timeout ^<n^>               - Sets the per-test timeout in milliseconds ^(default is 10 minutes = 10 * 60 * 1000 = 600000^).
+echo runincontext              - Run each test in an unloadable AssemblyLoadContext.
+echo timeout ^<n^>               - Sets the per-test timeout in milliseconds ^(default is 10 minutes = 600000^).
 echo                             Note: some options override this ^(gcstresslevel, longgc, gcsimulator^).
-echo logsdir ^<dir^>             - Specify the logs directory ^(default: artifacts/log^)
+echo logsdir ^<dir^>             - Specify the logs directory ^(default: artifacts/log^).
+echo coreRootDir ^<path^>        - Path to the CORE_ROOT location. Also accepted as last positional argument.
 echo msbuildargs ^<args...^>     - Pass all subsequent args directly to msbuild invocations.
-echo ^<CORE_ROOT^>               - Path to the runtime to test ^(if specified^).
 echo interpreter               - Runs the tests with the interpreter enabled.
-echo node                       - Runs the tests with NodeJS ^(wasm only^).
+echo node                      - Runs the tests with NodeJS ^(wasm only^).
 echo.
 echo Note that arguments are not case-sensitive.
 echo.
@@ -268,4 +293,6 @@ echo Examples:
 echo   %0 x86 checked
 echo   %0 x64 release
 echo   %0 wasm debug
+echo   %0 x64 checked --jitstress=2
+echo   %0 x64 checked --coreRootDir=C:\runtime\artifacts\tests\coreclr\windows.x64.Checked\Tests\Core_Root
 exit /b 1
