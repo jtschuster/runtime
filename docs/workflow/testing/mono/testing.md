@@ -20,8 +20,8 @@ cd src/tests
 ./build.sh mono <release|debug> /p:LibrariesConfiguration=<release|debug>
 ```
 
-To build an individual test, test directory, or a whole subdirectory tree, use the `-test:`, `-dir:` or `-tree:` options (without the src/tests prefix).
-For example: `./build.sh mono release -test:JIT/opt/InstructionCombining/DivToMul.csproj`. To generate executable `.sh` files for tests that are not set to be run individualy it is necessary to `export BuildAsStandalone=true` before building the tests.
+To build an individual test, test directory, or a whole subdirectory tree, use the `test`, `dir` or `tree` arguments (without the src/tests prefix).
+For example: `./build.sh mono release test JIT/opt/InstructionCombining/DivToMul.csproj`. To generate executable `.sh` files for tests that are not set to be run individualy it is necessary to `export BuildAsStandalone=true` before building the tests.
 
 
 Run individual test:
@@ -47,7 +47,7 @@ bash ./artifacts/tests/coreclr/osx.x64.Release/JIT/opt/InstructionCombining/DivT
 ### WebAssembly:
 Build the runtime tests for WebAssembly
 ```
-$(REPO_ROOT)/src/tests/build.sh -mono os browser wasm <Release/Debug>
+$(REPO_ROOT)/src/tests/build.sh mono os browser wasm <Release/Debug>
 ```
 
 The last few lines of the build log should contain something like this:
@@ -62,7 +62,7 @@ The last few lines of the build log should contain something like this:
 ### Android:
 Build the runtime tests for Android x64/ARM64
 ```
-$(REPO_ROOT)/src/tests/build.sh -mono os android <x64/arm64> <Release/Debug>
+$(REPO_ROOT)/src/tests/build.sh mono os android <x64/arm64> <Release/Debug>
 ```
 
 Run one test wrapper from repo root

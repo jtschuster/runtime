@@ -184,24 +184,24 @@ area-specific guidance (e.g., EventPipe test patterns).
 
 **Build a single test project** (path is relative to the repo root):
 ```bash
-# Use -priority1 ("-Priority 1" on Windows) for tests with <CLRTestPriority>1</CLRTestPriority>,
+# Use -priority 1 for tests with <CLRTestPriority>1</CLRTestPriority>,
 # otherwise the build silently reports "0 test projects" and builds nothing.
-src/tests/build.sh -Test tracing/eventpipe/eventsvalidation/GCEvents.csproj x64 Release -priority1
+src/tests/build.sh test tracing/eventpipe/eventsvalidation/GCEvents.csproj x64 Release -priority 1
 ```
 
 Other useful flags (run `src/tests/build.sh -h` for the full list):
 
 | Flag | Description |
 |------|-------------|
-| `-Test <path>` | Build one project |
-| `-Dir <path>` | Build all projects in a directory |
-| `-Tree <path>` | Build a subtree recursively |
-| `-priority1` (`-Priority 1` on Windows) | Include priority 1 tests |
-| `-GenerateLayoutOnly` | Generate Core_Root layout only |
+| `-test <path>` | Build one project |
+| `-dir <path>` | Build all projects in a directory |
+| `-tree <path>` | Build a subtree recursively |
+| `-priority 1` | Include priority 1 tests |
+| `generatelayoutonly` | Generate Core_Root layout only |
 
 **Generate Core_Root layout** (required before running individual tests):
 ```bash
-src/tests/build.sh -GenerateLayoutOnly x64 Release
+src/tests/build.sh generatelayoutonly x64 Release
 ```
 
 **Run a single test:**

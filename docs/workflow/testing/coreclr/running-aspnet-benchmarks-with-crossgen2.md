@@ -31,7 +31,7 @@ For Linux:
 
 ```bash
 ./build.sh -subset clr+libs -c release
-./src/tests/build.sh -release -generatelayoutonly
+./src/tests/build.sh Release generatelayoutonly
 ```
 
 ### Generate a Configuration File for ASP&#46;NET Benchmarking Runs

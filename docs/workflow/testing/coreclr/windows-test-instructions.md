@@ -42,10 +42,12 @@ This will use `crossgen.exe` to precompile test executables before they are exec
 ## Building Specific Priority Tests
 
 ```
-src\tests\build.cmd -priority=1
+src\tests\build.cmd -priority 1
 ```
 
 The above is an example of requesting that priority '1' and below be built. The default priority value is '0'. If '1' is specified, all tests with `CLRTestPriority` `0` **and** `1` will be built and run.
+
+**NOTE**: Both `build.cmd` and `build.sh` now accept the same argument format. Arguments can use `-`, `--`, or `/` prefixes (or no prefix at all), and values can be separated by a space, `=`, or `:`.
 
 ## Generating Core_Root
 
@@ -62,7 +64,7 @@ The output will be at `<repo_root>\artifacts\tests\coreclr\windows.<arch>.<confi
 To build crossgen'd priority '0' and '1' tests:
 
 ```
-src\tests\build.cmd crossgen -priority=1
+src\tests\build.cmd crossgen -priority 1
 ```
 
 To generate Core_Root for x86 release without building tests:
@@ -81,7 +83,7 @@ src\tests\build.cmd -?
 
 The `src\tests\build.cmd` script supports three options that let you limit the set of tests to build;
 when none of these is specified, the entire test tree (under `src\tests`) gets built but that can be
-lengthy (especially in `-priority=1` mode) and unnecessary when working on a particular test.
+lengthy (especially in `-priority 1` mode) and unnecessary when working on a particular test.
 
 1) `test <test-project>` - build a particular test project specified by its project file path,
 either absolute or relative to `src\tests`. The option can be specified multiple times on the command
@@ -105,7 +107,7 @@ can represent several project subtree root folder paths separated by semicolons.
 **Example**: `src\tests\build.cmd tree baseservices/exceptions;JIT/Methodical`
 
 **Please note** that priority filtering is orthogonal to specifying test subsets; even when you request
-building a particular test and the test is Pri1, you need to specify `-priority=1` in the command line,
+building a particular test and the test is Pri1, you need to specify `-priority 1` in the command line,
 otherwise the test build will get skipped. While somewhat unintuitive, 'fixing' this ad hoc would likely
 create more harm than good and we're hoping to ultimately get rid of the test priorities in the long term
 anyway.

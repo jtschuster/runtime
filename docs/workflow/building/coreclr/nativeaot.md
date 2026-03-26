@@ -91,9 +91,9 @@ The workflow looks like this:
 
 ## Running tests
 
-If you haven't built the tests yet, run `src\tests\build.cmd nativeaot [Debug|Release] tree nativeaot` on Windows, or `src/tests/build.sh -nativeaot [Debug|Release] -tree:nativeaot` on Linux. This will build the smoke tests only - they usually suffice to ensure the runtime and compiler is in a workable shape. To build all Pri-0 tests, drop the `tree nativeaot` parameter. The `Debug`/`Release` parameter should match the build configuration you used to build the runtime.
+If you haven't built the tests yet, run `src/tests/build.sh nativeaot [Debug|Release] tree nativeaot` (use `src\tests\build.cmd` and backslash paths on Windows). This will build the smoke tests only - they usually suffice to ensure the runtime and compiler is in a workable shape. To build all Pri-0 tests, drop the `tree nativeaot` parameter. The `Debug`/`Release` parameter should match the build configuration you used to build the runtime.
 
-To run all the tests that got built, run `src\tests\run.cmd runnativeaottests [Debug|Release]` on Windows, or `src/tests/run.sh --runnativeaottests [Debug|Release]` on Linux. The `Debug`/`Release` flag should match the flag that was passed to `build.cmd` in the previous step.
+To run all the tests that got built, run `src/tests/run.sh runnativeaottests [Debug|Release]` (use `src\tests\run.cmd` on Windows). The `Debug`/`Release` flag should match the flag that was passed to the build script in the previous step.
 
 To build an individual test, follow the instructions for compiling a individual test project located in [Building an Individual Test](/docs/workflow/testing/coreclr/testing.md#building-an-individual-test), but add `/t:BuildNativeAot /p:TestBuildMode=nativeaot` to the build command.
 

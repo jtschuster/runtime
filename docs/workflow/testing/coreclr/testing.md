@@ -41,7 +41,7 @@ Building the tests can be as simple as calling the build script without any argu
 ./src/tests/build.sh checked /p:LibrariesConfiguration=Debug
 ```
 
-Note that for the libraries configuration, we are passing the argument directly to MSBuild instead of the build script, hence the `/p:LibrariesConfiguration` flag. Also, make sure you use the correct syntax depending on our platform. The _cmd_ script takes the arguments by placing, while the _sh_ script requires them to be with a hyphen.
+Note that for the libraries configuration, we are passing the argument directly to MSBuild instead of the build script, hence the `/p:LibrariesConfiguration` flag. Both the _cmd_ and _sh_ scripts accept the same argument format: bare words (e.g. `checked`), hyphen-prefixed (e.g. `-checked`), or double-hyphen-prefixed (e.g. `--checked`), and values can be separated by a space, `=`, or `:`.
 
 In the case you are working with a different build configuration for the host, you can specify it here via the `/p:HostConfiguration` flag.
 
@@ -81,7 +81,7 @@ One of the most important attributes tests have is their **priority**. By defaul
 
 ### Building an Individual Test
 
-To build an individual test, you have to pass the `-test` flag along with the path to the test's `csproj` file to the build script. You can select more than one by repeating the `-test` flag. For example, let's try building a couple JIT tests:
+To build an individual test, you have to pass the `test` argument along with the path to the test's `csproj` file to the build script. You can select more than one by repeating the `test` argument. For example, let's try building a couple JIT tests:
 
 On Windows:
 
@@ -92,7 +92,7 @@ On Windows:
 On macOS and Linux:
 
 ```bash
-./src/tests/build.sh -test:JIT/Methodical/Methodical_d1.csproj -test:JIT/JIT_ro.csproj
+./src/tests/build.sh test JIT/Methodical/Methodical_d1.csproj test JIT/JIT_ro.csproj
 ```
 
 Alternatively, you can call _build_ directly using the `dotnet.cmd/dotnet.sh` script at the root of the repo and pass all arguments directly yourself:
@@ -103,7 +103,7 @@ Alternatively, you can call _build_ directly using the `dotnet.cmd/dotnet.sh` sc
 
 ### Building a Test Directory
 
-To build all the tests contained in an individual directory, you have to pass the `-dir` flag along with the directory's path to the build script. Just like with individual tests, you can select more than one by repeating the `-dir` flag. For example, let's try a couple of folders in the JIT subtree:
+To build all the tests contained in an individual directory, you have to pass the `dir` argument along with the directory's path to the build script. Just like with individual tests, you can select more than one by repeating the `dir` argument. For example, let's try a couple of folders in the JIT subtree:
 
 On Windows:
 
@@ -114,12 +114,12 @@ On Windows:
 On macOS and Linux:
 
 ```bash
-./src/tests/build.sh -dir:JIT -dir:Loader
+./src/tests/build.sh dir JIT dir Loader
 ```
 
 ### Building a Test Subtree
 
-To build a whole subtree, you have to pass the path to the root of the subtree you want with the `-tree` flag. Just like with any other subset, you can select more than one by repeating the `-tree` flag. For example, let's try building all the base services exceptions, and methodical JIT tests:
+To build a whole subtree, you have to pass the path to the root of the subtree you want with the `tree` argument. Just like with any other subset, you can select more than one by repeating the `tree` argument. For example, let's try building all the base services exceptions, and methodical JIT tests:
 
 On Windows:
 
@@ -130,7 +130,7 @@ On Windows:
 On macOS and Linux:
 
 ```bash
-./src/tests/build.sh -tree:baseservices/exceptions -tree:JIT/Methodical
+./src/tests/build.sh tree baseservices/exceptions tree JIT/Methodical
 ```
 
 ### Test Executors
@@ -200,23 +200,21 @@ As mentioned earlier in this guide, each test has a priority number assigned to 
 
 Now, here is where things get a little complicated. Test priority filtering is orthogonal to specifying test subsets. This means that even if when specifying tests, directories, and/or subtrees, you have to explicitly provide the priority if the test(s) of interest are not priority 0. Otherwise, the build will skip them.
 
-Another very important thing to keep in mind, is that priorities are accumulative. This means that if for example, you pass `-priority=1` to the build script, all priority 0 _AND_ priority 1 tests get built.
+Another very important thing to keep in mind, is that priorities are accumulative. This means that if for example, you pass `-priority 1` to the build script, all priority 0 _AND_ priority 1 tests get built.
 
 Let's take one of the examples used in the previous subsections. Assume you want to build all _JIT Methodical Div_ tests, including both _pri0_ and _pri1_. This is how the command-line would look:
 
 On Windows:
 
 ```cmd
-.\src\tests\build.cmd dir JIT\Methodical\divrem\div -priority=1
+.\src\tests\build.cmd dir JIT\Methodical\divrem\div -priority 1
 ```
 
 On macOS and Linux:
 
 ```bash
-./src/tests/build.sh -dir:JIT/Methodical/divrem/div -priority1
+./src/tests/build.sh dir JIT/Methodical/divrem/div -priority 1
 ```
-
-**NOTE**: Yes, you're seeing it right. The `priority` flag is a bit different between the Windows and macOS/Linux scripts.
 
 ## Running the Tests
 
