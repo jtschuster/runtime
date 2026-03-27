@@ -81,6 +81,7 @@ nativeaottest=0
 # Track the last unrecognized positional argument as potential CORE_ROOT
 __lastPositional=""
 __TestTimeout=""
+__ParallelType=""
 
 while [ $# -gt 0 ]; do
     # Preserve original argument for value extraction
@@ -273,14 +274,15 @@ while [ $# -gt 0 ]; do
             ;;
         parallel)
             if [[ -n "$__embeddedValue" ]]; then
-                :
+                __ParallelType="$__embeddedValue"
             else
                 shift
-                :
+                __ParallelType="$1"
             fi
             ;;
         *)
             # Treat unrecognized arguments as potential CORE_ROOT (last positional arg)
+            echo "Warning: Unrecognized argument '$1', treating as positional CORE_ROOT candidate."
             __lastPositional="$1"
             ;;
     esac
@@ -407,6 +409,10 @@ fi
 
 if [[ -n "$__TestTimeout" ]]; then
     runtestPyArguments+=("--test_timeout" "$__TestTimeout")
+fi
+
+if [[ -n "$__ParallelType" ]]; then
+    runtestPyArguments+=("-parallel" "$__ParallelType")
 fi
 
 # Default to python3 if it is installed

@@ -227,8 +227,12 @@ handle_arguments_local() {
             ;;
 
         priority|-priority)
-            __Priority="$2"
-            __ShiftArgs=1
+            if __extract_arg_value "$1"; then
+                __Priority="$__extractedValue"
+            else
+                __Priority="$2"
+                __ShiftArgs=1
+            fi
             ;;
 
         alltargets|-alltargets)

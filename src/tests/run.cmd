@@ -214,7 +214,15 @@ if defined RunWithNodeJS (
     set __RuntestPyArgs=%__RuntestPyArgs% --node
 )
 
-REM Find python and set it to the variable PYTHON
+if defined __TestTimeout (
+    set __RuntestPyArgs=%__RuntestPyArgs% --test_timeout %__TestTimeout%
+)
+
+if defined __TestRootDir (
+    set __RuntestPyArgs=%__RuntestPyArgs% -test_location %__TestRootDir%
+)
+
+REM Find pythonand set it to the variable PYTHON
 set _C=-c "import sys; sys.stdout.write(sys.executable)"
 (py -3 %_C% || py -2 %_C% || python3 %_C% || python2 %_C% || python %_C%) > %TEMP%\pythonlocation.txt 2> NUL
 set _C=
