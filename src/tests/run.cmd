@@ -54,8 +54,20 @@ if /i "%1" == "debug"                                   (set __BuildType=Debug&s
 if /i "%1" == "release"                                 (set __BuildType=Release&shift&goto Arg_Loop)
 if /i "%1" == "checked"                                 (set __BuildType=Checked&shift&goto Arg_Loop)
 
-@REM Strip /, -, -- prefixes and split into name and optional embedded value
-set __runArg=%~1
+@REM All remaining named arguments require a prefix (-, --, or /).
+set __rawArg=%~1
+set __prefixCheck=
+for /f "delims=" %%a in ('echo %__rawArg% ^| findstr /r "^[-/]"') do set __prefixCheck=%%a
+if not defined __prefixCheck (
+    @REM Treat as positional CORE_ROOT
+    set CORE_ROOT=%1
+    echo %__MsgPrefix%CORE_ROOT is initially set to: "!CORE_ROOT!"
+    shift
+    goto Arg_Loop
+)
+
+@REM Strip /, - characters and split into name and optional embedded value
+set __runArg=%__rawArg%
 set __runArg=%__runArg:/=%
 set __runArg=%__runArg:-=%
 set __argName=%__runArg%
@@ -64,6 +76,12 @@ for /f "tokens=1,2 delims=:=" %%a in ("%__runArg%") do (
     set __argName=%%a
     if not "%%b" == "" set __argValue=%%b
 )
+
+@REM Named architecture and configuration arguments
+if /i "%__argName%" == "a"             goto Set_RunArch
+if /i "%__argName%" == "arch"          goto Set_RunArch
+if /i "%__argName%" == "c"             goto Set_RunConfig
+if /i "%__argName%" == "configuration" goto Set_RunConfig
 
 @REM Boolean arguments (no value needed)
 if /i "%__argName%" == "testenv"                             if not defined __argValue (set __TestEnv=%2&shift&shift&goto Arg_Loop)
@@ -99,12 +117,20 @@ if /i "%__argName%" == "timeout"        if defined __argValue (set __TestTimeout
 if /i "%__argName%" == "corerootdir"    if defined __argValue (set CORE_ROOT=!__argValue!&shift&goto Arg_Loop) else (set CORE_ROOT=%2&shift&shift&goto Arg_Loop)
 if /i "%__argName%" == "testrootdir"    if defined __argValue (set __TestRootDir=!__argValue!&shift&goto Arg_Loop) else (set __TestRootDir=%2&shift&shift&goto Arg_Loop)
 
-@REM Named architecture and configuration arguments (matching ./build.sh conventions)
-if /i "%__argName%" == "a"             goto Set_RunArch
-if /i "%__argName%" == "arch"          goto Set_RunArch
-if /i "%__argName%" == "c"             goto Set_RunConfig
-if /i "%__argName%" == "configuration" goto Set_RunConfig
-goto Skip_RunNamedArgs
+if /i not "%__argName%" == "msbuildargs" goto SkipMsbuildArgs
+:: All the rest of the args will be collected and passed directly to msbuild.
+:CollectMsbuildArgs
+shift
+if "%1"=="" goto ArgsDone
+set __msbuildExtraArgs=%__msbuildExtraArgs% %1
+goto CollectMsbuildArgs
+:SkipMsbuildArgs
+
+@REM Unrecognized prefixed arg — treat as positional CORE_ROOT
+set CORE_ROOT=%1
+echo %__MsgPrefix%CORE_ROOT is initially set to: "%CORE_ROOT%"
+shift
+goto Arg_Loop
 
 :Set_RunArch
 if defined __argValue (set __BuildArch=!__argValue!&shift&goto Arg_Loop) else (set __BuildArch=%2&shift&shift&goto Arg_Loop)
@@ -115,21 +141,6 @@ if /i "!__cfgVal!" == "debug"   set __BuildType=Debug
 if /i "!__cfgVal!" == "release" set __BuildType=Release
 if /i "!__cfgVal!" == "checked" set __BuildType=Checked
 shift&goto Arg_Loop
-
-:Skip_RunNamedArgs
-
-if /i not "%__argName%" == "msbuildargs" goto SkipMsbuildArgs
-:: All the rest of the args will be collected and passed directly to msbuild.
-:CollectMsbuildArgs
-shift
-if "%1"=="" goto ArgsDone
-set __msbuildExtraArgs=%__msbuildExtraArgs% %1
-goto CollectMsbuildArgs
-:SkipMsbuildArgs
-
-set CORE_ROOT=%1
-echo %__MsgPrefix%CORE_ROOT is initially set to: "%CORE_ROOT%"
-shift
 :ArgsDone
 
 :: Done with argument processing. Check argument values for validity.

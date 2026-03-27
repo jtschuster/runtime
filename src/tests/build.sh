@@ -193,48 +193,48 @@ handle_arguments_local() {
     opt="${opt%%:*}"
 
     case "$opt" in
-        skipmanaged|-skipmanaged)
+        -skipmanaged)
             __SkipManaged=1
             ;;
 
-        skipnative|-skipnative)
+        -skipnative)
             __SkipNative=1
             __CopyNativeProjectsAfterCombinedTestBuild=false
             ;;
 
-        copynativeonly|-copynativeonly)
+        -copynativeonly)
             __SkipNative=1
             __CopyNativeTestBinaries=1
             __CopyNativeProjectsAfterCombinedTestBuild=false
             __SkipGenerateLayout=1
             ;;
 
-        crossgen2|-crossgen2)
+        -crossgen2)
             __TestBuildMode=crossgen2
             ;;
 
-        composite|-composite)
+        -composite)
             __CompositeBuildMode=1
             __TestBuildMode=crossgen2
             ;;
 
-        nativeaot|-nativeaot)
+        -nativeaot)
             __TestBuildMode=nativeaot
             ;;
 
-        perfmap|-perfmap)
+        -perfmap)
             __CreatePerfmap=1
             ;;
 
-        generatelayoutonly|-generatelayoutonly)
+        -generatelayoutonly)
             __GenerateLayoutOnly=1
             ;;
 
-        priority1|-priority1)
+        -priority1)
             __Priority=1
             ;;
 
-        priority|-priority)
+        -priority)
             if __extract_arg_value "$1"; then
                 __Priority="$__extractedValue"
             else
@@ -243,15 +243,15 @@ handle_arguments_local() {
             fi
             ;;
 
-        alltargets|-alltargets)
+        -alltargets)
             __UnprocessedBuildArgs+=("/p:CLRTestBuildAllTargets=allTargets")
             ;;
 
-        rebuild|-rebuild)
+        -rebuild)
             __RebuildTests=1
             ;;
 
-        test|-test)
+        -test)
             if __extract_arg_value "$1"; then
                 __BuildTestProject="$__BuildTestProject${__extractedValue}%3B"
             else
@@ -260,7 +260,7 @@ handle_arguments_local() {
             fi
             ;;
 
-        dir|-dir)
+        -dir)
             if __extract_arg_value "$1"; then
                 __BuildTestDir="$__BuildTestDir${__extractedValue}%3B"
             else
@@ -269,7 +269,7 @@ handle_arguments_local() {
             fi
             ;;
 
-        tree|-tree)
+        -tree)
             if __extract_arg_value "$1"; then
                 __BuildTestTree="$__BuildTestTree${__extractedValue}%3B"
             else
@@ -278,45 +278,45 @@ handle_arguments_local() {
             fi
             ;;
 
-        runtests|-runtests)
+        -runtests)
             __RunTests=1
             ;;
 
-        skiprestorepackages|-skiprestorepackages)
+        -skiprestorepackages)
             __SkipRestorePackages=1
             ;;
 
-        skipgeneratelayout|-skipgeneratelayout)
+        -skipgeneratelayout)
             __SkipGenerateLayout=1
             ;;
 
-        excludemonofailures|-excludemonofailures)
+        -excludemonofailures)
             __Mono=1
             ;;
 
-        mono|-mono)
+        -mono)
             __Mono=1
             ;;
 
-        mono_aot|-mono_aot)
+        -mono_aot)
             __Mono=1
             __MonoAot=1
             __SkipNative=1
             ;;
 
-        mono_fullaot|-mono_fullaot)
+        -mono_fullaot)
             __Mono=1
             __MonoFullAot=1
             __SkipNative=1
             ;;
 
-        coreclr|-coreclr)
+        -coreclr)
             __Mono=0
             __MonoAot=0
             __MonoFullAot=0
             ;;
 
-        log|-log)
+        -log)
             if __extract_arg_value "$1"; then
                 __BuildLogRootName="$__extractedValue"
             else
@@ -325,7 +325,7 @@ handle_arguments_local() {
             fi
             ;;
 
-        a|-a|arch|-arch)
+        -a|-arch)
             if __extract_arg_value "$1"; then
                 __TargetArch="$(echo "$__extractedValue" | tr '[:upper:]' '[:lower:]')"
             else
@@ -334,7 +334,7 @@ handle_arguments_local() {
             fi
             ;;
 
-        c|-c|configuration|-configuration)
+        -c|-configuration)
             local __cfgVal
             if __extract_arg_value "$1"; then
                 __cfgVal="$__extractedValue"
@@ -350,7 +350,7 @@ handle_arguments_local() {
             esac
             ;;
 
-        lc|-lc|librariesconfiguration|-librariesconfiguration)
+        -lc|-librariesconfiguration)
             if __extract_arg_value "$1"; then
                 __UnprocessedBuildArgs+=("/p:LibrariesConfiguration=$__extractedValue")
             else
@@ -359,7 +359,7 @@ handle_arguments_local() {
             fi
             ;;
 
-        rc|-rc|runtimeconfiguration|-runtimeconfiguration)
+        -rc|-runtimeconfiguration)
             if __extract_arg_value "$1"; then
                 __UnprocessedBuildArgs+=("/p:RuntimeConfiguration=$__extractedValue")
             else

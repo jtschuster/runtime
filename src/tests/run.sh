@@ -106,49 +106,44 @@ while [ $# -gt 0 ]; do
     __normArg="${__normArg#/}"
     __normArg="$(echo "$__normArg" | tr '[:upper:]' '[:lower:]')"
 
+    # Phase 1: Positional bare-word args (no prefix needed)
+    __positionalMatch=1
     case "$__normArg" in
         h|help|\?)
             print_usage
             exit $EXIT_CODE_SUCCESS
             ;;
+        x64)    buildArch="x64" ;;
+        x86)    buildArch="x86" ;;
+        arm)    buildArch="arm" ;;
+        arm64)  buildArch="arm64" ;;
+        loongarch64) buildArch="loongarch64" ;;
+        riscv64) buildArch="riscv64" ;;
+        wasm)   buildArch="wasm" ;;
+        android) buildOS="android" ;;
+        wasi)   buildOS="wasi" ;;
+        debug)  buildConfiguration="Debug" ;;
+        checked) buildConfiguration="Checked" ;;
+        release) buildConfiguration="Release" ;;
+        *)      __positionalMatch=0 ;;
+    esac
+
+    if [[ "$__positionalMatch" -eq 1 ]]; then
+        shift
+        continue
+    fi
+
+    # Phase 2: All named args require a prefix (-, --, /)
+    if [[ "$__origArg" != -* && "$__origArg" != /* ]]; then
+        echo "Warning: Unrecognized argument '$1', treating as positional CORE_ROOT candidate."
+        __lastPositional="$1"
+        shift
+        continue
+    fi
+
+    case "$__normArg" in
         v|verbose)
             verbose=1
-            ;;
-        x64)
-            buildArch="x64"
-            ;;
-        x86)
-            buildArch="x86"
-            ;;
-        arm)
-            buildArch="arm"
-            ;;
-        arm64)
-            buildArch="arm64"
-            ;;
-        loongarch64)
-            buildArch="loongarch64"
-            ;;
-        riscv64)
-            buildArch="riscv64"
-            ;;
-        wasm)
-            buildArch="wasm"
-            ;;
-        android)
-            buildOS="android"
-            ;;
-        wasi)
-            buildOS="wasi"
-            ;;
-        debug)
-            buildConfiguration="Debug"
-            ;;
-        checked)
-            buildConfiguration="Checked"
-            ;;
-        release)
-            buildConfiguration="Release"
             ;;
         a|arch)
             if [[ -n "$__embeddedValue" ]]; then
@@ -306,7 +301,6 @@ while [ $# -gt 0 ]; do
             fi
             ;;
         *)
-            # Treat unrecognized arguments as potential CORE_ROOT (last positional arg)
             echo "Warning: Unrecognized argument '$1', treating as positional CORE_ROOT candidate."
             __lastPositional="$1"
             ;;

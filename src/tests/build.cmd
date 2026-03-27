@@ -79,15 +79,17 @@ if /i "%1" == "checked"                  (set __BuildType=Checked&set processedA
 
 if /i "%1" == "ci"                       (set __ArcadeScriptArgs="-ci"&set __ErrMsgPrefix=##vso[task.logissue type=error]&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 
-@REM For the arguments below, we support '/', '-', and '--' prefixes.
-@REM But we also recognize them without prefixes at all. To achieve that,
-@REM we remove the '/' and '-' characters from the string for comparison.
+@REM All remaining named arguments require a prefix (-, --, or /).
+@REM Check if the raw argument starts with - or /
+set __rawBuildArg=%~1
+set __prefixCheck=
+for /f "delims=" %%a in ('echo %__rawBuildArg% ^| findstr /r "^[-/]"') do set __prefixCheck=%%a
+if not defined __prefixCheck goto ArgsDone
 
-set arg=%~1
+@REM Strip /, - characters and split into name and optional embedded value (name:value or name=value)
+set arg=%__rawBuildArg%
 set arg=%arg:/=%
 set arg=%arg:-=%
-
-@REM Split into name and optional embedded value (supports name:value and name=value)
 set __argName=%arg%
 set __argValue=
 for /f "tokens=1,2 delims=:=" %%a in ("%arg%") do (
@@ -101,6 +103,16 @@ if /i "%__argName%" == "help"  goto Usage
 
 @REM Specify this argument to test the argument parsing logic of this script without executing the build
 if /i "%__argName%" == "TestArgParsing"        (set __TestArgParsing=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+
+@REM Named architecture and configuration arguments
+if /i "%__argName%" == "a"                     goto Set_Arch
+if /i "%__argName%" == "arch"                  goto Set_Arch
+if /i "%__argName%" == "c"                     goto Set_Config
+if /i "%__argName%" == "configuration"         goto Set_Config
+if /i "%__argName%" == "lc"                    goto Set_LibConfig
+if /i "%__argName%" == "librariesconfiguration" goto Set_LibConfig
+if /i "%__argName%" == "rc"                    goto Set_RuntimeConfig
+if /i "%__argName%" == "runtimeconfiguration"  goto Set_RuntimeConfig
 
 @REM The following arguments are switches that do not consume any subsequent arguments
 if /i "%__argName%" == "Rebuild"               (set __RebuildTests=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
@@ -131,16 +143,14 @@ if /i "%__argName%" == "priority1"             (set __Priority=1&set processedAr
 if /i "%__argName%" == "priority"   if defined __argValue (set __Priority=!__argValue!&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop) else (set __Priority=%2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
 if /i "%__argName%" == "fsanitize"  if defined __argValue (set __CMakeArgs=%__CMakeArgs% "-DCLR_CMAKE_ENABLE_SANITIZERS=!__argValue!"&set __EnableNativeSanitizers=!__argValue!&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop) else (set __CMakeArgs=%__CMakeArgs% "-DCLR_CMAKE_ENABLE_SANITIZERS=%2"&set __EnableNativeSanitizers=%2&set processedArgs=!processedArgs! %1=%2&shift&shift&goto Arg_Loop)
 
-@REM Named architecture and configuration arguments (matching ./build.sh conventions)
-if /i "%__argName%" == "a"             goto Set_Arch
-if /i "%__argName%" == "arch"          goto Set_Arch
-if /i "%__argName%" == "c"             goto Set_Config
-if /i "%__argName%" == "configuration" goto Set_Config
-if /i "%__argName%" == "lc"                       goto Set_LibConfig
-if /i "%__argName%" == "librariesconfiguration"   goto Set_LibConfig
-if /i "%__argName%" == "rc"                       goto Set_RuntimeConfig
-if /i "%__argName%" == "runtimeconfiguration"     goto Set_RuntimeConfig
-goto Skip_NamedArgs
+@REM The following arguments also consume two subsequent arguments
+if /i "%__argName%" == "CMakeArgs"             (set __CMakeArgs="%2=%3" %__CMakeArgs%&set "processedArgs=!processedArgs! %1 %2 %3"&shift&shift&shift&goto Arg_Loop)
+
+@REM Obsolete arguments that now produce errors
+if /i "%__argName%" == "BuildAgainstPackages"  (echo error: Remove /BuildAgainstPackages switch&&exit /b 1)
+
+@REM Unrecognized prefixed arg — fall through to ArgsDone (pass to MSBuild as unprocessed)
+goto ArgsDone
 
 :Set_Arch
 if defined __argValue (set __BuildArch=!__argValue!&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop) else (set __BuildArch=%2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
@@ -158,14 +168,6 @@ if defined __argValue (set processedArgs=!processedArgs! %1&set __UnprocessedBui
 
 :Set_RuntimeConfig
 if defined __argValue (set processedArgs=!processedArgs! %1&set __UnprocessedBuildArgs=!__UnprocessedBuildArgs! /p:RuntimeConfiguration=!__argValue!&shift&goto Arg_Loop) else (set processedArgs=!processedArgs! %1 %2&set __UnprocessedBuildArgs=!__UnprocessedBuildArgs! /p:RuntimeConfiguration=%2&shift&shift&goto Arg_Loop)
-
-:Skip_NamedArgs
-
-@REM The following arguments also consume two subsequent arguments
-if /i "%__argName%" == "CMakeArgs"             (set __CMakeArgs="%2=%3" %__CMakeArgs%&set "processedArgs=!processedArgs! %1 %2 %3"&shift&shift&shift&goto Arg_Loop)
-
-@REM Obsolete arguments that now produce errors
-if /i "%__argName%" == "BuildAgainstPackages"  (echo error: Remove /BuildAgainstPackages switch&&exit /b 1)
 
 @REM If we encounter an unrecognized argument, then all remaining arguments are passed directly to MSBuild
 @REM This allows '/p:LibrariesConfiguration=Release' and other arguments to be passed through without having
