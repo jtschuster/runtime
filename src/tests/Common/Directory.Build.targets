@@ -32,9 +32,12 @@
     DependsOnTargets="ResolveAssemblyReferences">
 
     <!-- Only NuGet-sourced files that cannot be resolved from local build artifacts.
-         The bulk of Core_Root is populated by CopyRuntimeToCoreRoot in publishdependency.targets. -->
+         The bulk of Core_Root is populated by CopyRuntimeToCoreRoot in publishdependency.targets.
+         Remove @(LibrariesRuntimeFiles) since CopyRuntimeToCoreRoot already copies them;
+         this avoids copying hundreds of library files twice in every normal build. -->
     <ItemGroup>
       <_NuGetCopyLocal Include="@(RuntimeCopyLocalItems)" />
+      <_NuGetCopyLocal Remove="@(LibrariesRuntimeFiles)" />
       <_NuGetCopyLocal Include="@(NativeCopyLocalItems)" />
       <_NuGetCopyLocal Include="$(CoreDisToolsLibrary)" Condition="$(CopyCoreDisToolsToCoreRoot)" />
     </ItemGroup>
