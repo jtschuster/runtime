@@ -169,6 +169,18 @@ __ProjectRoot="$(cd "$(dirname "$0")"; pwd -P)"
 __RepoRootDir="$(cd "$__ProjectRoot"/../..; pwd -P)"
 __TargetArch=
 
+# Extract a value from an argument that may use :, =, or space as separator.
+# Sets __extractedValue to the value and returns 0 if embedded, 1 if caller should use $2.
+__extract_arg_value() {
+    __extractedValue=""
+    if [[ "$1" == *":"* ]]; then
+        __extractedValue="${1#*:}"
+    elif [[ "$1" == *"="* ]]; then
+        __extractedValue="${1#*=}"
+    fi
+    [[ -n "$__extractedValue" ]]
+}
+
 handle_arguments_local() {
     opt="$(echo "${1/#--/-}" | tr "[:upper:]" "[:lower:]")"
 
@@ -228,15 +240,8 @@ handle_arguments_local() {
             ;;
 
         test*|-test*)
-            local arg="$1"
-            local value=""
-            if [[ "$arg" == *":"* ]]; then
-                value="${arg#*:}"
-            elif [[ "$arg" == *"="* ]]; then
-                value="${arg#*=}"
-            fi
-            if [[ -n "$value" ]]; then
-                __BuildTestProject="$__BuildTestProject${value}%3B"
+            if __extract_arg_value "$1"; then
+                __BuildTestProject="$__BuildTestProject${__extractedValue}%3B"
             else
                 __BuildTestProject="$__BuildTestProject$2%3B"
                 __ShiftArgs=1
@@ -244,15 +249,8 @@ handle_arguments_local() {
             ;;
 
         dir*|-dir*)
-            local arg="$1"
-            local value=""
-            if [[ "$arg" == *":"* ]]; then
-                value="${arg#*:}"
-            elif [[ "$arg" == *"="* ]]; then
-                value="${arg#*=}"
-            fi
-            if [[ -n "$value" ]]; then
-                __BuildTestDir="$__BuildTestDir${value}%3B"
+            if __extract_arg_value "$1"; then
+                __BuildTestDir="$__BuildTestDir${__extractedValue}%3B"
             else
                 __BuildTestDir="$__BuildTestDir$2%3B"
                 __ShiftArgs=1
@@ -260,15 +258,8 @@ handle_arguments_local() {
             ;;
 
         tree*|-tree*)
-            local arg="$1"
-            local value=""
-            if [[ "$arg" == *":"* ]]; then
-                value="${arg#*:}"
-            elif [[ "$arg" == *"="* ]]; then
-                value="${arg#*=}"
-            fi
-            if [[ -n "$value" ]]; then
-                __BuildTestTree="$__BuildTestTree${value}%3B"
+            if __extract_arg_value "$1"; then
+                __BuildTestTree="$__BuildTestTree${__extractedValue}%3B"
             else
                 __BuildTestTree="$__BuildTestTree$2%3B"
                 __ShiftArgs=1
@@ -314,15 +305,8 @@ handle_arguments_local() {
             ;;
 
         log*|-log*)
-            local arg="$1"
-            local value=""
-            if [[ "$arg" == *":"* ]]; then
-                value="${arg#*:}"
-            elif [[ "$arg" == *"="* ]]; then
-                value="${arg#*=}"
-            fi
-            if [[ -n "$value" ]]; then
-                __BuildLogRootName="$value"
+            if __extract_arg_value "$1"; then
+                __BuildLogRootName="$__extractedValue"
             else
                 __BuildLogRootName="$2"
                 __ShiftArgs=1
