@@ -15,7 +15,9 @@ function print_usage {
     echo '  -h, --help                       : Show usage information.'
     echo '  -v, --verbose                    : Show output from each test.'
     echo '  <arch>                           : One of x64, x86, arm, arm64, loongarch64, riscv64, wasm. Defaults to current architecture.'
+    echo '  -a, --arch <arch>                : Same as above, using named argument syntax.'
     echo '  <build configuration>            : One of debug, checked, release. Defaults to debug.'
+    echo '  -c, --configuration <cfg>        : Same as above, using named argument syntax.'
     echo '  android                          : Set build OS to Android.'
     echo '  wasi                             : Set build OS to WASI.'
     echo '  testenv <path>                   : Script to set environment variables for tests. Also accepts --test-env=<path>.'
@@ -147,6 +149,29 @@ while [ $# -gt 0 ]; do
             ;;
         release)
             buildConfiguration="Release"
+            ;;
+        a|arch)
+            if [[ -n "$__embeddedValue" ]]; then
+                buildArch="$(echo "$__embeddedValue" | tr '[:upper:]' '[:lower:]')"
+            else
+                shift
+                buildArch="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+            fi
+            ;;
+        c|configuration)
+            local __cfgVal
+            if [[ -n "$__embeddedValue" ]]; then
+                __cfgVal="$__embeddedValue"
+            else
+                shift
+                __cfgVal="$1"
+            fi
+            case "$(echo "$__cfgVal" | tr '[:upper:]' '[:lower:]')" in
+                debug)   buildConfiguration="Debug" ;;
+                release) buildConfiguration="Release" ;;
+                checked) buildConfiguration="Checked" ;;
+                *)       buildConfiguration="$__cfgVal" ;;
+            esac
             ;;
         printlastresultsonly)
             printLastResultsOnly=1

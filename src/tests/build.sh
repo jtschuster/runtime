@@ -152,6 +152,11 @@ usage_list+=("-priority <N> - Include priority N tests in the build (e.g. -prior
 usage_list+=("-perfmap - Emit perfmap symbol files when compiling the framework assemblies using Crossgen2.")
 usage_list+=("-allTargets - Build managed tests for all target platforms (including test projects in which CLRTestTargetUnsupported resolves to true).")
 usage_list+=("")
+usage_list+=("-a, -arch <arch> - Target architecture (x64, x86, arm, arm64, etc.). Defaults to host architecture.")
+usage_list+=("-c, -configuration <cfg> - Build configuration (Debug, Release, Checked). Defaults to Debug.")
+usage_list+=("-lc, -librariesConfiguration <cfg> - Libraries configuration (Debug, Release). Passed as /p:LibrariesConfiguration.")
+usage_list+=("-rc, -runtimeConfiguration <cfg> - Runtime configuration (Debug, Release, Checked). Passed as /p:RuntimeConfiguration.")
+usage_list+=("")
 usage_list+=("-runtests - Run tests after building them.")
 usage_list+=("-mono, -excludemonofailures - Build the tests for the Mono runtime honoring mono-specific issues.")
 usage_list+=("-mono_aot - Use Mono AOT mode.")
@@ -183,6 +188,9 @@ __extract_arg_value() {
 
 handle_arguments_local() {
     opt="$(echo "${1/#--/-}" | tr "[:upper:]" "[:lower:]")"
+    # Strip embedded value (after : or =) so case patterns are exact matches
+    opt="${opt%%=*}"
+    opt="${opt%%:*}"
 
     case "$opt" in
         skipmanaged|-skipmanaged)
@@ -243,7 +251,7 @@ handle_arguments_local() {
             __RebuildTests=1
             ;;
 
-        test*|-test*)
+        test|-test)
             if __extract_arg_value "$1"; then
                 __BuildTestProject="$__BuildTestProject${__extractedValue}%3B"
             else
@@ -252,7 +260,7 @@ handle_arguments_local() {
             fi
             ;;
 
-        dir*|-dir*)
+        dir|-dir)
             if __extract_arg_value "$1"; then
                 __BuildTestDir="$__BuildTestDir${__extractedValue}%3B"
             else
@@ -261,7 +269,7 @@ handle_arguments_local() {
             fi
             ;;
 
-        tree*|-tree*)
+        tree|-tree)
             if __extract_arg_value "$1"; then
                 __BuildTestTree="$__BuildTestTree${__extractedValue}%3B"
             else
@@ -308,11 +316,54 @@ handle_arguments_local() {
             __MonoFullAot=0
             ;;
 
-        log*|-log*)
+        log|-log)
             if __extract_arg_value "$1"; then
                 __BuildLogRootName="$__extractedValue"
             else
                 __BuildLogRootName="$2"
+                __ShiftArgs=1
+            fi
+            ;;
+
+        a|-a|arch|-arch)
+            if __extract_arg_value "$1"; then
+                __TargetArch="$(echo "$__extractedValue" | tr '[:upper:]' '[:lower:]')"
+            else
+                __TargetArch="$(echo "$2" | tr '[:upper:]' '[:lower:]')"
+                __ShiftArgs=1
+            fi
+            ;;
+
+        c|-c|configuration|-configuration)
+            local __cfgVal
+            if __extract_arg_value "$1"; then
+                __cfgVal="$__extractedValue"
+            else
+                __cfgVal="$2"
+                __ShiftArgs=1
+            fi
+            case "$(echo "$__cfgVal" | tr '[:upper:]' '[:lower:]')" in
+                debug)   __BuildType=Debug ;;
+                release) __BuildType=Release ;;
+                checked) __BuildType=Checked ;;
+                *)       __BuildType="$__cfgVal" ;;
+            esac
+            ;;
+
+        lc|-lc|librariesconfiguration|-librariesconfiguration)
+            if __extract_arg_value "$1"; then
+                __UnprocessedBuildArgs+=("/p:LibrariesConfiguration=$__extractedValue")
+            else
+                __UnprocessedBuildArgs+=("/p:LibrariesConfiguration=$2")
+                __ShiftArgs=1
+            fi
+            ;;
+
+        rc|-rc|runtimeconfiguration|-runtimeconfiguration)
+            if __extract_arg_value "$1"; then
+                __UnprocessedBuildArgs+=("/p:RuntimeConfiguration=$__extractedValue")
+            else
+                __UnprocessedBuildArgs+=("/p:RuntimeConfiguration=$2")
                 __ShiftArgs=1
             fi
             ;;

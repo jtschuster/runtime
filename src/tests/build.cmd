@@ -131,6 +131,36 @@ if /i "%__argName%" == "priority1"             (set __Priority=1&set processedAr
 if /i "%__argName%" == "priority"   if defined __argValue (set __Priority=!__argValue!&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop) else (set __Priority=%2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
 if /i "%__argName%" == "fsanitize"  if defined __argValue (set __CMakeArgs=%__CMakeArgs% "-DCLR_CMAKE_ENABLE_SANITIZERS=!__argValue!"&set __EnableNativeSanitizers=!__argValue!&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop) else (set __CMakeArgs=%__CMakeArgs% "-DCLR_CMAKE_ENABLE_SANITIZERS=%2"&set __EnableNativeSanitizers=%2&set processedArgs=!processedArgs! %1=%2&shift&shift&goto Arg_Loop)
 
+@REM Named architecture and configuration arguments (matching ./build.sh conventions)
+if /i "%__argName%" == "a"             goto Set_Arch
+if /i "%__argName%" == "arch"          goto Set_Arch
+if /i "%__argName%" == "c"             goto Set_Config
+if /i "%__argName%" == "configuration" goto Set_Config
+if /i "%__argName%" == "lc"                       goto Set_LibConfig
+if /i "%__argName%" == "librariesconfiguration"   goto Set_LibConfig
+if /i "%__argName%" == "rc"                       goto Set_RuntimeConfig
+if /i "%__argName%" == "runtimeconfiguration"     goto Set_RuntimeConfig
+goto Skip_NamedArgs
+
+:Set_Arch
+if defined __argValue (set __BuildArch=!__argValue!&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop) else (set __BuildArch=%2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
+
+:Set_Config
+if defined __argValue (set __cfgVal=!__argValue!) else (set __cfgVal=%2&shift)
+if /i "!__cfgVal!" == "debug"   set __BuildType=Debug
+if /i "!__cfgVal!" == "release" set __BuildType=Release
+if /i "!__cfgVal!" == "checked" set __BuildType=Checked
+set processedArgs=!processedArgs! %1
+shift&goto Arg_Loop
+
+:Set_LibConfig
+if defined __argValue (set processedArgs=!processedArgs! %1&set __UnprocessedBuildArgs=!__UnprocessedBuildArgs! /p:LibrariesConfiguration=!__argValue!&shift&goto Arg_Loop) else (set processedArgs=!processedArgs! %1 %2&set __UnprocessedBuildArgs=!__UnprocessedBuildArgs! /p:LibrariesConfiguration=%2&shift&shift&goto Arg_Loop)
+
+:Set_RuntimeConfig
+if defined __argValue (set processedArgs=!processedArgs! %1&set __UnprocessedBuildArgs=!__UnprocessedBuildArgs! /p:RuntimeConfiguration=!__argValue!&shift&goto Arg_Loop) else (set processedArgs=!processedArgs! %1 %2&set __UnprocessedBuildArgs=!__UnprocessedBuildArgs! /p:RuntimeConfiguration=%2&shift&shift&goto Arg_Loop)
+
+:Skip_NamedArgs
+
 @REM The following arguments also consume two subsequent arguments
 if /i "%__argName%" == "CMakeArgs"             (set __CMakeArgs="%2=%3" %__CMakeArgs%&set "processedArgs=!processedArgs! %1 %2 %3"&shift&shift&shift&goto Arg_Loop)
 
@@ -366,6 +396,11 @@ echo.-? -h --help: View this message.
 echo.
 echo Build architecture: one of "x64", "x86", "arm64" ^(default: x64^).
 echo Build type: one of "Debug", "Checked", "Release" ^(default: Debug^).
+echo.
+echo -a, -arch ^<arch^>  : Target architecture (x64, x86, arm64, etc.). Same as passing the name directly.
+echo -c, -configuration ^<cfg^>  : Build configuration (Debug, Release, Checked). Same as passing the name directly.
+echo -lc, -librariesConfiguration ^<cfg^> : Libraries configuration. Passed as /p:LibrariesConfiguration.
+echo -rc, -runtimeConfiguration ^<cfg^>   : Runtime configuration. Passed as /p:RuntimeConfiguration.
 echo.
 echo -Rebuild: Clean up all test artifacts prior to building tests.
 echo -SkipRestorePackages: Skip package restore.

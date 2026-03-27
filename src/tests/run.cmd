@@ -99,6 +99,25 @@ if /i "%__argName%" == "timeout"        if defined __argValue (set __TestTimeout
 if /i "%__argName%" == "corerootdir"    if defined __argValue (set CORE_ROOT=!__argValue!&shift&goto Arg_Loop) else (set CORE_ROOT=%2&shift&shift&goto Arg_Loop)
 if /i "%__argName%" == "testrootdir"    if defined __argValue (set __TestRootDir=!__argValue!&shift&goto Arg_Loop) else (set __TestRootDir=%2&shift&shift&goto Arg_Loop)
 
+@REM Named architecture and configuration arguments (matching ./build.sh conventions)
+if /i "%__argName%" == "a"             goto Set_RunArch
+if /i "%__argName%" == "arch"          goto Set_RunArch
+if /i "%__argName%" == "c"             goto Set_RunConfig
+if /i "%__argName%" == "configuration" goto Set_RunConfig
+goto Skip_RunNamedArgs
+
+:Set_RunArch
+if defined __argValue (set __BuildArch=!__argValue!&shift&goto Arg_Loop) else (set __BuildArch=%2&shift&shift&goto Arg_Loop)
+
+:Set_RunConfig
+if defined __argValue (set __cfgVal=!__argValue!) else (set __cfgVal=%2&shift)
+if /i "!__cfgVal!" == "debug"   set __BuildType=Debug
+if /i "!__cfgVal!" == "release" set __BuildType=Release
+if /i "!__cfgVal!" == "checked" set __BuildType=Checked
+shift&goto Arg_Loop
+
+:Skip_RunNamedArgs
+
 if /i not "%__argName%" == "msbuildargs" goto SkipMsbuildArgs
 :: All the rest of the args will be collected and passed directly to msbuild.
 :CollectMsbuildArgs
@@ -260,7 +279,9 @@ echo where:
 echo.
 echo./? -? /h -h /help -help   - View this message.
 echo ^<build_architecture^>      - Specifies build architecture: x64, x86, arm64, or wasm ^(default: x64^).
+echo -a, -arch ^<arch^>          - Same as above, using named argument syntax.
 echo ^<build_type^>              - Specifies build type: Debug, Release, or Checked ^(default: Debug^).
+echo -c, -configuration ^<cfg^>  - Same as above, using named argument syntax.
 echo TestEnv ^<test_env_script^> - Run a custom script before every test to set custom test environment settings.
 echo sequential                - Run tests sequentially ^(no parallelism^).
 echo parallel ^<type^>           - Run tests with given level of parallelism: none, collections, assemblies, all. Default: collections.
