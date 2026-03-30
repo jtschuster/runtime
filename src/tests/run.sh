@@ -78,6 +78,12 @@ treeSubtree=
 
 for i in "$@"
 do
+    if [[ "$__nextTreeArg" == "1" ]]; then
+        treeSubtree="$i"
+        __nextTreeArg=
+        continue
+    fi
+
     case $i in
         -h|--help)
             print_usage
@@ -191,8 +197,14 @@ do
         --runnativeaottests)
             nativeaottest=1
             ;;
-        --tree=*)
+        --tree=*|-tree=*)
             treeSubtree=${i#*=}
+            ;;
+        --tree:*|-tree:*)
+            treeSubtree=${i#*:}
+            ;;
+        --tree|-tree)
+            __nextTreeArg=1
             ;;
         --interpreter)
             export RunInterpreter=1

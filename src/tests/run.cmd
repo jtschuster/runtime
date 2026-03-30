@@ -79,7 +79,11 @@ if /i "%1" == "tieringtest"                             (set TieringTest=1&shift
 if /i "%1" == "runnativeaottests"                       (set RunNativeAot=1&shift&goto Arg_Loop)
 if /i "%1" == "interpreter"                             (set RunInterpreter=1&shift&goto Arg_Loop)
 if /i "%1" == "node"                                    (set RunWithNodeJS=1&shift&goto Arg_Loop)
-if /i "%1" == "tree"                                    (set __TreeSubtree=%2&shift&shift&goto Arg_Loop)
+@REM For tree, support '/', '-', and '--' prefixes like build.cmd
+set __treeArg=%~1
+set __treeArg=%__treeArg:/=%
+set __treeArg=%__treeArg:-=%
+if /i "%__treeArg%" == "tree"                           (set __TreeSubtree=%~2&shift&shift&goto Arg_Loop)
 
 if /i not "%1" == "msbuildargs" goto SkipMsbuildArgs
 :: All the rest of the args will be collected and passed directly to msbuild.
@@ -197,7 +201,7 @@ if defined RunWithNodeJS (
 )
 
 if defined __TreeSubtree (
-    set __RuntestPyArgs=%__RuntestPyArgs% --tree %__TreeSubtree%
+    set __RuntestPyArgs=%__RuntestPyArgs% --tree "%__TreeSubtree%"
 )
 
 REM Find python and set it to the variable PYTHON
