@@ -24,17 +24,13 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
     /// The fixup encodes two distinct pieces of information:
     /// <list type="bullet">
     /// <item>The IL body hash, computed from the <see cref="ILMethod"/> (the underlying EcmaMethod whose metadata
-    /// contains the IL). This is derived from <c>_signatureMethod</c> via <c>GetPrimaryMethodDesc()</c>.</item>
-    /// <item>The method identity (<c>_signatureMethod</c>), encoded in the fixup signature. The runtime decodes this
-    /// back to a MethodDesc via <c>ZapSig::DecodeMethod</c> and reads the IL at that method's RVA to compare against
+    /// contains the IL). This is derived from _signatureMethod via GetPrimaryMethodDesc().</item>
+    /// <item>The method identity (_signatureMethod), encoded in the fixup signature. The runtime decodes this
+    /// back to a MethodDesc via ZapSig::DecodeMethod and reads the IL at that method's RVA to compare against
     /// the hash.</item>
     /// </list>
-    /// For most methods, <c>_signatureMethod</c> is already the EcmaMethod. For runtime-async methods, the JIT inlines
-    /// an <c>AsyncMethodVariant</c> (a <c>MethodDelegator</c>, not an EcmaMethod), but the IL body lives on the
-    /// underlying EcmaMethod. Since <c>AsyncMethodVariant</c> cannot be encoded as a MethodDef token,
-    /// <c>_signatureMethod</c> is the EcmaMethod itself, and the runtime side
-    /// (see <c>GetILHeaderForStandaloneMetadata</c> in readytorunstandalonemethodmetadata.cpp) handles the fact that
-    /// the decoded MethodDesc is marked as an async thunk whose <c>MayHaveILHeader()</c> returns false.
+    /// For most methods, _signatureMethod is already the EcmaMethod. For runtime-async methods, the JIT inlines
+    /// an AsyncMethodVariant. The EcmaMethod for AsyncMethodVariant can be retrieved with GetPrimaryMethodDesc().
     /// </remarks>
     public class ILBodyFixupSignature : Signature, IEquatable<ILBodyFixupSignature>
     {
@@ -49,6 +45,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
         public ILBodyFixupSignature(ReadyToRunFixupKind fixupKind, MethodDesc signatureMethod)
         {
             Debug.Assert(signatureMethod.IsTypicalMethodDefinition);
+            Debug.Assert(!signatureMethod.IsCompilerGeneratedILBodyForAsync());
             Debug.Assert(signatureMethod.GetPrimaryMethodDesc() is EcmaMethod);
             _fixupKind = fixupKind;
             _signatureMethod = signatureMethod;
@@ -127,12 +124,12 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             if (result != 0)
                 return result;
 
-            return comparer.Compare(ILMethod, otherNode.ILMethod);
+            return comparer.Compare(_signatureMethod, otherNode._signatureMethod);
         }
 
         public override string ToString()
         {
-            return $"ILBodyFixupSignature {_fixupKind} {ILMethod}";
+            return $"ILBodyFixupSignature {_fixupKind} {_signatureMethod}";
         }
 
         public bool Equals(ILBodyFixupSignature other) => object.ReferenceEquals(other, this);

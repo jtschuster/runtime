@@ -816,13 +816,15 @@ namespace Internal.JitInterface
                     return;
                 }
 
-                if (MethodBeingCompiled.GetTypicalMethodDefinition() is EcmaMethod ecmaMethod)
+                var typicalDef = MethodBeingCompiled.GetTypicalMethodDefinition();
+                if (typicalDef is EcmaMethod or AsyncMethodVariant)
                 {
-                    if ((methodIL.GetMethodILScopeDefinition() is IEcmaMethodIL && _compilation.SymbolNodeFactory.VerifyTypeAndFieldLayout && ecmaMethod.Module == ecmaMethod.Context.SystemModule) ||
+                    var ecmaMethod = (EcmaMethod)typicalDef.GetPrimaryMethodDesc();
+                    if ((methodIL.GetMethodILScopeDefinition() is IEcmaMethodIL && _compilation.SymbolNodeFactory.VerifyTypeAndFieldLayout && ecmaMethod.Module == typicalDef.Context.SystemModule) ||
                         (!_compilation.NodeFactory.CompilationModuleGroup.VersionsWithMethodBody(MethodBeingCompiled) &&
                             _compilation.NodeFactory.CompilationModuleGroup.CrossModuleInlineable(MethodBeingCompiled)))
                     {
-                        ISymbolNode ilBodyNode = _compilation.SymbolNodeFactory.CheckILBodyFixupSignature((EcmaMethod)MethodBeingCompiled.GetTypicalMethodDefinition());
+                        ISymbolNode ilBodyNode = _compilation.SymbolNodeFactory.CheckILBodyFixupSignature(typicalDef);
                         AddPrecodeFixup(ilBodyNode);
                     }
 
@@ -846,7 +848,7 @@ namespace Internal.JitInterface
                         else
                         {
                             _ilBodiesNeeded = _ilBodiesNeeded ?? new List<MethodDesc>();
-                            _ilBodiesNeeded.Add(ecmaMethod);
+                            _ilBodiesNeeded.Add(typicalDef);
                         }
                     }
                 }
@@ -3355,7 +3357,7 @@ namespace Internal.JitInterface
                         // or if we are working with a full cross module inline
                         // The CheckILBodyFixupSignature will use the exact IL in metadata, not what is used by the ReadyToRunILProvider,
                         // which can be different for runtime-async methods (the ILProvider returns the Task-returning thunk for runtime-async EcmaMethods).
-                        ISymbolNode ilBodyNode = _compilation.SymbolNodeFactory.CheckILBodyFixupSignature(ecmaMethod);
+                        ISymbolNode ilBodyNode = _compilation.SymbolNodeFactory.CheckILBodyFixupSignature(typicalMethod);
                         AddPrecodeFixup(ilBodyNode);
                     }
 
