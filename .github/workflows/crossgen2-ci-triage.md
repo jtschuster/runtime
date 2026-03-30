@@ -62,10 +62,12 @@ permissions:
   contents: read
   issues: read
   actions: read
+  pull-requests: read
 
 tools:
   github:
     toolsets: [default, actions, search]
+    min-integrity: none
   web-fetch:
   cache-memory: true
 
@@ -133,12 +135,15 @@ For each failed build, use the CI Analysis skill script:
 pwsh .github/skills/ci-analysis/scripts/Get-CIStatus.ps1 -BuildId <BUILD_ID> -ShowLogs -SearchMihuBot -ContinueOnError
 ```
 
-From the output, extract:
+From the output, extract and preserve:
 - **Failed job names** and their error categories
-- **Failed test names** and error messages
-- **Helix work item details** (test names, error snippets, console logs)
+- **Specific test names**: Fully qualified test class and method names (e.g., `System.Net.Security.Tests.SslStreamTest.ConnectAsync_InvalidCertificate_Throws`)
+- **Error messages and stack traces**: Copy exact error text from the CI output — these go directly into issue bodies
+- **Helix work item details**: Work item names, error snippets, and console log URLs
 - **Known issue matches** from Build Analysis
 - **The `[CI_ANALYSIS_SUMMARY]` JSON block** for structured analysis
+
+**IMPORTANT**: Do not summarize or paraphrase error output. Copy the actual error messages, assertion failures, and stack traces verbatim from the CI analysis output. Issues must contain enough concrete detail for someone to understand the failure without re-running CI analysis.
 
 ### Filtering Known Issues
 
@@ -197,17 +202,35 @@ Create issues with the following structure:
 
 - **Pipeline**: <pipeline name>
 - **Build**: [<build_id>](https://dev.azure.com/dnceng-public/public/_build/results?buildId=<build_id>)
-- **Test**: `<fully qualified test name>`
+- **Failed Tests**: List each failing test with its fully qualified name
 - **Configuration**: <OS/arch/config if available>
 - **Error Category**: <test-failure|build-error|crash|timeout>
 
+### Failing Tests
+
+List each failing test individually with its fully qualified name:
+
+| Test Name | Platform | Error Type |
+|-----------|----------|------------|
+| `Namespace.Class.Method` | linux-x64 | AssertionError / Timeout / Crash / etc. |
+
 ### Error Output
+
+Include the **actual error messages and stack traces** from the CI analysis output.
+Do NOT write "Helix console logs are not accessible" — instead include whatever error
+text the CI analysis script DID return (assertion messages, exit codes, error lines).
 
 <details>
 <summary><b>Error details</b></summary>
 
 \`\`\`
-<error message and relevant stack trace, truncated to key information>
+<paste the exact error output from Get-CIStatus.ps1, including:
+  - Assertion failure messages with expected vs actual values
+  - Exception types and messages
+  - Relevant stack trace lines
+  - Exit codes
+  - Build error messages
+Truncate only if over 2000 characters, keeping the most diagnostic lines.>
 \`\`\`
 
 </details>
@@ -253,6 +276,10 @@ Use filesystem-safe timestamp format `YYYY-MM-DD-HH-MM-SS` (no colons).
 - **Do not create duplicate issues.** Always search thoroughly before creating.
 - **Do not create issues for known/tracked failures.** If Build Analysis has already matched a failure to a known issue, skip it.
 - **Be conservative with "simple fix" assessments.** When in doubt, instruct Copilot to disable the test rather than attempt a fix.
+- **Include specific test names and real error output in every issue.** Each issue MUST contain:
+  - Fully qualified test names (not just work item names like "GC" — drill into the specific test methods)
+  - Actual error messages, assertion text, or stack traces copied from the CI analysis output
+  - Do NOT say "Helix console logs are not accessible without authentication" as a substitute for error details. The CI analysis script already extracts error information — use it.
 - **Include enough context in issues** for Copilot Coding Agent to act without further investigation.
 - **Group related failures.** If the same test fails across multiple pipelines or configurations, create a single issue covering all occurrences.
 - If there are no new unknown failures to report, call the `noop` safe output explaining what you analyzed and that all failures are either known or already tracked.
