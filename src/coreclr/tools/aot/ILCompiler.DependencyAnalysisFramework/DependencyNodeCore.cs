@@ -129,6 +129,39 @@ namespace ILCompiler.DependencyAnalysisFramework
 
         public abstract IEnumerable<CombinedDependencyListEntry> SearchDynamicDependencies(List<DependencyNodeCore<DependencyContextType>> markedNodes, int firstNode, DependencyContextType context);
 
+        /// <summary>
+        /// Collects static dependencies into a reusable collector buffer.
+        /// The default implementation delegates to <see cref="GetStaticDependencies"/>.
+        /// Override for zero-allocation edge collection on hot-path node types.
+        /// </summary>
+        protected internal virtual void CollectStaticDependencies(DependencyContextType context, DependencyCollector<DependencyContextType> collector)
+        {
+            IEnumerable<DependencyListEntry> deps = GetStaticDependencies(context);
+            if (deps is not null)
+            {
+                foreach (DependencyListEntry dep in deps)
+                {
+                    collector.Add(dep.Node, dep.Reason);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Collects conditional static dependencies into a reusable collector buffer.
+        /// The default implementation delegates to <see cref="GetConditionalStaticDependencies"/>.
+        /// </summary>
+        protected internal virtual void CollectConditionalStaticDependencies(DependencyContextType context, CombinedDependencyCollector<DependencyContextType> collector)
+        {
+            IEnumerable<CombinedDependencyListEntry> deps = GetConditionalStaticDependencies(context);
+            if (deps is not null)
+            {
+                foreach (CombinedDependencyListEntry dep in deps)
+                {
+                    collector.Add(dep.Node, dep.OtherReasonNode, dep.Reason);
+                }
+            }
+        }
+
         internal void CallOnMarked(DependencyContextType context)
         {
             OnMarked(context);

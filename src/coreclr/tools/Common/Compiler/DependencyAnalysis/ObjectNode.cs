@@ -82,6 +82,33 @@ namespace ILCompiler.DependencyAnalysis
                 return dependencies;
         }
 
+        protected sealed override void CollectStaticDependencies(NodeFactory context, DependencyCollector<NodeFactory> collector)
+        {
+            DependencyList dependencies = ComputeNonRelocationBasedDependencies(context);
+            if (dependencies is not null)
+            {
+                foreach (DependencyListEntry dep in dependencies)
+                {
+                    collector.Add(dep.Node, dep.Reason);
+                }
+            }
+
+            Relocation[] relocs = GetData(context, true).Relocs;
+            if (relocs is not null)
+            {
+                foreach (Relocation reloc in relocs)
+                {
+                    collector.Add((DependencyNodeCore<NodeFactory>)reloc.Target, "reloc");
+                }
+            }
+
+            if (context.Target.IsWasm && this is IMethodCodeNodeWithTypeSignature wasmMethodCodeNode)
+            {
+                WasmTypeNode wasmTypeNode = context.WasmTypeNode(wasmMethodCodeNode.Method);
+                collector.Add(wasmTypeNode, "Wasm Method Code Nodes Require Signature");
+            }
+        }
+
         protected virtual DependencyList ComputeNonRelocationBasedDependencies(NodeFactory factory)
         {
             return null;

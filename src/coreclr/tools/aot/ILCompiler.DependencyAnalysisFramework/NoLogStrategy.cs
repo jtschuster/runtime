@@ -13,6 +13,8 @@ namespace ILCompiler.DependencyAnalysisFramework
     {
         private static readonly object s_singleton = new object();
 
+        static bool IDependencyAnalysisMarkStrategy<DependencyContextType>.NeedsReasons => false;
+
         bool IDependencyAnalysisMarkStrategy<DependencyContextType>.MarkNode(
             DependencyNodeCore<DependencyContextType> node,
             DependencyNodeCore<DependencyContextType> reasonNode,

@@ -22,5 +22,12 @@ namespace ILCompiler.DependencyAnalysisFramework
         void VisitLogEdges(IEnumerable<DependencyNodeCore<DependencyContextType>> nodeList, IDependencyAnalyzerLogEdgeVisitor<DependencyContextType> logEdgeVisitor);
 
         void AttachContext(DependencyContextType context);
+
+        /// <summary>
+        /// Indicates whether this strategy needs reason strings for dependency edges.
+        /// When false, the analyzer can skip capturing and passing reason strings,
+        /// reducing memory usage and improving cache utilization.
+        /// </summary>
+        static virtual bool NeedsReasons => true;
     }
 }

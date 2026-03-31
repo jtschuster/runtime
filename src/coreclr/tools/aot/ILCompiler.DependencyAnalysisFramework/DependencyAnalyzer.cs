@@ -42,6 +42,9 @@ namespace ILCompiler.DependencyAnalysisFramework
         private Dictionary<DependencyNodeCore<DependencyContextType>, HashSet<DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry>> _conditional_dependency_store = new Dictionary<DependencyNodeCore<DependencyContextType>, HashSet<DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry>>();
         private bool _markingCompleted;
 
+        private readonly DependencyCollector<DependencyContextType> _staticDepCollector;
+        private readonly CombinedDependencyCollector<DependencyContextType> _conditionalDepCollector;
+
         private sealed class RandomInsertStack<T>
         {
             private List<T> _nodes = new List<T>();
@@ -103,6 +106,10 @@ namespace ILCompiler.DependencyAnalysisFramework
             _dependencyContext = dependencyContext;
             _resultSorter = resultSorter;
             _marker.AttachContext(dependencyContext);
+
+            bool captureReasons = MarkStrategy.NeedsReasons;
+            _staticDepCollector = new DependencyCollector<DependencyContextType>(captureReasons);
+            _conditionalDepCollector = new CombinedDependencyCollector<DependencyContextType>(captureReasons);
 
             Random stackPopRandomizer = null;
             if (int.TryParse(Environment.GetEnvironmentVariable("CoreRT_DeterminismSeed"), out int seed))
@@ -179,34 +186,40 @@ namespace ILCompiler.DependencyAnalysisFramework
         // Internal details
         private void GetStaticDependenciesImpl(DependencyNodeCore<DependencyContextType> node)
         {
-            IEnumerable<DependencyNodeCore<DependencyContextType>.DependencyListEntry> staticDependencies = node.GetStaticDependencies(_dependencyContext);
-            if (staticDependencies != null)
+            _staticDepCollector.Clear();
+            node.CollectStaticDependencies(_dependencyContext, _staticDepCollector);
+
+            for (int i = 0; i < _staticDepCollector.Count; i++)
             {
-                foreach (DependencyNodeCore<DependencyContextType>.DependencyListEntry dependency in staticDependencies)
-                {
-                    AddToMarkStack(dependency.Node, dependency.Reason, node, null);
-                }
+                AddToMarkStack(_staticDepCollector.GetNode(i), _staticDepCollector.GetReason(i), node, null);
             }
 
             if (node.HasConditionalStaticDependencies)
             {
-                foreach (DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry dependency in node.GetConditionalStaticDependencies(_dependencyContext))
+                _conditionalDepCollector.Clear();
+                node.CollectConditionalStaticDependencies(_dependencyContext, _conditionalDepCollector);
+
+                for (int i = 0; i < _conditionalDepCollector.Count; i++)
                 {
-                    if (dependency.OtherReasonNode.Marked)
+                    DependencyNodeCore<DependencyContextType> depNode = _conditionalDepCollector.GetNode(i);
+                    DependencyNodeCore<DependencyContextType> otherReasonNode = _conditionalDepCollector.GetOtherReasonNode(i);
+                    string reason = _conditionalDepCollector.GetReason(i);
+
+                    if (otherReasonNode.Marked)
                     {
-                        AddToMarkStack(dependency.Node, dependency.Reason, node, dependency.OtherReasonNode);
+                        AddToMarkStack(depNode, reason, node, otherReasonNode);
                     }
                     else
                     {
                         HashSet<DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry> storedDependencySet;
-                        if (!_conditional_dependency_store.TryGetValue(dependency.OtherReasonNode, out storedDependencySet))
+                        if (!_conditional_dependency_store.TryGetValue(otherReasonNode, out storedDependencySet))
                         {
                             storedDependencySet = new HashSet<DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry>();
-                            _conditional_dependency_store.Add(dependency.OtherReasonNode, storedDependencySet);
+                            _conditional_dependency_store.Add(otherReasonNode, storedDependencySet);
                         }
                         // Swap out other reason node as we're storing that as the dictionary key
                         DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry conditionalDependencyStoreEntry =
-                            new DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry(dependency.Node, node, dependency.Reason);
+                            new DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry(depNode, node, reason);
                         storedDependencySet.Add(conditionalDependencyStoreEntry);
                     }
                 }
