@@ -46,7 +46,7 @@ namespace ILCompiler.DependencyAnalysisFramework
         private static int s_GraphIds;
 
         private int GraphId;
-        private int RootIndex;
+        private uint RootIndex;
         private int ObjectIndex;
         private DependencyContextType _context;
 
@@ -70,11 +70,11 @@ namespace ILCompiler.DependencyAnalysisFramework
         {
             bool retVal = false;
 
-            int nodeIndex;
+            uint nodeIndex;
 
             if (!node.Marked)
             {
-                nodeIndex = Interlocked.Increment(ref ObjectIndex);
+                nodeIndex = (uint)Interlocked.Increment(ref ObjectIndex);
                 node.SetMark(nodeIndex);
 
                 if (GraphId == 0)
@@ -85,35 +85,35 @@ namespace ILCompiler.DependencyAnalysisFramework
                         {
                             GraphId = Interlocked.Increment(ref s_GraphIds);
                             GraphEventSource.Log.Graph(GraphId, "");
-                            RootIndex = Interlocked.Increment(ref ObjectIndex);
-                            GraphEventSource.Log.Node(GraphId, RootIndex, "roots");
+                            RootIndex = (uint)Interlocked.Increment(ref ObjectIndex);
+                            GraphEventSource.Log.Node(GraphId, (int)RootIndex, "roots");
                         }
                     }
                 }
 
                 retVal = true;
 
-                GraphEventSource.Log.Node(GraphId, nodeIndex, node.GetNameInternal(_context));
+                GraphEventSource.Log.Node(GraphId, (int)nodeIndex, node.GetNameInternal(_context));
             }
             else
             {
-                nodeIndex = (int)node.GetMark();
+                nodeIndex = node.GetMarkIndex();
             }
 
             if (reasonNode != null)
             {
                 if (reasonNode2 != null)
                 {
-                    GraphEventSource.Log.ConditionalEdge(GraphId, (int)reasonNode.GetMark(), (int)reasonNode2.GetMark(), nodeIndex, reason);
+                    GraphEventSource.Log.ConditionalEdge(GraphId, (int)reasonNode.GetMarkIndex(), (int)reasonNode2.GetMarkIndex(), (int)nodeIndex, reason);
                 }
                 else
                 {
-                    GraphEventSource.Log.Edge(GraphId, (int)reasonNode.GetMark(), nodeIndex, reason);
+                    GraphEventSource.Log.Edge(GraphId, (int)reasonNode.GetMarkIndex(), (int)nodeIndex, reason);
                 }
             }
             else
             {
-                GraphEventSource.Log.Edge(GraphId, RootIndex, nodeIndex, reason);
+                GraphEventSource.Log.Edge(GraphId, (int)RootIndex, (int)nodeIndex, reason);
             }
             return retVal;
         }

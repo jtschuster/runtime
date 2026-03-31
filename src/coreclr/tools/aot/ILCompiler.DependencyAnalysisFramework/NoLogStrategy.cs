@@ -11,7 +11,7 @@ namespace ILCompiler.DependencyAnalysisFramework
     /// <typeparam name="DependencyContextType"></typeparam>
     public struct NoLogStrategy<DependencyContextType> : IDependencyAnalysisMarkStrategy<DependencyContextType>
     {
-        private static readonly object s_singleton = new object();
+        private uint _nextIndex;
 
         bool IDependencyAnalysisMarkStrategy<DependencyContextType>.MarkNode(
             DependencyNodeCore<DependencyContextType> node,
@@ -22,7 +22,7 @@ namespace ILCompiler.DependencyAnalysisFramework
             if (node.Marked)
                 return false;
 
-            node.SetMark(s_singleton);
+            node.SetMark(++_nextIndex);
             return true;
         }
 

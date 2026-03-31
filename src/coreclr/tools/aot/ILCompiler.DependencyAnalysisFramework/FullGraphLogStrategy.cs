@@ -96,6 +96,7 @@ namespace ILCompiler.DependencyAnalysisFramework
         }
 
         private HashSet<string> _reasonStringOnlyNodes;
+        private List<HashSet<MarkData>> _marks;
 
         bool IDependencyAnalysisMarkStrategy<DependencyContextType>.MarkNode(
             DependencyNodeCore<DependencyContextType> node,
@@ -109,11 +110,13 @@ namespace ILCompiler.DependencyAnalysisFramework
             if (newlyMarked)
             {
                 associatedNodes = new HashSet<MarkData>(MarkDataEqualityComparer.Default);
-                node.SetMark(associatedNodes);
+                _marks ??= new List<HashSet<MarkData>>();
+                _marks.Add(associatedNodes);
+                node.SetMark((uint)_marks.Count);
             }
             else
             {
-                associatedNodes = (HashSet<MarkData>)node.GetMark();
+                associatedNodes = _marks[(int)node.GetMarkIndex() - 1];
             }
 
             if ((reasonNode == null) && (reasonNode2 == null))
@@ -144,7 +147,7 @@ namespace ILCompiler.DependencyAnalysisFramework
             {
                 if (node.Marked)
                 {
-                    HashSet<MarkData> nodeReasons = (HashSet<MarkData>)node.GetMark();
+                    HashSet<MarkData> nodeReasons = _marks[(int)node.GetMarkIndex() - 1];
                     foreach (MarkData markData in nodeReasons)
                     {
                         if (markData.Reason2 != null)
@@ -167,7 +170,7 @@ namespace ILCompiler.DependencyAnalysisFramework
             {
                 if (node.Marked)
                 {
-                    HashSet<MarkData> nodeReasons = (HashSet<MarkData>)node.GetMark();
+                    HashSet<MarkData> nodeReasons = _marks[(int)node.GetMarkIndex() - 1];
                     foreach (MarkData markData in nodeReasons)
                     {
                         if (markData.Reason2 != null)

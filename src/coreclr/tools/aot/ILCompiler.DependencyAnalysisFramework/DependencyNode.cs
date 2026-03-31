@@ -7,29 +7,29 @@ namespace ILCompiler.DependencyAnalysisFramework
 {
     public abstract class DependencyNode : IDependencyNode
     {
-        private object _mark;
+        private uint _markIndex;
 
         // Only DependencyNodeCore<T> is allowed to derive from this
         internal DependencyNode()
         { }
 
-        internal void SetMark(object mark)
+        internal void SetMark(uint markIndex)
         {
-            Debug.Assert(mark != null);
-            Debug.Assert(_mark == null);
-            _mark = mark;
+            Debug.Assert(markIndex != 0);
+            Debug.Assert(_markIndex == 0);
+            _markIndex = markIndex;
         }
 
-        internal object GetMark()
+        internal uint GetMarkIndex()
         {
-            return _mark;
+            return _markIndex;
         }
 
         public bool Marked
         {
             get
             {
-                return _mark != null;
+                return _markIndex != 0;
             }
         }
 

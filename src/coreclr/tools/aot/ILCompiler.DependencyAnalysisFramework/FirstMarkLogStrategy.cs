@@ -35,6 +35,7 @@ namespace ILCompiler.DependencyAnalysisFramework
         }
 
         private HashSet<string> _reasonStringOnlyNodes;
+        private List<MarkData> _marks;
 
         bool IDependencyAnalysisMarkStrategy<DependencyContextType>.MarkNode(
             DependencyNodeCore<DependencyContextType> node,
@@ -53,7 +54,9 @@ namespace ILCompiler.DependencyAnalysisFramework
                 _reasonStringOnlyNodes.Add(reason);
             }
 
-            node.SetMark(new MarkData(reason, reasonNode, reasonNode2));
+            _marks ??= new List<MarkData>();
+            _marks.Add(new MarkData(reason, reasonNode, reasonNode2));
+            node.SetMark((uint)_marks.Count);
             return true;
         }
 
@@ -73,7 +76,7 @@ namespace ILCompiler.DependencyAnalysisFramework
             {
                 if (node.Marked)
                 {
-                    MarkData markData = (MarkData)node.GetMark();
+                    MarkData markData = _marks[(int)node.GetMarkIndex() - 1];
 
                     if (markData.Reason2 != null)
                     {
@@ -94,7 +97,7 @@ namespace ILCompiler.DependencyAnalysisFramework
             {
                 if (node.Marked)
                 {
-                    MarkData markData = (MarkData)node.GetMark();
+                    MarkData markData = _marks[(int)node.GetMarkIndex() - 1];
 
                     if (markData.Reason2 != null)
                     {
