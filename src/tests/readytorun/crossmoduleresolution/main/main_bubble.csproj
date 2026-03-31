@@ -1,0 +1,161 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RequiresProcessIsolation>true</RequiresProcessIsolation>
+    <ReferenceXUnitWrapperGenerator>false</ReferenceXUnitWrapperGenerator>
+    <CrossGenTest>false</CrossGenTest>
+    <CLRTestPriority>1</CLRTestPriority>
+    <IlasmRoundTripIncompatible>true</IlasmRoundTripIncompatible>
+    <!-- This test launches crossgen2 with dotnet, so we skip under sanitizers. -->
+    <CLRTestTargetUnsupported Condition="'$(EnableNativeSanitizers)' != ''">true</CLRTestTargetUnsupported>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\assemblyB\assemblyB.csproj" />
+    <ProjectReference Include="..\assemblyC\assemblyC.csproj" />
+    <ProjectReference Include="..\assemblyD\assemblyD.csproj" />
+    <ProjectReference Include="..\assemblyE\assemblyE.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="main.cs" />
+  </ItemGroup>
+  <PropertyGroup>
+    <CLRTestBatchPreCommands><![CDATA[
+$(CLRTestBatchPreCommands)
+
+REM Suppress some DOTNET variables for the duration of Crossgen2 execution
+setlocal
+set "DOTNET_GCName="
+set "DOTNET_GCStress="
+set "DOTNET_HeapVerify="
+set "DOTNET_ReadyToRun="
+
+md IL_DLLS 2>nul
+
+REM Copy IL assemblies before crossgen2 overwrites them
+for %%A in (main_bubble assemblyB assemblyC assemblyD assemblyE) do (
+    if not exist IL_DLLS\%%A.dll (
+        copy /y %%A.dll IL_DLLS\%%A.dll
+        if not exist IL_DLLS\%%A.dll (
+            echo FAILED to copy %%A.dll to IL_DLLS
+            exit /b 1
+        )
+    )
+)
+
+REM Crossgen2 assemblyD (no special flags)
+%Core_Root%\crossgen2\crossgen2.exe -r:%Core_Root%\*.dll -o:assemblyD.dll IL_DLLS\assemblyD.dll
+
+set CrossGenStatus=!ERRORLEVEL!
+IF NOT !CrossGenStatus!==0 (
+    ECHO Crossgen assemblyD failed with exitcode - !CrossGenStatus!
+    Exit /b 1
+)
+
+REM Crossgen2 assemblyE (references assemblyD)
+%Core_Root%\crossgen2\crossgen2.exe -r:%Core_Root%\*.dll -r:assemblyD.dll -o:assemblyE.dll IL_DLLS\assemblyE.dll
+
+set CrossGenStatus=!ERRORLEVEL!
+IF NOT !CrossGenStatus!==0 (
+    ECHO Crossgen assemblyE failed with exitcode - !CrossGenStatus!
+    Exit /b 1
+)
+
+REM Crossgen2 assemblyB (no special flags)
+%Core_Root%\crossgen2\crossgen2.exe -r:%Core_Root%\*.dll -o:assemblyB.dll IL_DLLS\assemblyB.dll
+
+set CrossGenStatus=!ERRORLEVEL!
+IF NOT !CrossGenStatus!==0 (
+    ECHO Crossgen assemblyB failed with exitcode - !CrossGenStatus!
+    Exit /b 1
+)
+
+REM Crossgen2 assemblyC (references assemblyD, assemblyE)
+%Core_Root%\crossgen2\crossgen2.exe -r:%Core_Root%\*.dll -r:assemblyD.dll -r:assemblyE.dll -o:assemblyC.dll IL_DLLS\assemblyC.dll
+
+set CrossGenStatus=!ERRORLEVEL!
+IF NOT !CrossGenStatus!==0 (
+    ECHO Crossgen assemblyC failed with exitcode - !CrossGenStatus!
+    Exit /b 1
+)
+
+REM Crossgen2 main with --inputbubbleref assemblyB (version bubble)
+%Core_Root%\crossgen2\crossgen2.exe --map -r:%Core_Root%\*.dll -r:assemblyB.dll -r:assemblyC.dll -r:assemblyD.dll -r:assemblyE.dll --inputbubbleref:assemblyB.dll -o:main_bubble.dll IL_DLLS\main_bubble.dll
+
+set CrossGenStatus=!ERRORLEVEL!
+IF NOT !CrossGenStatus!==0 (
+    ECHO Crossgen main_bubble failed with exitcode - !CrossGenStatus!
+    Exit /b 1
+)
+if not exist main_bubble.map (
+    echo FAILED to build main_bubble.dll - no map file
+    exit /b 1
+)
+
+endlocal
+]]></CLRTestBatchPreCommands>
+    <CLRTestBashPreCommands><![CDATA[
+$(CLRTestBashPreCommands)
+
+# Suppress some DOTNET variables for the duration of Crossgen2 execution
+export -n DOTNET_GCName DOTNET_GCStress DOTNET_HeapVerify DOTNET_ReadyToRun
+
+mkdir -p IL_DLLS
+
+# Copy IL assemblies before crossgen2 overwrites them
+for asm in main_bubble assemblyB assemblyC assemblyD assemblyE; do
+    if [ ! -f "IL_DLLS/${asm}.dll" ]; then
+        cp "${asm}.dll" "IL_DLLS/${asm}.dll"
+        if [ ! -f "IL_DLLS/${asm}.dll" ]; then
+            echo "FAILED to copy ${asm}.dll to IL_DLLS"
+            exit 1
+        fi
+    fi
+done
+
+# Crossgen2 assemblyD (no special flags)
+"$CORE_ROOT"/crossgen2/crossgen2 -r:"$CORE_ROOT"/*.dll -o:assemblyD.dll IL_DLLS/assemblyD.dll
+__cgExitCode=$?
+if [ $__cgExitCode -ne 0 ]; then
+    echo "Crossgen assemblyD failed with exitcode: $__cgExitCode"
+    exit 1
+fi
+
+# Crossgen2 assemblyE (references assemblyD)
+"$CORE_ROOT"/crossgen2/crossgen2 -r:"$CORE_ROOT"/*.dll -r:assemblyD.dll -o:assemblyE.dll IL_DLLS/assemblyE.dll
+__cgExitCode=$?
+if [ $__cgExitCode -ne 0 ]; then
+    echo "Crossgen assemblyE failed with exitcode: $__cgExitCode"
+    exit 1
+fi
+
+# Crossgen2 assemblyB (no special flags)
+"$CORE_ROOT"/crossgen2/crossgen2 -r:"$CORE_ROOT"/*.dll -o:assemblyB.dll IL_DLLS/assemblyB.dll
+__cgExitCode=$?
+if [ $__cgExitCode -ne 0 ]; then
+    echo "Crossgen assemblyB failed with exitcode: $__cgExitCode"
+    exit 1
+fi
+
+# Crossgen2 assemblyC (references assemblyD, assemblyE)
+"$CORE_ROOT"/crossgen2/crossgen2 -r:"$CORE_ROOT"/*.dll -r:assemblyD.dll -r:assemblyE.dll -o:assemblyC.dll IL_DLLS/assemblyC.dll
+__cgExitCode=$?
+if [ $__cgExitCode -ne 0 ]; then
+    echo "Crossgen assemblyC failed with exitcode: $__cgExitCode"
+    exit 1
+fi
+
+# Crossgen2 main with --inputbubbleref assemblyB (version bubble)
+"$CORE_ROOT"/crossgen2/crossgen2 --map -r:"$CORE_ROOT"/*.dll -r:assemblyB.dll -r:assemblyC.dll -r:assemblyD.dll -r:assemblyE.dll --inputbubbleref:assemblyB.dll -o:main_bubble.dll IL_DLLS/main_bubble.dll
+__cgExitCode=$?
+if [ $__cgExitCode -ne 0 ]; then
+    echo "Crossgen main_bubble failed with exitcode: $__cgExitCode"
+    exit 1
+fi
+if [ ! -f main_bubble.map ]; then
+    echo "FAILED to build main_bubble.dll - no map file"
+    exit 1
+fi
+
+export DOTNET_GCName DOTNET_GCStress DOTNET_HeapVerify DOTNET_ReadyToRun
+]]></CLRTestBashPreCommands>
+  </PropertyGroup>
+</Project>

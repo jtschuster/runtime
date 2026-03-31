@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>library</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\assemblyD\assemblyD.csproj" />
+    <ProjectReference Include="..\assemblyE\assemblyE.csproj" />
+    <Compile Include="C.cs" />
+  </ItemGroup>
+</Project>
