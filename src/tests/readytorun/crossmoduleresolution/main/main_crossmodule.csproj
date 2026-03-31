@@ -9,7 +9,13 @@
     <NoWarn>$(NoWarn);CS1998</NoWarn>
     <!-- This test launches crossgen2 with dotnet, so we skip under sanitizers. -->
     <CLRTestTargetUnsupported Condition="'$(EnableNativeSanitizers)' != ''">true</CLRTestTargetUnsupported>
+
+    <!-- Crossgen2 configuration -->
+    <Crossgen2CommonArgs>--opt-async-methods</Crossgen2CommonArgs>
+    <Crossgen2MainAssembly>main_crossmodule</Crossgen2MainAssembly>
+    <Crossgen2MainExtraArgs>--opt-cross-module:assemblyC</Crossgen2MainExtraArgs>
   </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\assemblyB\assemblyB.csproj" />
     <ProjectReference Include="..\assemblyC\assemblyC.csproj" />
@@ -19,176 +25,24 @@
   <ItemGroup>
     <Compile Include="main.cs" />
   </ItemGroup>
-  <PropertyGroup>
-    <CLRTestBatchPreCommands><![CDATA[
-$(CLRTestBatchPreCommands)
 
-REM Suppress some DOTNET variables for the duration of Crossgen2 execution
-setlocal
-set "DOTNET_GCName="
-set "DOTNET_GCStress="
-set "DOTNET_HeapVerify="
-set "DOTNET_ReadyToRun="
+  <!-- Crossgen2 compilation steps (order matters — dependencies first) -->
+  <ItemGroup>
+    <Crossgen2Step Include="assemblyD" />
+    <Crossgen2Step Include="assemblyE" ExtraArgs="-r:assemblyD.dll" />
+    <Crossgen2Step Include="assemblyB" />
+    <Crossgen2Step Include="assemblyC" ExtraArgs="-r:assemblyD.dll -r:assemblyE.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <Crossgen2MainRef Include="assemblyB;assemblyC;assemblyD;assemblyE" />
+  </ItemGroup>
 
-md IL_DLLS 2>nul
+  <!-- R2R validation: expected assembly refs, inlined methods, and async thunks -->
+  <ItemGroup>
+    <R2RExpectRef Include="assemblyC;assemblyB" />
+    <R2RExpectInlined Include="TestTypeRef_CrossModuleOwn;TestTypeRef_Transitive;TestMethodCall_Transitive;TestFieldAccess_Transitive;TestGeneric_MixedOrigin;TestGeneric_CrossModuleDefinition;TestNestedType_External;TestTypeForwarder" />
+    <R2RExpectAsyncThunks Include="TestAsyncTypeRef_CrossModuleOwn;TestAsyncTypeRef_Transitive;TestAsyncMethodCall_Transitive;TestAsyncFieldAccess_Transitive;TestAsyncGeneric_MixedOrigin;TestAsyncVoid_CrossModuleOwn;TestAsyncVoid_Transitive" />
+  </ItemGroup>
 
-REM Copy IL assemblies before crossgen2 overwrites them
-for %%A in (main_crossmodule assemblyB assemblyC assemblyD assemblyE) do (
-    if not exist IL_DLLS\%%A.dll (
-        copy /y %%A.dll IL_DLLS\%%A.dll
-        if not exist IL_DLLS\%%A.dll (
-            echo FAILED to copy %%A.dll to IL_DLLS
-            exit /b 1
-        )
-    )
-)
-
-REM Crossgen2 assemblyD (no special flags)
-%Core_Root%\crossgen2\crossgen2.exe --opt-async-methods -r:%Core_Root%\*.dll -o:assemblyD.dll IL_DLLS\assemblyD.dll
-
-set CrossGenStatus=!ERRORLEVEL!
-IF NOT !CrossGenStatus!==0 (
-    ECHO Crossgen assemblyD failed with exitcode - !CrossGenStatus!
-    Exit /b 1
-)
-
-REM Crossgen2 assemblyE (references assemblyD)
-%Core_Root%\crossgen2\crossgen2.exe --opt-async-methods -r:%Core_Root%\*.dll -r:assemblyD.dll -o:assemblyE.dll IL_DLLS\assemblyE.dll
-
-set CrossGenStatus=!ERRORLEVEL!
-IF NOT !CrossGenStatus!==0 (
-    ECHO Crossgen assemblyE failed with exitcode - !CrossGenStatus!
-    Exit /b 1
-)
-
-REM Crossgen2 assemblyB (no special flags)
-%Core_Root%\crossgen2\crossgen2.exe --opt-async-methods -r:%Core_Root%\*.dll -o:assemblyB.dll IL_DLLS\assemblyB.dll
-
-set CrossGenStatus=!ERRORLEVEL!
-IF NOT !CrossGenStatus!==0 (
-    ECHO Crossgen assemblyB failed with exitcode - !CrossGenStatus!
-    Exit /b 1
-)
-
-REM Crossgen2 assemblyC (references assemblyD, assemblyE)
-%Core_Root%\crossgen2\crossgen2.exe --opt-async-methods -r:%Core_Root%\*.dll -r:assemblyD.dll -r:assemblyE.dll -o:assemblyC.dll IL_DLLS\assemblyC.dll
-
-set CrossGenStatus=!ERRORLEVEL!
-IF NOT !CrossGenStatus!==0 (
-    ECHO Crossgen assemblyC failed with exitcode - !CrossGenStatus!
-    Exit /b 1
-)
-
-REM Crossgen2 main with --opt-cross-module:assemblyC
-%Core_Root%\crossgen2\crossgen2.exe --opt-async-methods --map -r:%Core_Root%\*.dll -r:assemblyB.dll -r:assemblyC.dll -r:assemblyD.dll -r:assemblyE.dll --opt-cross-module:assemblyC -o:main_crossmodule.dll IL_DLLS\main_crossmodule.dll
-
-set CrossGenStatus=!ERRORLEVEL!
-IF NOT !CrossGenStatus!==0 (
-    ECHO Crossgen main_crossmodule failed with exitcode - !CrossGenStatus!
-    Exit /b 1
-)
-if not exist main_crossmodule.map (
-    echo FAILED to build main_crossmodule.dll - no map file
-    exit /b 1
-)
-
-REM R2R Validation: verify cross-module inlining artifacts and async thunks
-set R2RVALIDATE_DIR=..\..\r2rvalidate\r2rvalidate
-if exist "%R2RVALIDATE_DIR%\r2rvalidate.dll" (
-    echo Running R2R validation on main_crossmodule.dll...
-    %Core_Root%\corerun "%R2RVALIDATE_DIR%\r2rvalidate.dll" --in main_crossmodule.dll --ref %Core_Root% --ref . --expect-manifest-ref assemblyC --expect-manifest-ref assemblyB --expect-inlined TestTypeRef_CrossModuleOwn --expect-inlined TestTypeRef_Transitive --expect-inlined TestMethodCall_Transitive --expect-inlined TestFieldAccess_Transitive --expect-inlined TestGeneric_MixedOrigin --expect-inlined TestGeneric_CrossModuleDefinition --expect-inlined TestNestedType_External --expect-inlined TestTypeForwarder --expect-async-thunks TestAsyncTypeRef_CrossModuleOwn --expect-async-thunks TestAsyncTypeRef_Transitive --expect-async-thunks TestAsyncMethodCall_Transitive --expect-async-thunks TestAsyncFieldAccess_Transitive --expect-async-thunks TestAsyncGeneric_MixedOrigin --expect-async-thunks TestAsyncVoid_CrossModuleOwn --expect-async-thunks TestAsyncVoid_Transitive
-    set ValStatus=!ERRORLEVEL!
-    IF NOT !ValStatus!==100 (
-        ECHO R2R validation failed with exitcode - !ValStatus!
-        Exit /b 1
-    )
-    echo R2R validation passed
-) ELSE (
-    echo WARNING: r2rvalidate.dll not found, skipping R2R validation
-)
-
-endlocal
-]]></CLRTestBatchPreCommands>
-    <CLRTestBashPreCommands><![CDATA[
-$(CLRTestBashPreCommands)
-
-# Suppress some DOTNET variables for the duration of Crossgen2 execution
-export -n DOTNET_GCName DOTNET_GCStress DOTNET_HeapVerify DOTNET_ReadyToRun
-
-mkdir -p IL_DLLS
-
-# Copy IL assemblies before crossgen2 overwrites them
-for asm in main_crossmodule assemblyB assemblyC assemblyD assemblyE; do
-    if [ ! -f "IL_DLLS/${asm}.dll" ]; then
-        cp "${asm}.dll" "IL_DLLS/${asm}.dll"
-        if [ ! -f "IL_DLLS/${asm}.dll" ]; then
-            echo "FAILED to copy ${asm}.dll to IL_DLLS"
-            exit 1
-        fi
-    fi
-done
-
-# Crossgen2 assemblyD (no special flags)
-"$CORE_ROOT"/crossgen2/crossgen2 --opt-async-methods -r:"$CORE_ROOT"/*.dll -o:assemblyD.dll IL_DLLS/assemblyD.dll
-__cgExitCode=$?
-if [ $__cgExitCode -ne 0 ]; then
-    echo "Crossgen assemblyD failed with exitcode: $__cgExitCode"
-    exit 1
-fi
-
-# Crossgen2 assemblyE (references assemblyD)
-"$CORE_ROOT"/crossgen2/crossgen2 --opt-async-methods -r:"$CORE_ROOT"/*.dll -r:assemblyD.dll -o:assemblyE.dll IL_DLLS/assemblyE.dll
-__cgExitCode=$?
-if [ $__cgExitCode -ne 0 ]; then
-    echo "Crossgen assemblyE failed with exitcode: $__cgExitCode"
-    exit 1
-fi
-
-# Crossgen2 assemblyB (no special flags)
-"$CORE_ROOT"/crossgen2/crossgen2 --opt-async-methods -r:"$CORE_ROOT"/*.dll -o:assemblyB.dll IL_DLLS/assemblyB.dll
-__cgExitCode=$?
-if [ $__cgExitCode -ne 0 ]; then
-    echo "Crossgen assemblyB failed with exitcode: $__cgExitCode"
-    exit 1
-fi
-
-# Crossgen2 assemblyC (references assemblyD, assemblyE)
-"$CORE_ROOT"/crossgen2/crossgen2 --opt-async-methods -r:"$CORE_ROOT"/*.dll -r:assemblyD.dll -r:assemblyE.dll -o:assemblyC.dll IL_DLLS/assemblyC.dll
-__cgExitCode=$?
-if [ $__cgExitCode -ne 0 ]; then
-    echo "Crossgen assemblyC failed with exitcode: $__cgExitCode"
-    exit 1
-fi
-
-# Crossgen2 main with --opt-cross-module:assemblyC
-"$CORE_ROOT"/crossgen2/crossgen2 --opt-async-methods --map -r:"$CORE_ROOT"/*.dll -r:assemblyB.dll -r:assemblyC.dll -r:assemblyD.dll -r:assemblyE.dll --opt-cross-module:assemblyC -o:main_crossmodule.dll IL_DLLS/main_crossmodule.dll
-__cgExitCode=$?
-if [ $__cgExitCode -ne 0 ]; then
-    echo "Crossgen main_crossmodule failed with exitcode: $__cgExitCode"
-    exit 1
-fi
-if [ ! -f main_crossmodule.map ]; then
-    echo "FAILED to build main_crossmodule.dll - no map file"
-    exit 1
-fi
-
-# R2R Validation: verify cross-module inlining artifacts and async thunks
-# Path is relative to this test's output directory (script cd's here before running)
-R2RVALIDATE_DIR="../../r2rvalidate/r2rvalidate"
-if [ -f "${R2RVALIDATE_DIR}/r2rvalidate.dll" ]; then
-    echo "Running R2R validation on main_crossmodule.dll..."
-    "${CORE_ROOT}"/corerun "${R2RVALIDATE_DIR}/r2rvalidate.dll" --in main_crossmodule.dll --ref "${CORE_ROOT}" --ref . --expect-manifest-ref assemblyC --expect-manifest-ref assemblyB --expect-inlined TestTypeRef_CrossModuleOwn --expect-inlined TestTypeRef_Transitive --expect-inlined TestMethodCall_Transitive --expect-inlined TestFieldAccess_Transitive --expect-inlined TestGeneric_MixedOrigin --expect-inlined TestGeneric_CrossModuleDefinition --expect-inlined TestNestedType_External --expect-inlined TestTypeForwarder --expect-async-thunks TestAsyncTypeRef_CrossModuleOwn --expect-async-thunks TestAsyncTypeRef_Transitive --expect-async-thunks TestAsyncMethodCall_Transitive --expect-async-thunks TestAsyncFieldAccess_Transitive --expect-async-thunks TestAsyncGeneric_MixedOrigin --expect-async-thunks TestAsyncVoid_CrossModuleOwn --expect-async-thunks TestAsyncVoid_Transitive
-    __valExitCode=$?
-    if [ $__valExitCode -ne 100 ]; then
-        echo "R2R validation failed with exitcode: $__valExitCode"
-        exit 1
-    fi
-    echo "R2R validation passed"
-else
-    echo "WARNING: r2rvalidate.dll not found at ${R2RVALIDATE_DIR}, skipping R2R validation"
-fi
-
-export DOTNET_GCName DOTNET_GCStress DOTNET_HeapVerify DOTNET_ReadyToRun
-]]></CLRTestBashPreCommands>
-  </PropertyGroup>
+  <Import Project="..\crossmoduleresolution.targets" />
 </Project>

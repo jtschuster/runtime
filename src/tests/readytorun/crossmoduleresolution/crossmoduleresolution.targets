@@ -1,0 +1,160 @@
+<!--
+  Shared targets for cross-module resolution R2R tests.
+
+  This file generates CLRTestBashPreCommands / CLRTestBatchPreCommands that:
+    1. Copy IL assemblies to IL_DLLS/ before crossgen2 overwrites them
+    2. Run crossgen2 on each dependency assembly (Crossgen2Step items)
+    3. Run crossgen2 on the main assembly with extra args
+    4. Optionally run r2rvalidate for R2R image validation
+
+  Consuming csproj files define MSBuild items and properties, then import this file.
+
+  Properties:
+    Crossgen2CommonArgs      - Args added to every crossgen2 invocation (e.g. double-hyphen-opt-async-methods)
+    Crossgen2MainAssembly    - Name of the main test assembly (without .dll)
+    Crossgen2MainExtraArgs   - Extra args for the main assembly compilation
+
+  Items:
+    Crossgen2Step            - Dependency assemblies to crossgen, in declaration order.
+                               ExtraArgs metadata: additional crossgen2 args (e.g. -r:assemblyD.dll)
+    Crossgen2MainRef         - Assemblies to pass as -r: when crossgenning the main assembly
+    R2RExpectRef             - Assembly names expected in the R2R AssemblyRef table
+    R2RExpectInlined         - Method name substrings expected to have CHECK_IL_BODY fixups
+    R2RExpectAsyncThunks     - Method name substrings expected to have 3+ RuntimeFunctions
+-->
+<Project>
+  <PropertyGroup Condition="'$(Crossgen2MainAssembly)' != ''">
+    <!-- Build the validation argument string from items -->
+    <_R2RValArgs>@(R2RExpectRef->'--expect-manifest-ref %(Identity)', ' ')</_R2RValArgs>
+    <_R2RValArgs>$(_R2RValArgs) @(R2RExpectInlined->'--expect-inlined %(Identity)', ' ')</_R2RValArgs>
+    <_R2RValArgs>$(_R2RValArgs) @(R2RExpectAsyncThunks->'--expect-async-thunks %(Identity)', ' ')</_R2RValArgs>
+
+    <CLRTestBatchPreCommands><![CDATA[
+$(CLRTestBatchPreCommands)
+
+REM Suppress some DOTNET variables for the duration of Crossgen2 execution
+setlocal
+set "DOTNET_GCName="
+set "DOTNET_GCStress="
+set "DOTNET_HeapVerify="
+set "DOTNET_ReadyToRun="
+
+REM Skip past the helper subroutine
+goto :__cg2_start
+
+:__cg2_invoke
+    set "__cg2Name=%~1"
+    set "__cg2Extra=%~2 %~3 %~4 %~5 %~6 %~7 %~8 %~9"
+    %Core_Root%\crossgen2\crossgen2.exe $(Crossgen2CommonArgs) -r:%Core_Root%\*.dll !__cg2Extra! -o:!__cg2Name!.dll IL_DLLS\!__cg2Name!.dll
+    set __cg2Exit=!ERRORLEVEL!
+    if not !__cg2Exit!==0 (
+        echo Crossgen2 !__cg2Name! failed with exitcode: !__cg2Exit!
+        exit /b 1
+    )
+    exit /b 0
+
+:__cg2_start
+
+md IL_DLLS 2>nul
+
+REM Copy IL assemblies before crossgen2 overwrites them
+for %%A in (@(Crossgen2Step->'%(Identity)', ' ') $(Crossgen2MainAssembly)) do (
+    if not exist IL_DLLS\%%A.dll (
+        copy /y %%A.dll IL_DLLS\%%A.dll
+        if not exist IL_DLLS\%%A.dll (
+            echo FAILED to copy %%A.dll to IL_DLLS
+            exit /b 1
+        )
+    )
+)
+
+REM Crossgen2 each dependency assembly
+@(Crossgen2Step->'call :__cg2_invoke %(Identity) %(ExtraArgs)%0aIF NOT !ERRORLEVEL!==0 Exit /b 1', '%0a')
+
+REM Crossgen2 main assembly
+call :__cg2_invoke $(Crossgen2MainAssembly) @(Crossgen2MainRef->'-r:%(Identity).dll', ' ') $(Crossgen2MainExtraArgs) --map
+IF NOT !ERRORLEVEL!==0 Exit /b 1
+
+if not exist $(Crossgen2MainAssembly).map (
+    echo FAILED to build $(Crossgen2MainAssembly).dll - no map file
+    exit /b 1
+)
+
+REM R2R Validation
+set R2RVALIDATE_DIR=..\..\r2rvalidate\r2rvalidate
+if exist "%R2RVALIDATE_DIR%\r2rvalidate.dll" (
+    echo Running R2R validation on $(Crossgen2MainAssembly).dll...
+    %Core_Root%\corerun "%R2RVALIDATE_DIR%\r2rvalidate.dll" --in $(Crossgen2MainAssembly).dll --ref %Core_Root% --ref . $(_R2RValArgs)
+    set ValStatus=!ERRORLEVEL!
+    IF NOT !ValStatus!==100 (
+        ECHO R2R validation failed with exitcode - !ValStatus!
+        Exit /b 1
+    )
+    echo R2R validation passed
+) ELSE (
+    echo WARNING: r2rvalidate.dll not found, skipping R2R validation
+)
+
+endlocal
+]]></CLRTestBatchPreCommands>
+
+    <CLRTestBashPreCommands><![CDATA[
+$(CLRTestBashPreCommands)
+
+# Suppress some DOTNET variables for the duration of Crossgen2 execution
+export -n DOTNET_GCName DOTNET_GCStress DOTNET_HeapVerify DOTNET_ReadyToRun
+
+__crossgen2() {
+    local name="$1"
+    shift
+    "$CORE_ROOT"/crossgen2/crossgen2 $(Crossgen2CommonArgs) -r:"$CORE_ROOT"/*.dll "$@" -o:"${name}.dll" "IL_DLLS/${name}.dll"
+    local __exitCode=$?
+    if [ $__exitCode -ne 0 ]%3B then
+        echo "Crossgen2 ${name} failed with exitcode: $__exitCode"
+        exit 1
+    fi
+}
+
+mkdir -p IL_DLLS
+
+# Copy IL assemblies before crossgen2 overwrites them
+for asm in @(Crossgen2Step->'%(Identity)', ' ') $(Crossgen2MainAssembly)%3B do
+    if [ ! -f "IL_DLLS/${asm}.dll" ]%3B then
+        cp "${asm}.dll" "IL_DLLS/${asm}.dll"
+        if [ ! -f "IL_DLLS/${asm}.dll" ]%3B then
+            echo "FAILED to copy ${asm}.dll to IL_DLLS"
+            exit 1
+        fi
+    fi
+done
+
+# Crossgen2 each dependency assembly
+@(Crossgen2Step->'__crossgen2 %(Identity) %(ExtraArgs)', '%0a')
+
+# Crossgen2 main assembly
+__crossgen2 $(Crossgen2MainAssembly) @(Crossgen2MainRef->'-r:%(Identity).dll', ' ') $(Crossgen2MainExtraArgs) --map
+
+if [ ! -f $(Crossgen2MainAssembly).map ]%3B then
+    echo "FAILED to build $(Crossgen2MainAssembly).dll - no map file"
+    exit 1
+fi
+
+# R2R Validation
+R2RVALIDATE_DIR="../../r2rvalidate/r2rvalidate"
+if [ -f "${R2RVALIDATE_DIR}/r2rvalidate.dll" ]%3B then
+    echo "Running R2R validation on $(Crossgen2MainAssembly).dll..."
+    "${CORE_ROOT}"/corerun "${R2RVALIDATE_DIR}/r2rvalidate.dll" --in $(Crossgen2MainAssembly).dll --ref "${CORE_ROOT}" --ref . $(_R2RValArgs)
+    __valExitCode=$?
+    if [ $__valExitCode -ne 100 ]%3B then
+        echo "R2R validation failed with exitcode: $__valExitCode"
+        exit 1
+    fi
+    echo "R2R validation passed"
+else
+    echo "WARNING: r2rvalidate.dll not found, skipping R2R validation"
+fi
+
+export DOTNET_GCName DOTNET_GCStress DOTNET_HeapVerify DOTNET_ReadyToRun
+]]></CLRTestBashPreCommands>
+  </PropertyGroup>
+</Project>
