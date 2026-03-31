@@ -3,6 +3,9 @@
     <OutputType>Exe</OutputType>
     <CLRTestKind>BuildOnly</CLRTestKind>
     <CLRTestPriority>1</CLRTestPriority>
+    <OutputPath>$(CORE_ROOT)/runcrossgen</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="RunCrossgen.cs" />

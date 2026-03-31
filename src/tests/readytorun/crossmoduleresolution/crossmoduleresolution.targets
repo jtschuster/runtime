@@ -57,9 +57,9 @@
       <_ValidateDll>$([MSBuild]::NormalizePath('$(OutputPath)', '..', '..', 'r2rvalidate', 'r2rvalidate', 'r2rvalidate.dll'))</_ValidateDll>
     </PropertyGroup>
 
-    <!-- Find the built RunCrossgen tool output -->
+    <!-- Find the built RunCrossgen tool in CORE_ROOT -->
     <PropertyGroup>
-      <_RunCrossgenDll>$([MSBuild]::NormalizePath('$(OutputPath)', '..', '..', 'runcrossgen', 'runcrossgen', 'runcrossgen.dll'))</_RunCrossgenDll>
+      <_RunCrossgenDll>$(CORE_ROOT)/runcrossgen/runcrossgen.dll</_RunCrossgenDll>
     </PropertyGroup>
 
     <Error Text="RunCrossgen tool not found at $(_RunCrossgenDll). Build the runcrossgen project first."
