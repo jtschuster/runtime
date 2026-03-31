@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <CLRTestKind>BuildOnly</CLRTestKind>
+    <CLRTestPriority>1</CLRTestPriority>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="$(TestSourceDir)/../coreclr/tools/aot/ILCompiler.Reflection.ReadyToRun/ILCompiler.Reflection.ReadyToRun.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="R2RValidate.cs" />
+  </ItemGroup>
+</Project>

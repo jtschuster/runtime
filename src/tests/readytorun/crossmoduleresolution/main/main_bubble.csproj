@@ -92,6 +92,21 @@ if not exist main_bubble.map (
     exit /b 1
 )
 
+REM R2R Validation: verify assembly references present (no cross-module inlining expected)
+set R2RVALIDATE_DIR=..\..\r2rvalidate\r2rvalidate
+if exist "%R2RVALIDATE_DIR%\r2rvalidate.dll" (
+    echo Running R2R validation on main_bubble.dll...
+    %Core_Root%\corerun "%R2RVALIDATE_DIR%\r2rvalidate.dll" --in main_bubble.dll --ref %Core_Root% --ref . --expect-manifest-ref assemblyC --expect-manifest-ref assemblyB
+    set ValStatus=!ERRORLEVEL!
+    IF NOT !ValStatus!==100 (
+        ECHO R2R validation failed with exitcode - !ValStatus!
+        Exit /b 1
+    )
+    echo R2R validation passed
+) ELSE (
+    echo WARNING: r2rvalidate.dll not found, skipping R2R validation
+)
+
 endlocal
 ]]></CLRTestBatchPreCommands>
     <CLRTestBashPreCommands><![CDATA[
@@ -155,6 +170,21 @@ fi
 if [ ! -f main_bubble.map ]; then
     echo "FAILED to build main_bubble.dll - no map file"
     exit 1
+fi
+
+# R2R Validation: verify assembly references present (no cross-module inlining expected)
+R2RVALIDATE_DIR="../../r2rvalidate/r2rvalidate"
+if [ -f "${R2RVALIDATE_DIR}/r2rvalidate.dll" ]; then
+    echo "Running R2R validation on main_bubble.dll..."
+    "${CORE_ROOT}"/corerun "${R2RVALIDATE_DIR}/r2rvalidate.dll" --in main_bubble.dll --ref "${CORE_ROOT}" --ref . --expect-manifest-ref assemblyC --expect-manifest-ref assemblyB
+    __valExitCode=$?
+    if [ $__valExitCode -ne 100 ]; then
+        echo "R2R validation failed with exitcode: $__valExitCode"
+        exit 1
+    fi
+    echo "R2R validation passed"
+else
+    echo "WARNING: r2rvalidate.dll not found at ${R2RVALIDATE_DIR}, skipping R2R validation"
 fi
 
 export DOTNET_GCName DOTNET_GCStress DOTNET_HeapVerify DOTNET_ReadyToRun

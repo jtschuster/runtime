@@ -92,6 +92,21 @@ if not exist main_crossmodule.map (
     exit /b 1
 )
 
+REM R2R Validation: verify cross-module inlining artifacts and async thunks
+set R2RVALIDATE_DIR=..\..\r2rvalidate\r2rvalidate
+if exist "%R2RVALIDATE_DIR%\r2rvalidate.dll" (
+    echo Running R2R validation on main_crossmodule.dll...
+    %Core_Root%\corerun "%R2RVALIDATE_DIR%\r2rvalidate.dll" --in main_crossmodule.dll --ref %Core_Root% --ref . --expect-manifest-ref assemblyC --expect-manifest-ref assemblyB --expect-inlined TestTypeRef_CrossModuleOwn --expect-inlined TestTypeRef_Transitive --expect-inlined TestMethodCall_Transitive --expect-inlined TestFieldAccess_Transitive --expect-inlined TestGeneric_MixedOrigin --expect-inlined TestGeneric_CrossModuleDefinition --expect-inlined TestNestedType_External --expect-inlined TestTypeForwarder --expect-async-thunks TestAsyncTypeRef_CrossModuleOwn --expect-async-thunks TestAsyncTypeRef_Transitive --expect-async-thunks TestAsyncMethodCall_Transitive --expect-async-thunks TestAsyncFieldAccess_Transitive --expect-async-thunks TestAsyncGeneric_MixedOrigin --expect-async-thunks TestAsyncVoid_CrossModuleOwn --expect-async-thunks TestAsyncVoid_Transitive
+    set ValStatus=!ERRORLEVEL!
+    IF NOT !ValStatus!==100 (
+        ECHO R2R validation failed with exitcode - !ValStatus!
+        Exit /b 1
+    )
+    echo R2R validation passed
+) ELSE (
+    echo WARNING: r2rvalidate.dll not found, skipping R2R validation
+)
+
 endlocal
 ]]></CLRTestBatchPreCommands>
     <CLRTestBashPreCommands><![CDATA[
@@ -155,6 +170,22 @@ fi
 if [ ! -f main_crossmodule.map ]; then
     echo "FAILED to build main_crossmodule.dll - no map file"
     exit 1
+fi
+
+# R2R Validation: verify cross-module inlining artifacts and async thunks
+# Path is relative to this test's output directory (script cd's here before running)
+R2RVALIDATE_DIR="../../r2rvalidate/r2rvalidate"
+if [ -f "${R2RVALIDATE_DIR}/r2rvalidate.dll" ]; then
+    echo "Running R2R validation on main_crossmodule.dll..."
+    "${CORE_ROOT}"/corerun "${R2RVALIDATE_DIR}/r2rvalidate.dll" --in main_crossmodule.dll --ref "${CORE_ROOT}" --ref . --expect-manifest-ref assemblyC --expect-manifest-ref assemblyB --expect-inlined TestTypeRef_CrossModuleOwn --expect-inlined TestTypeRef_Transitive --expect-inlined TestMethodCall_Transitive --expect-inlined TestFieldAccess_Transitive --expect-inlined TestGeneric_MixedOrigin --expect-inlined TestGeneric_CrossModuleDefinition --expect-inlined TestNestedType_External --expect-inlined TestTypeForwarder --expect-async-thunks TestAsyncTypeRef_CrossModuleOwn --expect-async-thunks TestAsyncTypeRef_Transitive --expect-async-thunks TestAsyncMethodCall_Transitive --expect-async-thunks TestAsyncFieldAccess_Transitive --expect-async-thunks TestAsyncGeneric_MixedOrigin --expect-async-thunks TestAsyncVoid_CrossModuleOwn --expect-async-thunks TestAsyncVoid_Transitive
+    __valExitCode=$?
+    if [ $__valExitCode -ne 100 ]; then
+        echo "R2R validation failed with exitcode: $__valExitCode"
+        exit 1
+    fi
+    echo "R2R validation passed"
+else
+    echo "WARNING: r2rvalidate.dll not found at ${R2RVALIDATE_DIR}, skipping R2R validation"
 fi
 
 export DOTNET_GCName DOTNET_GCStress DOTNET_HeapVerify DOTNET_ReadyToRun
