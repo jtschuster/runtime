@@ -5,6 +5,8 @@
     <CrossGenTest>false</CrossGenTest>
     <CLRTestPriority>1</CLRTestPriority>
     <IlasmRoundTripIncompatible>true</IlasmRoundTripIncompatible>
+    <Features>$(Features);runtime-async=on</Features>
+    <NoWarn>$(NoWarn);CS1998</NoWarn>
     <!-- This test launches crossgen2 with dotnet, so we skip under sanitizers. -->
     <CLRTestTargetUnsupported Condition="'$(EnableNativeSanitizers)' != ''">true</CLRTestTargetUnsupported>
   </PropertyGroup>
@@ -42,7 +44,7 @@ for %%A in (main_bubble assemblyB assemblyC assemblyD assemblyE) do (
 )
 
 REM Crossgen2 assemblyD (no special flags)
-%Core_Root%\crossgen2\crossgen2.exe -r:%Core_Root%\*.dll -o:assemblyD.dll IL_DLLS\assemblyD.dll
+%Core_Root%\crossgen2\crossgen2.exe --opt-async-methods -r:%Core_Root%\*.dll -o:assemblyD.dll IL_DLLS\assemblyD.dll
 
 set CrossGenStatus=!ERRORLEVEL!
 IF NOT !CrossGenStatus!==0 (
@@ -51,7 +53,7 @@ IF NOT !CrossGenStatus!==0 (
 )
 
 REM Crossgen2 assemblyE (references assemblyD)
-%Core_Root%\crossgen2\crossgen2.exe -r:%Core_Root%\*.dll -r:assemblyD.dll -o:assemblyE.dll IL_DLLS\assemblyE.dll
+%Core_Root%\crossgen2\crossgen2.exe --opt-async-methods -r:%Core_Root%\*.dll -r:assemblyD.dll -o:assemblyE.dll IL_DLLS\assemblyE.dll
 
 set CrossGenStatus=!ERRORLEVEL!
 IF NOT !CrossGenStatus!==0 (
@@ -60,7 +62,7 @@ IF NOT !CrossGenStatus!==0 (
 )
 
 REM Crossgen2 assemblyB (no special flags)
-%Core_Root%\crossgen2\crossgen2.exe -r:%Core_Root%\*.dll -o:assemblyB.dll IL_DLLS\assemblyB.dll
+%Core_Root%\crossgen2\crossgen2.exe --opt-async-methods -r:%Core_Root%\*.dll -o:assemblyB.dll IL_DLLS\assemblyB.dll
 
 set CrossGenStatus=!ERRORLEVEL!
 IF NOT !CrossGenStatus!==0 (
@@ -69,7 +71,7 @@ IF NOT !CrossGenStatus!==0 (
 )
 
 REM Crossgen2 assemblyC (references assemblyD, assemblyE)
-%Core_Root%\crossgen2\crossgen2.exe -r:%Core_Root%\*.dll -r:assemblyD.dll -r:assemblyE.dll -o:assemblyC.dll IL_DLLS\assemblyC.dll
+%Core_Root%\crossgen2\crossgen2.exe --opt-async-methods -r:%Core_Root%\*.dll -r:assemblyD.dll -r:assemblyE.dll -o:assemblyC.dll IL_DLLS\assemblyC.dll
 
 set CrossGenStatus=!ERRORLEVEL!
 IF NOT !CrossGenStatus!==0 (
@@ -78,7 +80,7 @@ IF NOT !CrossGenStatus!==0 (
 )
 
 REM Crossgen2 main with --inputbubbleref assemblyB (version bubble)
-%Core_Root%\crossgen2\crossgen2.exe --map -r:%Core_Root%\*.dll -r:assemblyB.dll -r:assemblyC.dll -r:assemblyD.dll -r:assemblyE.dll --inputbubbleref:assemblyB.dll -o:main_bubble.dll IL_DLLS\main_bubble.dll
+%Core_Root%\crossgen2\crossgen2.exe --opt-async-methods --map -r:%Core_Root%\*.dll -r:assemblyB.dll -r:assemblyC.dll -r:assemblyD.dll -r:assemblyE.dll --inputbubbleref:assemblyB.dll -o:main_bubble.dll IL_DLLS\main_bubble.dll
 
 set CrossGenStatus=!ERRORLEVEL!
 IF NOT !CrossGenStatus!==0 (
@@ -112,7 +114,7 @@ for asm in main_bubble assemblyB assemblyC assemblyD assemblyE; do
 done
 
 # Crossgen2 assemblyD (no special flags)
-"$CORE_ROOT"/crossgen2/crossgen2 -r:"$CORE_ROOT"/*.dll -o:assemblyD.dll IL_DLLS/assemblyD.dll
+"$CORE_ROOT"/crossgen2/crossgen2 --opt-async-methods -r:"$CORE_ROOT"/*.dll -o:assemblyD.dll IL_DLLS/assemblyD.dll
 __cgExitCode=$?
 if [ $__cgExitCode -ne 0 ]; then
     echo "Crossgen assemblyD failed with exitcode: $__cgExitCode"
@@ -120,7 +122,7 @@ if [ $__cgExitCode -ne 0 ]; then
 fi
 
 # Crossgen2 assemblyE (references assemblyD)
-"$CORE_ROOT"/crossgen2/crossgen2 -r:"$CORE_ROOT"/*.dll -r:assemblyD.dll -o:assemblyE.dll IL_DLLS/assemblyE.dll
+"$CORE_ROOT"/crossgen2/crossgen2 --opt-async-methods -r:"$CORE_ROOT"/*.dll -r:assemblyD.dll -o:assemblyE.dll IL_DLLS/assemblyE.dll
 __cgExitCode=$?
 if [ $__cgExitCode -ne 0 ]; then
     echo "Crossgen assemblyE failed with exitcode: $__cgExitCode"
@@ -128,7 +130,7 @@ if [ $__cgExitCode -ne 0 ]; then
 fi
 
 # Crossgen2 assemblyB (no special flags)
-"$CORE_ROOT"/crossgen2/crossgen2 -r:"$CORE_ROOT"/*.dll -o:assemblyB.dll IL_DLLS/assemblyB.dll
+"$CORE_ROOT"/crossgen2/crossgen2 --opt-async-methods -r:"$CORE_ROOT"/*.dll -o:assemblyB.dll IL_DLLS/assemblyB.dll
 __cgExitCode=$?
 if [ $__cgExitCode -ne 0 ]; then
     echo "Crossgen assemblyB failed with exitcode: $__cgExitCode"
@@ -136,7 +138,7 @@ if [ $__cgExitCode -ne 0 ]; then
 fi
 
 # Crossgen2 assemblyC (references assemblyD, assemblyE)
-"$CORE_ROOT"/crossgen2/crossgen2 -r:"$CORE_ROOT"/*.dll -r:assemblyD.dll -r:assemblyE.dll -o:assemblyC.dll IL_DLLS/assemblyC.dll
+"$CORE_ROOT"/crossgen2/crossgen2 --opt-async-methods -r:"$CORE_ROOT"/*.dll -r:assemblyD.dll -r:assemblyE.dll -o:assemblyC.dll IL_DLLS/assemblyC.dll
 __cgExitCode=$?
 if [ $__cgExitCode -ne 0 ]; then
     echo "Crossgen assemblyC failed with exitcode: $__cgExitCode"
@@ -144,7 +146,7 @@ if [ $__cgExitCode -ne 0 ]; then
 fi
 
 # Crossgen2 main with --inputbubbleref assemblyB (version bubble)
-"$CORE_ROOT"/crossgen2/crossgen2 --map -r:"$CORE_ROOT"/*.dll -r:assemblyB.dll -r:assemblyC.dll -r:assemblyD.dll -r:assemblyE.dll --inputbubbleref:assemblyB.dll -o:main_bubble.dll IL_DLLS/main_bubble.dll
+"$CORE_ROOT"/crossgen2/crossgen2 --opt-async-methods --map -r:"$CORE_ROOT"/*.dll -r:assemblyB.dll -r:assemblyC.dll -r:assemblyD.dll -r:assemblyE.dll --inputbubbleref:assemblyB.dll -o:main_bubble.dll IL_DLLS/main_bubble.dll
 __cgExitCode=$?
 if [ $__cgExitCode -ne 0 ]; then
     echo "Crossgen main_bubble failed with exitcode: $__cgExitCode"

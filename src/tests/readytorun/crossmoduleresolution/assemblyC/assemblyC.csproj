@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>library</OutputType>
+    <Features>$(Features);runtime-async=on</Features>
+    <NoWarn>$(NoWarn);CS1998</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\assemblyD\assemblyD.csproj" />
