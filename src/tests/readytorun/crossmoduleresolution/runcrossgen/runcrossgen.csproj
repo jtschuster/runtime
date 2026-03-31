@@ -3,9 +3,12 @@
     <OutputType>Exe</OutputType>
     <CLRTestKind>BuildOnly</CLRTestKind>
     <CLRTestPriority>1</CLRTestPriority>
+    <!-- Build into CORE_ROOT so it is available alongside crossgen2 and corerun -->
     <OutputPath>$(CORE_ROOT)/runcrossgen</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <!-- Use the host/SDK RID since this tool runs at build time, not test time -->
+    <RuntimeIdentifier>$(NETCoreSdkRuntimeIdentifier)</RuntimeIdentifier>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="RunCrossgen.cs" />
