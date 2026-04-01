@@ -21,7 +21,7 @@ internal sealed class R2RExpectations
     public List<string> ExpectedManifestRefs { get; } = new();
     public List<ExpectedInlinedMethod> ExpectedInlinedMethods { get; } = new();
     public bool CompositeMode { get; set; }
-    public List<string> Crossgen2Options { get; } = new();
+    public List<Crossgen2Option> Crossgen2Options { get; } = new();
     /// <summary>
     /// Roslyn feature flags for the main assembly (e.g. runtime-async=on).
     /// </summary>

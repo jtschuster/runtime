@@ -31,14 +31,14 @@ internal static class TestPaths
         get
         {
             string dir = GetRequiredConfig("R2RTest.Crossgen2Dir");
-            if (!Directory.Exists(dir))
+            if (!File.Exists(Path.Combine(dir, "crossgen2.dll")))
             {
                 // Try Checked and Release fallbacks since crossgen2 may be built in a different config
                 foreach (string fallbackConfig in new[] { "Checked", "Release", "Debug" })
                 {
                     string fallback = Regex.Replace(
                         dir, @"\.(Debug|Release|Checked)[/\\]", $".{fallbackConfig}/");
-                    if (Directory.Exists(fallback))
+                    if (File.Exists(Path.Combine(fallback, "crossgen2.dll")))
                         return fallback;
                 }
             }

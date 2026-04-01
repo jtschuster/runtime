@@ -21,20 +21,23 @@ internal sealed class R2RTestCase
     /// Additional source files to compile with the main assembly (e.g. shared attribute files).
     /// </summary>
     public string[]? MainExtraSourceResourceNames { get; init; }
-    public required List<DependencyInfo> Dependencies { get; init; }
+    public required List<CompiledAssembly> Dependencies { get; init; }
     public required R2RExpectations Expectations { get; init; }
 }
 
 /// <summary>
-/// Describes a dependency assembly for a test case.
+/// Describes an assembly compiled as part of a test case.
+/// Dependencies are compiled in listed order — each assembly can reference all previously compiled assemblies.
 /// </summary>
-internal sealed class DependencyInfo
+internal sealed class CompiledAssembly
 {
     public required string AssemblyName { get; init; }
     public required string[] SourceResourceNames { get; init; }
-    public bool Crossgen { get; init; }
-    public List<string> CrossgenOptions { get; init; } = new();
-    public List<string> AdditionalReferences { get; init; } = new();
+    /// <summary>
+    /// If true, this assembly is passed as an input to crossgen2.
+    /// If false, it is only used as a reference (--ref) during crossgen2 compilation.
+    /// </summary>
+    public bool IsCrossgenInput { get; init; }
     /// <summary>
     /// Roslyn feature flags for this dependency (e.g. runtime-async=on).
     /// </summary>
@@ -60,9 +63,9 @@ internal sealed class R2RTestRunner
             Directory.CreateDirectory(ilDir);
             Directory.CreateDirectory(r2rDir);
 
-            // Step 1: Compile all dependencies with Roslyn
+            // Step 1: Compile all dependencies with Roslyn (in order, leaf to root)
             var compiler = new R2RTestCaseCompiler(ilDir);
-            var compiledDeps = new List<(DependencyInfo Dep, string IlPath)>();
+            var compiledDeps = new List<(CompiledAssembly Dep, string IlPath)>();
 
             foreach (var dep in testCase.Dependencies)
             {
@@ -70,9 +73,8 @@ internal sealed class R2RTestRunner
                     .Select(R2RTestCaseCompiler.ReadEmbeddedSource)
                     .ToList();
 
-                var refs = dep.AdditionalReferences
-                    .Select(r => compiledDeps.First(d => d.Dep.AssemblyName == r).IlPath)
-                    .ToList();
+                // Each dependency can reference all previously compiled assemblies
+                var refs = compiledDeps.Select(d => d.IlPath).ToList();
 
                 string ilPath = compiler.CompileAssembly(dep.AssemblyName, sources, refs,
                     features: dep.Features.Count > 0 ? dep.Features : null);
@@ -101,7 +103,7 @@ internal sealed class R2RTestRunner
 
             foreach (var (dep, ilPath) in compiledDeps)
             {
-                if (!dep.Crossgen)
+                if (!dep.IsCrossgenInput)
                     continue;
 
                 string r2rPath = Path.Combine(r2rDir, Path.GetFileName(ilPath));
@@ -110,7 +112,6 @@ internal sealed class R2RTestRunner
                     InputPath = ilPath,
                     OutputPath = r2rPath,
                     ReferencePaths = allRefPaths,
-                    ExtraArgs = dep.CrossgenOptions,
                 });
 
                 Assert.True(result.Success,
@@ -156,7 +157,7 @@ internal sealed class R2RTestRunner
             InputPath = mainIlPath,
             OutputPath = mainR2RPath,
             ReferencePaths = allRefPaths,
-            ExtraArgs = testCase.Expectations.Crossgen2Options.ToList(),
+            ExtraArgs = testCase.Expectations.Crossgen2Options.SelectMany(o => o.ToArgs()).ToList(),
         };
 
         var result = driver.Compile(options);
@@ -172,12 +173,12 @@ internal sealed class R2RTestRunner
         string mainIlPath,
         string mainR2RPath,
         List<string> allRefPaths,
-        List<(DependencyInfo Dep, string IlPath)> compiledDeps)
+        List<(CompiledAssembly Dep, string IlPath)> compiledDeps)
     {
         var compositeInputs = new List<string> { mainIlPath };
         foreach (var (dep, ilPath) in compiledDeps)
         {
-            if (dep.Crossgen)
+            if (dep.IsCrossgenInput)
                 compositeInputs.Add(ilPath);
         }
 
@@ -188,7 +189,7 @@ internal sealed class R2RTestRunner
             ReferencePaths = allRefPaths,
             Composite = true,
             CompositeInputPaths = compositeInputs,
-            ExtraArgs = testCase.Expectations.Crossgen2Options.ToList(),
+            ExtraArgs = testCase.Expectations.Crossgen2Options.SelectMany(o => o.ToArgs()).ToList(),
         };
 
         var result = driver.Compile(options);

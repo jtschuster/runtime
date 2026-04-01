@@ -23,19 +23,19 @@ public class R2RTestSuites
         expectations.ExpectedManifestRefs.Add("InlineableLib");
         expectations.ExpectedInlinedMethods.Add(new ExpectedInlinedMethod("GetValue"));
         expectations.ExpectedInlinedMethods.Add(new ExpectedInlinedMethod("GetString"));
-        expectations.Crossgen2Options.Add("--opt-cross-module:InlineableLib");
+        expectations.Crossgen2Options.Add(Crossgen2Option.CrossModuleOptimization("InlineableLib"));
 
         var testCase = new R2RTestCase
         {
             Name = "BasicCrossModuleInlining",
             MainSourceResourceName = "CrossModuleInlining/BasicInlining.cs",
-            Dependencies = new List<DependencyInfo>
+            Dependencies = new List<CompiledAssembly>
             {
-                new DependencyInfo
+                new CompiledAssembly
                 {
                     AssemblyName = "InlineableLib",
                     SourceResourceNames = new[] { "CrossModuleInlining/Dependencies/InlineableLib.cs" },
-                    Crossgen = true,
+                    IsCrossgenInput = true,
                 }
             },
             Expectations = expectations,
@@ -51,26 +51,25 @@ public class R2RTestSuites
         expectations.ExpectedManifestRefs.Add("InlineableLibTransitive");
         expectations.ExpectedManifestRefs.Add("ExternalLib");
         expectations.ExpectedInlinedMethods.Add(new ExpectedInlinedMethod("GetExternalValue"));
-        expectations.Crossgen2Options.Add("--opt-cross-module:InlineableLibTransitive");
+        expectations.Crossgen2Options.Add(Crossgen2Option.CrossModuleOptimization("InlineableLibTransitive"));
 
         var testCase = new R2RTestCase
         {
             Name = "TransitiveReferences",
             MainSourceResourceName = "CrossModuleInlining/TransitiveReferences.cs",
-            Dependencies = new List<DependencyInfo>
+            Dependencies = new List<CompiledAssembly>
             {
-                new DependencyInfo
+                new CompiledAssembly
                 {
                     AssemblyName = "ExternalLib",
                     SourceResourceNames = new[] { "CrossModuleInlining/Dependencies/ExternalLib.cs" },
-                    Crossgen = false,
+                    IsCrossgenInput = false,
                 },
-                new DependencyInfo
+                new CompiledAssembly
                 {
                     AssemblyName = "InlineableLibTransitive",
                     SourceResourceNames = new[] { "CrossModuleInlining/Dependencies/InlineableLibTransitive.cs" },
-                    Crossgen = true,
-                    AdditionalReferences = { "ExternalLib" },
+                    IsCrossgenInput = true,
                 }
             },
             Expectations = expectations,
@@ -85,19 +84,19 @@ public class R2RTestSuites
         var expectations = new R2RExpectations();
         expectations.ExpectedManifestRefs.Add("AsyncInlineableLib");
         expectations.ExpectedInlinedMethods.Add(new ExpectedInlinedMethod("GetValueAsync"));
-        expectations.Crossgen2Options.Add("--opt-cross-module:AsyncInlineableLib");
+        expectations.Crossgen2Options.Add(Crossgen2Option.CrossModuleOptimization("AsyncInlineableLib"));
 
         var testCase = new R2RTestCase
         {
             Name = "AsyncCrossModuleInlining",
             MainSourceResourceName = "CrossModuleInlining/AsyncMethods.cs",
-            Dependencies = new List<DependencyInfo>
+            Dependencies = new List<CompiledAssembly>
             {
-                new DependencyInfo
+                new CompiledAssembly
                 {
                     AssemblyName = "AsyncInlineableLib",
                     SourceResourceNames = new[] { "CrossModuleInlining/Dependencies/AsyncInlineableLib.cs" },
-                    Crossgen = true,
+                    IsCrossgenInput = true,
                 }
             },
             Expectations = expectations,
@@ -119,13 +118,13 @@ public class R2RTestSuites
         {
             Name = "CompositeBasic",
             MainSourceResourceName = "CrossModuleInlining/CompositeBasic.cs",
-            Dependencies = new List<DependencyInfo>
+            Dependencies = new List<CompiledAssembly>
             {
-                new DependencyInfo
+                new CompiledAssembly
                 {
                     AssemblyName = "CompositeLib",
                     SourceResourceNames = new[] { "CrossModuleInlining/Dependencies/CompositeLib.cs" },
-                    Crossgen = true,
+                    IsCrossgenInput = true,
                 }
             },
             Expectations = expectations,
@@ -142,11 +141,6 @@ public class R2RTestSuites
     [Fact]
     public void RuntimeAsyncMethodEmission()
     {
-        string attrSource = R2RTestCaseCompiler.ReadEmbeddedSource(
-            "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs");
-        string mainSource = R2RTestCaseCompiler.ReadEmbeddedSource(
-            "RuntimeAsync/BasicAsyncEmission.cs");
-
         var expectations = new R2RExpectations();
         expectations.Features.Add(RuntimeAsyncFeature);
         expectations.ExpectedAsyncVariantMethods.Add("SimpleAsyncMethod");
@@ -158,7 +152,7 @@ public class R2RTestSuites
             Name = "RuntimeAsyncMethodEmission",
             MainSourceResourceName = "RuntimeAsync/BasicAsyncEmission.cs",
             MainExtraSourceResourceNames = new[] { "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs" },
-            Dependencies = new List<DependencyInfo>(),
+            Dependencies = new List<CompiledAssembly>(),
             Expectations = expectations,
         };
 
@@ -173,11 +167,6 @@ public class R2RTestSuites
     [Fact]
     public void RuntimeAsyncContinuationLayout()
     {
-        string attrSource = R2RTestCaseCompiler.ReadEmbeddedSource(
-            "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs");
-        string mainSource = R2RTestCaseCompiler.ReadEmbeddedSource(
-            "RuntimeAsync/AsyncWithContinuation.cs");
-
         var expectations = new R2RExpectations
         {
             ExpectContinuationLayout = true,
@@ -192,7 +181,7 @@ public class R2RTestSuites
             Name = "RuntimeAsyncContinuationLayout",
             MainSourceResourceName = "RuntimeAsync/AsyncWithContinuation.cs",
             MainExtraSourceResourceNames = new[] { "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs" },
-            Dependencies = new List<DependencyInfo>(),
+            Dependencies = new List<CompiledAssembly>(),
             Expectations = expectations,
         };
 
@@ -215,7 +204,7 @@ public class R2RTestSuites
             Name = "RuntimeAsyncDevirtualize",
             MainSourceResourceName = "RuntimeAsync/AsyncDevirtualize.cs",
             MainExtraSourceResourceNames = new[] { "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs" },
-            Dependencies = new List<DependencyInfo>(),
+            Dependencies = new List<CompiledAssembly>(),
             Expectations = expectations,
         };
 
@@ -239,7 +228,7 @@ public class R2RTestSuites
             Name = "RuntimeAsyncNoYield",
             MainSourceResourceName = "RuntimeAsync/AsyncNoYield.cs",
             MainExtraSourceResourceNames = new[] { "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs" },
-            Dependencies = new List<DependencyInfo>(),
+            Dependencies = new List<CompiledAssembly>(),
             Expectations = expectations,
         };
 
@@ -257,16 +246,16 @@ public class R2RTestSuites
         expectations.Features.Add(RuntimeAsyncFeature);
         expectations.ExpectedManifestRefs.Add("AsyncDepLib");
         expectations.ExpectedAsyncVariantMethods.Add("CallCrossModuleAsync");
-        expectations.Crossgen2Options.Add("--opt-cross-module:AsyncDepLib");
+        expectations.Crossgen2Options.Add(Crossgen2Option.CrossModuleOptimization("AsyncDepLib"));
 
         var testCase = new R2RTestCase
         {
             Name = "RuntimeAsyncCrossModule",
             MainSourceResourceName = "RuntimeAsync/AsyncCrossModule.cs",
             MainExtraSourceResourceNames = new[] { "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs" },
-            Dependencies = new List<DependencyInfo>
+            Dependencies = new List<CompiledAssembly>
             {
-                new DependencyInfo
+                new CompiledAssembly
                 {
                     AssemblyName = "AsyncDepLib",
                     SourceResourceNames = new[]
@@ -274,7 +263,7 @@ public class R2RTestSuites
                         "RuntimeAsync/Dependencies/AsyncDepLib.cs",
                         "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs"
                     },
-                    Crossgen = true,
+                    IsCrossgenInput = true,
                     Features = { RuntimeAsyncFeature },
                 }
             },

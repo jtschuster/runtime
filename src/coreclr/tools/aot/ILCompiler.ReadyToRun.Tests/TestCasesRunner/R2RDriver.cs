@@ -11,6 +11,30 @@ using System.Text;
 namespace ILCompiler.ReadyToRun.Tests.TestCasesRunner;
 
 /// <summary>
+/// Known crossgen2 option kinds.
+/// </summary>
+internal enum Crossgen2OptionKind
+{
+    /// <summary>Enables cross-module inlining for a named assembly (--opt-cross-module:AssemblyName).</summary>
+    CrossModuleOptimization,
+}
+
+/// <summary>
+/// A typed crossgen2 option with optional parameter value.
+/// </summary>
+internal sealed record Crossgen2Option(Crossgen2OptionKind Kind, string? Value = null)
+{
+    public static Crossgen2Option CrossModuleOptimization(string assemblyName)
+        => new(Crossgen2OptionKind.CrossModuleOptimization, assemblyName);
+
+    public IEnumerable<string> ToArgs() => Kind switch
+    {
+        Crossgen2OptionKind.CrossModuleOptimization => [$"--opt-cross-module:{Value}"],
+        _ => throw new ArgumentOutOfRangeException(nameof(Kind)),
+    };
+}
+
+/// <summary>
 /// Result of a crossgen2 compilation step.
 /// </summary>
 internal sealed record R2RCompilationResult(
