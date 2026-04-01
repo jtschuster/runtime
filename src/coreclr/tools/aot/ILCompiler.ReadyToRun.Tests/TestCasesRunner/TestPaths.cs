@@ -150,22 +150,6 @@ internal static class TestPaths
     }
 
     /// <summary>
-    /// Returns the corerun executable path.
-    /// </summary>
-    public static string CoreRun
-    {
-        get
-        {
-            string exe = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "corerun.exe" : "corerun";
-            string path = Path.Combine(CoreCLRArtifactsDir, exe);
-            if (File.Exists(path))
-                return path;
-
-            throw new FileNotFoundException($"corerun not found at {path}");
-        }
-    }
-
-    /// <summary>
     /// Returns the target triple string for crossgen2 (e.g. "linux-x64").
     /// </summary>
     public static string TargetTriple => $"{TargetOS.ToLowerInvariant()}-{TargetArchitecture.ToLowerInvariant()}";

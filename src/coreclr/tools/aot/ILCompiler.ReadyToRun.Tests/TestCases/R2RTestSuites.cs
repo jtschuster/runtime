@@ -77,19 +77,16 @@ public class R2RTestSuites
     }
 
     [Fact]
-    public void AsyncMethodThunks()
+    public void AsyncCrossModuleInlining()
     {
-        var expectations = new R2RExpectations
-        {
-            RuntimeAsync = true,
-        };
+        var expectations = new R2RExpectations();
         expectations.ExpectedManifestRefs.Add("AsyncInlineableLib");
-        expectations.ExpectedAsyncMethods.Add(new ExpectedAsyncMethod("TestAsyncInline", 3));
+        expectations.ExpectedInlinedMethods.Add(new ExpectedInlinedMethod("GetValueAsync"));
         expectations.Crossgen2Options.Add("--opt-cross-module:AsyncInlineableLib");
 
         var testCase = new R2RTestCase
         {
-            Name = "AsyncMethodThunks",
+            Name = "AsyncCrossModuleInlining",
             MainSourceResourceName = "CrossModuleInlining/AsyncMethods.cs",
             Dependencies = new List<DependencyInfo>
             {

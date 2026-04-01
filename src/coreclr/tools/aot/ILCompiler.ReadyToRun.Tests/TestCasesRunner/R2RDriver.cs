@@ -34,7 +34,6 @@ internal sealed class R2RCompilationOptions
     public bool Composite { get; init; }
     public List<string>? CompositeInputPaths { get; init; }
     public List<string>? InputBubbleRefs { get; init; }
-    public bool OptAsyncMethods { get; init; }
 }
 
 /// <summary>
@@ -89,11 +88,6 @@ internal sealed class R2RDriver
                 args.Add("--inputbubbleref");
                 args.Add(bubbleRef);
             }
-        }
-
-        if (options.OptAsyncMethods)
-        {
-            args.Add("--opt-async-methods");
         }
 
         args.AddRange(options.ExtraArgs);

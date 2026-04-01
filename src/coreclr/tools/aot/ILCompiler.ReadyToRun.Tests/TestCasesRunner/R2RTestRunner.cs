@@ -138,7 +138,6 @@ internal sealed class R2RTestRunner
             OutputPath = mainR2RPath,
             ReferencePaths = allRefPaths,
             ExtraArgs = testCase.Expectations.Crossgen2Options.ToList(),
-            OptAsyncMethods = testCase.Expectations.RuntimeAsync,
         };
 
         var result = driver.Compile(options);
@@ -171,7 +170,6 @@ internal sealed class R2RTestRunner
             Composite = true,
             CompositeInputPaths = compositeInputs,
             ExtraArgs = testCase.Expectations.Crossgen2Options.ToList(),
-            OptAsyncMethods = testCase.Expectations.RuntimeAsync,
         };
 
         var result = driver.Compile(options);

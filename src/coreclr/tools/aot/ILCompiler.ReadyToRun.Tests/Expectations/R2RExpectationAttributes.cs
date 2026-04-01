@@ -22,18 +22,13 @@ public sealed class ExpectInlinedAttribute : Attribute
 }
 
 /// <summary>
-/// Marks a method as expected to have async thunk RuntimeFunctions in the R2R image.
-/// Async methods compiled with --opt-async-methods produce 3 RuntimeFunctions:
-/// thunk + async body + resumption stub.
+/// Marks a method as expected to have a specific number of RuntimeFunctions in the R2R image.
 /// </summary>
 [Conditional("R2R_EXPECTATIONS")]
 [AttributeUsage(AttributeTargets.Method)]
-public sealed class ExpectAsyncThunkAttribute : Attribute
+public sealed class ExpectRuntimeFunctionCountAttribute : Attribute
 {
-    /// <summary>
-    /// Expected number of RuntimeFunctions. Defaults to 3 (thunk + body + resumption).
-    /// </summary>
-    public int ExpectedRuntimeFunctionCount { get; set; } = 3;
+    public int ExpectedCount { get; set; }
 }
 
 /// <summary>
@@ -124,15 +119,5 @@ public sealed class ExpectR2RMethodAttribute : Attribute
 [Conditional("R2R_EXPECTATIONS")]
 [AttributeUsage(AttributeTargets.Assembly)]
 public sealed class CompositeModeAttribute : Attribute
-{
-}
-
-/// <summary>
-/// Marks an assembly-level option to enable runtime-async compilation.
-/// Adds Features=runtime-async=on to Roslyn compilation and --opt-async-methods to crossgen2.
-/// </summary>
-[Conditional("R2R_EXPECTATIONS")]
-[AttributeUsage(AttributeTargets.Assembly)]
-public sealed class EnableRuntimeAsyncAttribute : Attribute
 {
 }
