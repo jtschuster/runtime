@@ -3,7 +3,6 @@
 
 using System.Collections.Generic;
 using ILCompiler.ReadyToRun.Tests.TestCasesRunner;
-using Internal.ReadyToRunConstants;
 using Xunit;
 
 namespace ILCompiler.ReadyToRun.Tests.TestCases;
@@ -19,118 +18,108 @@ public class R2RTestSuites
     [Fact]
     public void BasicCrossModuleInlining()
     {
-        var expectations = new R2RExpectations();
-        expectations.ExpectedManifestRefs.Add("InlineableLib");
-        expectations.ExpectedInlinedMethods.Add(new ExpectedInlinedMethod("GetValue"));
-        expectations.ExpectedInlinedMethods.Add(new ExpectedInlinedMethod("GetString"));
-        expectations.Crossgen2Options.Add(Crossgen2Option.CrossModuleOptimization("InlineableLib"));
-
-        var testCase = new R2RTestCase
+        new R2RTestRunner().Run(new R2RTestCase
         {
             Name = "BasicCrossModuleInlining",
             MainSourceResourceName = "CrossModuleInlining/BasicInlining.cs",
+            Crossgen2Options = { Crossgen2Option.CrossModuleOptimization("InlineableLib") },
             Dependencies = new List<CompiledAssembly>
             {
-                new CompiledAssembly
+                new()
                 {
                     AssemblyName = "InlineableLib",
-                    SourceResourceNames = new[] { "CrossModuleInlining/Dependencies/InlineableLib.cs" },
+                    SourceResourceNames = ["CrossModuleInlining/Dependencies/InlineableLib.cs"],
                     IsCrossgenInput = true,
                 }
             },
-            Expectations = expectations,
-        };
-
-        new R2RTestRunner().Run(testCase);
+            Validate = reader =>
+            {
+                R2RAssert.HasManifestRef(reader, "InlineableLib");
+                R2RAssert.HasInlinedMethod(reader, "GetValue");
+                R2RAssert.HasInlinedMethod(reader, "GetString");
+            },
+        });
     }
 
     [Fact]
     public void TransitiveReferences()
     {
-        var expectations = new R2RExpectations();
-        expectations.ExpectedManifestRefs.Add("InlineableLibTransitive");
-        expectations.ExpectedManifestRefs.Add("ExternalLib");
-        expectations.ExpectedInlinedMethods.Add(new ExpectedInlinedMethod("GetExternalValue"));
-        expectations.Crossgen2Options.Add(Crossgen2Option.CrossModuleOptimization("InlineableLibTransitive"));
-
-        var testCase = new R2RTestCase
+        new R2RTestRunner().Run(new R2RTestCase
         {
             Name = "TransitiveReferences",
             MainSourceResourceName = "CrossModuleInlining/TransitiveReferences.cs",
+            Crossgen2Options = { Crossgen2Option.CrossModuleOptimization("InlineableLibTransitive") },
             Dependencies = new List<CompiledAssembly>
             {
-                new CompiledAssembly
+                new()
                 {
                     AssemblyName = "ExternalLib",
-                    SourceResourceNames = new[] { "CrossModuleInlining/Dependencies/ExternalLib.cs" },
+                    SourceResourceNames = ["CrossModuleInlining/Dependencies/ExternalLib.cs"],
                     IsCrossgenInput = false,
                 },
-                new CompiledAssembly
+                new()
                 {
                     AssemblyName = "InlineableLibTransitive",
-                    SourceResourceNames = new[] { "CrossModuleInlining/Dependencies/InlineableLibTransitive.cs" },
+                    SourceResourceNames = ["CrossModuleInlining/Dependencies/InlineableLibTransitive.cs"],
                     IsCrossgenInput = true,
                 }
             },
-            Expectations = expectations,
-        };
-
-        new R2RTestRunner().Run(testCase);
+            Validate = reader =>
+            {
+                R2RAssert.HasManifestRef(reader, "InlineableLibTransitive");
+                R2RAssert.HasManifestRef(reader, "ExternalLib");
+                R2RAssert.HasInlinedMethod(reader, "GetExternalValue");
+            },
+        });
     }
 
     [Fact]
     public void AsyncCrossModuleInlining()
     {
-        var expectations = new R2RExpectations();
-        expectations.ExpectedManifestRefs.Add("AsyncInlineableLib");
-        expectations.ExpectedInlinedMethods.Add(new ExpectedInlinedMethod("GetValueAsync"));
-        expectations.Crossgen2Options.Add(Crossgen2Option.CrossModuleOptimization("AsyncInlineableLib"));
-
-        var testCase = new R2RTestCase
+        new R2RTestRunner().Run(new R2RTestCase
         {
             Name = "AsyncCrossModuleInlining",
             MainSourceResourceName = "CrossModuleInlining/AsyncMethods.cs",
+            Crossgen2Options = { Crossgen2Option.CrossModuleOptimization("AsyncInlineableLib") },
             Dependencies = new List<CompiledAssembly>
             {
-                new CompiledAssembly
+                new()
                 {
                     AssemblyName = "AsyncInlineableLib",
-                    SourceResourceNames = new[] { "CrossModuleInlining/Dependencies/AsyncInlineableLib.cs" },
+                    SourceResourceNames = ["CrossModuleInlining/Dependencies/AsyncInlineableLib.cs"],
                     IsCrossgenInput = true,
                 }
             },
-            Expectations = expectations,
-        };
-
-        new R2RTestRunner().Run(testCase);
+            Validate = reader =>
+            {
+                R2RAssert.HasManifestRef(reader, "AsyncInlineableLib");
+                R2RAssert.HasInlinedMethod(reader, "GetValueAsync");
+            },
+        });
     }
 
     [Fact]
     public void CompositeBasic()
     {
-        var expectations = new R2RExpectations
-        {
-            CompositeMode = true,
-        };
-        expectations.ExpectedManifestRefs.Add("CompositeLib");
-
-        var testCase = new R2RTestCase
+        new R2RTestRunner().Run(new R2RTestCase
         {
             Name = "CompositeBasic",
             MainSourceResourceName = "CrossModuleInlining/CompositeBasic.cs",
+            CompositeMode = true,
             Dependencies = new List<CompiledAssembly>
             {
-                new CompiledAssembly
+                new()
                 {
                     AssemblyName = "CompositeLib",
-                    SourceResourceNames = new[] { "CrossModuleInlining/Dependencies/CompositeLib.cs" },
+                    SourceResourceNames = ["CrossModuleInlining/Dependencies/CompositeLib.cs"],
                     IsCrossgenInput = true,
                 }
             },
-            Expectations = expectations,
-        };
-
-        new R2RTestRunner().Run(testCase);
+            Validate = reader =>
+            {
+                R2RAssert.HasManifestRef(reader, "CompositeLib");
+            },
+        });
     }
 
     /// <summary>
@@ -141,22 +130,20 @@ public class R2RTestSuites
     [Fact]
     public void RuntimeAsyncMethodEmission()
     {
-        var expectations = new R2RExpectations();
-        expectations.Features.Add(RuntimeAsyncFeature);
-        expectations.ExpectedAsyncVariantMethods.Add("SimpleAsyncMethod");
-        expectations.ExpectedAsyncVariantMethods.Add("AsyncVoidReturn");
-        expectations.ExpectedAsyncVariantMethods.Add("ValueTaskMethod");
-
-        var testCase = new R2RTestCase
+        new R2RTestRunner().Run(new R2RTestCase
         {
             Name = "RuntimeAsyncMethodEmission",
             MainSourceResourceName = "RuntimeAsync/BasicAsyncEmission.cs",
-            MainExtraSourceResourceNames = new[] { "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs" },
+            MainExtraSourceResourceNames = ["RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs"],
+            Features = { RuntimeAsyncFeature },
             Dependencies = new List<CompiledAssembly>(),
-            Expectations = expectations,
-        };
-
-        new R2RTestRunner().Run(testCase);
+            Validate = reader =>
+            {
+                R2RAssert.HasAsyncVariant(reader, "SimpleAsyncMethod");
+                R2RAssert.HasAsyncVariant(reader, "AsyncVoidReturn");
+                R2RAssert.HasAsyncVariant(reader, "ValueTaskMethod");
+            },
+        });
     }
 
     /// <summary>
@@ -167,25 +154,21 @@ public class R2RTestSuites
     [Fact]
     public void RuntimeAsyncContinuationLayout()
     {
-        var expectations = new R2RExpectations
-        {
-            ExpectContinuationLayout = true,
-            ExpectResumptionStubFixup = true,
-        };
-        expectations.Features.Add(RuntimeAsyncFeature);
-        expectations.ExpectedAsyncVariantMethods.Add("CaptureObjectAcrossAwait");
-        expectations.ExpectedAsyncVariantMethods.Add("CaptureMultipleRefsAcrossAwait");
-
-        var testCase = new R2RTestCase
+        new R2RTestRunner().Run(new R2RTestCase
         {
             Name = "RuntimeAsyncContinuationLayout",
             MainSourceResourceName = "RuntimeAsync/AsyncWithContinuation.cs",
-            MainExtraSourceResourceNames = new[] { "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs" },
+            MainExtraSourceResourceNames = ["RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs"],
+            Features = { RuntimeAsyncFeature },
             Dependencies = new List<CompiledAssembly>(),
-            Expectations = expectations,
-        };
-
-        new R2RTestRunner().Run(testCase);
+            Validate = reader =>
+            {
+                R2RAssert.HasAsyncVariant(reader, "CaptureObjectAcrossAwait");
+                R2RAssert.HasAsyncVariant(reader, "CaptureMultipleRefsAcrossAwait");
+                R2RAssert.HasContinuationLayout(reader);
+                R2RAssert.HasResumptionStubFixup(reader);
+            },
+        });
     }
 
     /// <summary>
@@ -195,20 +178,18 @@ public class R2RTestSuites
     [Fact]
     public void RuntimeAsyncDevirtualize()
     {
-        var expectations = new R2RExpectations();
-        expectations.Features.Add(RuntimeAsyncFeature);
-        expectations.ExpectedAsyncVariantMethods.Add("GetValueAsync");
-
-        var testCase = new R2RTestCase
+        new R2RTestRunner().Run(new R2RTestCase
         {
             Name = "RuntimeAsyncDevirtualize",
             MainSourceResourceName = "RuntimeAsync/AsyncDevirtualize.cs",
-            MainExtraSourceResourceNames = new[] { "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs" },
+            MainExtraSourceResourceNames = ["RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs"],
+            Features = { RuntimeAsyncFeature },
             Dependencies = new List<CompiledAssembly>(),
-            Expectations = expectations,
-        };
-
-        new R2RTestRunner().Run(testCase);
+            Validate = reader =>
+            {
+                R2RAssert.HasAsyncVariant(reader, "GetValueAsync");
+            },
+        });
     }
 
     /// <summary>
@@ -218,21 +199,19 @@ public class R2RTestSuites
     [Fact]
     public void RuntimeAsyncNoYield()
     {
-        var expectations = new R2RExpectations();
-        expectations.Features.Add(RuntimeAsyncFeature);
-        expectations.ExpectedAsyncVariantMethods.Add("AsyncButNoAwait");
-        expectations.ExpectedAsyncVariantMethods.Add("AsyncWithConditionalAwait");
-
-        var testCase = new R2RTestCase
+        new R2RTestRunner().Run(new R2RTestCase
         {
             Name = "RuntimeAsyncNoYield",
             MainSourceResourceName = "RuntimeAsync/AsyncNoYield.cs",
-            MainExtraSourceResourceNames = new[] { "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs" },
+            MainExtraSourceResourceNames = ["RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs"],
+            Features = { RuntimeAsyncFeature },
             Dependencies = new List<CompiledAssembly>(),
-            Expectations = expectations,
-        };
-
-        new R2RTestRunner().Run(testCase);
+            Validate = reader =>
+            {
+                R2RAssert.HasAsyncVariant(reader, "AsyncButNoAwait");
+                R2RAssert.HasAsyncVariant(reader, "AsyncWithConditionalAwait");
+            },
+        });
     }
 
     /// <summary>
@@ -242,34 +221,32 @@ public class R2RTestSuites
     [Fact]
     public void RuntimeAsyncCrossModule()
     {
-        var expectations = new R2RExpectations();
-        expectations.Features.Add(RuntimeAsyncFeature);
-        expectations.ExpectedManifestRefs.Add("AsyncDepLib");
-        expectations.ExpectedAsyncVariantMethods.Add("CallCrossModuleAsync");
-        expectations.Crossgen2Options.Add(Crossgen2Option.CrossModuleOptimization("AsyncDepLib"));
-
-        var testCase = new R2RTestCase
+        new R2RTestRunner().Run(new R2RTestCase
         {
             Name = "RuntimeAsyncCrossModule",
             MainSourceResourceName = "RuntimeAsync/AsyncCrossModule.cs",
-            MainExtraSourceResourceNames = new[] { "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs" },
+            MainExtraSourceResourceNames = ["RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs"],
+            Features = { RuntimeAsyncFeature },
+            Crossgen2Options = { Crossgen2Option.CrossModuleOptimization("AsyncDepLib") },
             Dependencies = new List<CompiledAssembly>
             {
-                new CompiledAssembly
+                new()
                 {
                     AssemblyName = "AsyncDepLib",
-                    SourceResourceNames = new[]
-                    {
+                    SourceResourceNames =
+                    [
                         "RuntimeAsync/Dependencies/AsyncDepLib.cs",
                         "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs"
-                    },
+                    ],
                     IsCrossgenInput = true,
                     Features = { RuntimeAsyncFeature },
                 }
             },
-            Expectations = expectations,
-        };
-
-        new R2RTestRunner().Run(testCase);
+            Validate = reader =>
+            {
+                R2RAssert.HasManifestRef(reader, "AsyncDepLib");
+                R2RAssert.HasAsyncVariant(reader, "CallCrossModuleAsync");
+            },
+        });
     }
 }

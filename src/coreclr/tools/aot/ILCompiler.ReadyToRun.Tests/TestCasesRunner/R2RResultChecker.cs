@@ -14,149 +14,15 @@ using Xunit;
 namespace ILCompiler.ReadyToRun.Tests.TestCasesRunner;
 
 /// <summary>
-/// Parsed expectations from a test case's assembly-level and method-level attributes.
+/// Static assertion helpers for validating R2R images via <see cref="ReadyToRunReader"/>.
+/// Use these in <see cref="R2RTestCase.Validate"/> callbacks.
 /// </summary>
-internal sealed class R2RExpectations
-{
-    public List<string> ExpectedManifestRefs { get; } = new();
-    public List<ExpectedInlinedMethod> ExpectedInlinedMethods { get; } = new();
-    public bool CompositeMode { get; set; }
-    public List<Crossgen2Option> Crossgen2Options { get; } = new();
-    /// <summary>
-    /// Roslyn feature flags for the main assembly (e.g. runtime-async=on).
-    /// </summary>
-    public List<KeyValuePair<string, string>> Features { get; } = new();
-    /// <summary>
-    /// Method names expected to have [ASYNC] variant entries in the R2R image.
-    /// </summary>
-    public List<string> ExpectedAsyncVariantMethods { get; } = new();
-    /// <summary>
-    /// Method names expected to have [RESUME] (resumption stub) entries.
-    /// </summary>
-    public List<string> ExpectedResumptionStubs { get; } = new();
-    /// <summary>
-    /// If true, expect at least one ContinuationLayout fixup in the image.
-    /// </summary>
-    public bool ExpectContinuationLayout { get; set; }
-    /// <summary>
-    /// If true, expect at least one ResumptionStubEntryPoint fixup in the image.
-    /// </summary>
-    public bool ExpectResumptionStubFixup { get; set; }
-    /// <summary>
-    /// Fixup kinds that must be present somewhere in the image.
-    /// </summary>
-    public List<ReadyToRunFixupKind> ExpectedFixupKinds { get; } = new();
-}
-
-internal sealed record ExpectedInlinedMethod(string MethodName);
-
-/// <summary>
-/// Validates R2R images against test expectations using ReadyToRunReader.
-/// </summary>
-internal sealed class R2RResultChecker
+internal static class R2RAssert
 {
     /// <summary>
-    /// Validates the main R2R image against expectations.
+    /// Returns all methods (assembly methods + instance methods) from the reader.
     /// </summary>
-    public void Check(string r2rImagePath, R2RExpectations expectations)
-    {
-        Assert.True(File.Exists(r2rImagePath), $"R2R image not found: {r2rImagePath}");
-
-        using var fileStream = File.OpenRead(r2rImagePath);
-        using var peReader = new PEReader(fileStream);
-
-        Assert.True(ReadyToRunReader.IsReadyToRunImage(peReader),
-            $"'{Path.GetFileName(r2rImagePath)}' is not a valid R2R image");
-
-        var reader = new ReadyToRunReader(new SimpleAssemblyResolver(), r2rImagePath);
-
-        CheckManifestRefs(reader, expectations, r2rImagePath);
-        CheckInlinedMethods(reader, expectations, r2rImagePath);
-        CheckAsyncVariantMethods(reader, expectations, r2rImagePath);
-        CheckResumptionStubs(reader, expectations, r2rImagePath);
-        CheckFixupKinds(reader, expectations, r2rImagePath);
-    }
-
-    private static void CheckManifestRefs(ReadyToRunReader reader, R2RExpectations expectations, string imagePath)
-    {
-        if (expectations.ExpectedManifestRefs.Count == 0)
-            return;
-
-        // Get all assembly references (both MSIL and manifest)
-        var allRefs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        // Read MSIL AssemblyRef table
-        var globalMetadata = reader.GetGlobalMetadata();
-        var mdReader = globalMetadata.MetadataReader;
-        foreach (var handle in mdReader.AssemblyReferences)
-        {
-            var assemblyRef = mdReader.GetAssemblyReference(handle);
-            string name = mdReader.GetString(assemblyRef.Name);
-            allRefs.Add(name);
-        }
-
-        // Read manifest references (extra refs beyond MSIL table)
-        foreach (var kvp in reader.ManifestReferenceAssemblies)
-        {
-            allRefs.Add(kvp.Key);
-        }
-
-        foreach (string expected in expectations.ExpectedManifestRefs)
-        {
-            Assert.True(allRefs.Contains(expected),
-                $"Expected assembly reference '{expected}' not found in R2R image '{Path.GetFileName(imagePath)}'. " +
-                $"Found: [{string.Join(", ", allRefs.OrderBy(s => s))}]");
-        }
-    }
-
-    private static void CheckInlinedMethods(ReadyToRunReader reader, R2RExpectations expectations, string imagePath)
-    {
-        if (expectations.ExpectedInlinedMethods.Count == 0)
-            return;
-
-        var checkIlBodySignatures = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var formattingOptions = new SignatureFormattingOptions();
-        var allFixupSummary = new List<string>();
-
-        void CollectFixups(ReadyToRunMethod method)
-        {
-            foreach (var cell in method.Fixups)
-            {
-                if (cell.Signature is null)
-                    continue;
-
-                string sigText = cell.Signature.ToString(formattingOptions);
-                allFixupSummary.Add($"[{cell.Signature.FixupKind}] {sigText}");
-
-                if (cell.Signature.FixupKind is ReadyToRunFixupKind.Check_IL_Body or ReadyToRunFixupKind.Verify_IL_Body)
-                {
-                    checkIlBodySignatures.Add(sigText);
-                }
-            }
-        }
-
-        foreach (var assembly in reader.ReadyToRunAssemblies)
-        {
-            foreach (var method in assembly.Methods)
-                CollectFixups(method);
-        }
-
-        foreach (var instanceMethod in reader.InstanceMethods)
-            CollectFixups(instanceMethod.Method);
-
-        foreach (var expected in expectations.ExpectedInlinedMethods)
-        {
-            bool found = checkIlBodySignatures.Any(f =>
-                f.Contains(expected.MethodName, StringComparison.OrdinalIgnoreCase));
-
-            Assert.True(found,
-                $"Expected CHECK_IL_BODY fixup for '{expected.MethodName}' not found in '{Path.GetFileName(imagePath)}'. " +
-                $"CHECK_IL_BODY fixups: [{string.Join(", ", checkIlBodySignatures)}]. " +
-                $"All fixups: [{string.Join("; ", allFixupSummary)}]");
-        }
-    }
-
-    private static List<ReadyToRunMethod> GetAllMethods(ReadyToRunReader reader)
+    public static List<ReadyToRunMethod> GetAllMethods(ReadyToRunReader reader)
     {
         var methods = new List<ReadyToRunMethod>();
         foreach (var assembly in reader.ReadyToRunAssemblies)
@@ -167,71 +33,109 @@ internal sealed class R2RResultChecker
         return methods;
     }
 
-    private static void CheckAsyncVariantMethods(ReadyToRunReader reader, R2RExpectations expectations, string imagePath)
+    /// <summary>
+    /// Asserts the R2R image contains a manifest or MSIL assembly reference with the given name.
+    /// </summary>
+    public static void HasManifestRef(ReadyToRunReader reader, string assemblyName)
     {
-        if (expectations.ExpectedAsyncVariantMethods.Count == 0)
-            return;
+        var allRefs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        var allMethods = GetAllMethods(reader);
-        var asyncMethods = allMethods
+        var globalMetadata = reader.GetGlobalMetadata();
+        var mdReader = globalMetadata.MetadataReader;
+        foreach (var handle in mdReader.AssemblyReferences)
+        {
+            var assemblyRef = mdReader.GetAssemblyReference(handle);
+            allRefs.Add(mdReader.GetString(assemblyRef.Name));
+        }
+
+        foreach (var kvp in reader.ManifestReferenceAssemblies)
+            allRefs.Add(kvp.Key);
+
+        Assert.True(allRefs.Contains(assemblyName),
+            $"Expected assembly reference '{assemblyName}' not found. " +
+            $"Found: [{string.Join(", ", allRefs.OrderBy(s => s))}]");
+    }
+
+    /// <summary>
+    /// Asserts the R2R image contains a CHECK_IL_BODY fixup whose signature contains the given method name.
+    /// </summary>
+    public static void HasInlinedMethod(ReadyToRunReader reader, string methodName)
+    {
+        var formattingOptions = new SignatureFormattingOptions();
+        var checkIlBodySigs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var method in GetAllMethods(reader))
+        {
+            if (method.Fixups is null)
+                continue;
+            foreach (var cell in method.Fixups)
+            {
+                if (cell.Signature?.FixupKind is ReadyToRunFixupKind.Check_IL_Body or ReadyToRunFixupKind.Verify_IL_Body)
+                    checkIlBodySigs.Add(cell.Signature.ToString(formattingOptions));
+            }
+        }
+
+        Assert.True(
+            checkIlBodySigs.Any(s => s.Contains(methodName, StringComparison.OrdinalIgnoreCase)),
+            $"Expected CHECK_IL_BODY fixup for '{methodName}' not found. " +
+            $"CHECK_IL_BODY fixups: [{string.Join(", ", checkIlBodySigs)}]");
+    }
+
+    /// <summary>
+    /// Asserts the R2R image contains an [ASYNC] variant entry whose signature contains the given method name.
+    /// </summary>
+    public static void HasAsyncVariant(ReadyToRunReader reader, string methodName)
+    {
+        var asyncSigs = GetAllMethods(reader)
             .Where(m => m.SignatureString.Contains("[ASYNC]", StringComparison.OrdinalIgnoreCase))
             .Select(m => m.SignatureString)
             .ToList();
 
-        foreach (string expected in expectations.ExpectedAsyncVariantMethods)
-        {
-            bool found = asyncMethods.Any(sig =>
-                sig.Contains(expected, StringComparison.OrdinalIgnoreCase));
-
-            Assert.True(found,
-                $"Expected [ASYNC] variant for '{expected}' not found in '{Path.GetFileName(imagePath)}'. " +
-                $"Async methods: [{string.Join(", ", asyncMethods)}]. " +
-                $"All methods: [{string.Join(", ", allMethods.Select(m => m.SignatureString).Take(30))}]");
-        }
+        Assert.True(
+            asyncSigs.Any(s => s.Contains(methodName, StringComparison.OrdinalIgnoreCase)),
+            $"Expected [ASYNC] variant for '{methodName}' not found. " +
+            $"Async methods: [{string.Join(", ", asyncSigs)}]");
     }
 
-    private static void CheckResumptionStubs(ReadyToRunReader reader, R2RExpectations expectations, string imagePath)
+    /// <summary>
+    /// Asserts the R2R image contains a [RESUME] stub entry whose signature contains the given method name.
+    /// </summary>
+    public static void HasResumptionStub(ReadyToRunReader reader, string methodName)
     {
-        if (expectations.ExpectedResumptionStubs.Count == 0 && !expectations.ExpectResumptionStubFixup)
-            return;
-
-        var allMethods = GetAllMethods(reader);
-        var resumeMethods = allMethods
+        var resumeSigs = GetAllMethods(reader)
             .Where(m => m.SignatureString.Contains("[RESUME]", StringComparison.OrdinalIgnoreCase))
             .Select(m => m.SignatureString)
             .ToList();
 
-        foreach (string expected in expectations.ExpectedResumptionStubs)
-        {
-            bool found = resumeMethods.Any(sig =>
-                sig.Contains(expected, StringComparison.OrdinalIgnoreCase));
-
-            Assert.True(found,
-                $"Expected [RESUME] stub for '{expected}' not found in '{Path.GetFileName(imagePath)}'. " +
-                $"Resume methods: [{string.Join(", ", resumeMethods)}]. " +
-                $"All methods: [{string.Join(", ", allMethods.Select(m => m.SignatureString).Take(30))}]");
-        }
-
-        if (expectations.ExpectResumptionStubFixup)
-        {
-            var formattingOptions = new SignatureFormattingOptions();
-            bool hasResumptionFixup = allMethods.Any(m =>
-                m.Fixups.Any(c =>
-                    c.Signature?.FixupKind == ReadyToRunFixupKind.ResumptionStubEntryPoint));
-
-            Assert.True(hasResumptionFixup,
-                $"Expected ResumptionStubEntryPoint fixup not found in '{Path.GetFileName(imagePath)}'.");
-        }
+        Assert.True(
+            resumeSigs.Any(s => s.Contains(methodName, StringComparison.OrdinalIgnoreCase)),
+            $"Expected [RESUME] stub for '{methodName}' not found. " +
+            $"Resume methods: [{string.Join(", ", resumeSigs)}]");
     }
 
-    private static void CheckFixupKinds(ReadyToRunReader reader, R2RExpectations expectations, string imagePath)
+    /// <summary>
+    /// Asserts the R2R image contains at least one ContinuationLayout fixup.
+    /// </summary>
+    public static void HasContinuationLayout(ReadyToRunReader reader)
     {
-        if (expectations.ExpectedFixupKinds.Count == 0 && !expectations.ExpectContinuationLayout)
-            return;
+        HasFixupKind(reader, ReadyToRunFixupKind.ContinuationLayout);
+    }
 
-        var allMethods = GetAllMethods(reader);
+    /// <summary>
+    /// Asserts the R2R image contains at least one ResumptionStubEntryPoint fixup.
+    /// </summary>
+    public static void HasResumptionStubFixup(ReadyToRunReader reader)
+    {
+        HasFixupKind(reader, ReadyToRunFixupKind.ResumptionStubEntryPoint);
+    }
+
+    /// <summary>
+    /// Asserts the R2R image contains at least one fixup of the given kind.
+    /// </summary>
+    public static void HasFixupKind(ReadyToRunReader reader, ReadyToRunFixupKind kind)
+    {
         var presentKinds = new HashSet<ReadyToRunFixupKind>();
-        foreach (var method in allMethods)
+        foreach (var method in GetAllMethods(reader))
         {
             if (method.Fixups is null)
                 continue;
@@ -242,19 +146,9 @@ internal sealed class R2RResultChecker
             }
         }
 
-        if (expectations.ExpectContinuationLayout)
-        {
-            Assert.True(presentKinds.Contains(ReadyToRunFixupKind.ContinuationLayout),
-                $"Expected ContinuationLayout fixup not found in '{Path.GetFileName(imagePath)}'. " +
-                $"Present fixup kinds: [{string.Join(", ", presentKinds)}]");
-        }
-
-        foreach (var expectedKind in expectations.ExpectedFixupKinds)
-        {
-            Assert.True(presentKinds.Contains(expectedKind),
-                $"Expected fixup kind '{expectedKind}' not found in '{Path.GetFileName(imagePath)}'. " +
-                $"Present fixup kinds: [{string.Join(", ", presentKinds)}]");
-        }
+        Assert.True(presentKinds.Contains(kind),
+            $"Expected fixup kind '{kind}' not found. " +
+            $"Present kinds: [{string.Join(", ", presentKinds)}]");
     }
 }
 
@@ -263,12 +157,11 @@ internal sealed class R2RResultChecker
 /// </summary>
 internal sealed class SimpleAssemblyResolver : IAssemblyResolver
 {
-    private readonly Dictionary<string, string> _cache = new(StringComparer.OrdinalIgnoreCase);
-
     public IAssemblyMetadata? FindAssembly(MetadataReader metadataReader, AssemblyReferenceHandle assemblyReferenceHandle, string parentFile)
     {
         var assemblyRef = metadataReader.GetAssemblyReference(assemblyReferenceHandle);
         string name = metadataReader.GetString(assemblyRef.Name);
+
         return FindAssembly(name, parentFile);
     }
 
@@ -280,10 +173,7 @@ internal sealed class SimpleAssemblyResolver : IAssemblyResolver
 
         string candidate = Path.Combine(dir, simpleName + ".dll");
         if (!File.Exists(candidate))
-        {
-            // Try in runtime pack
             candidate = Path.Combine(TestPaths.RuntimePackDir, simpleName + ".dll");
-        }
 
         if (!File.Exists(candidate))
             return null;

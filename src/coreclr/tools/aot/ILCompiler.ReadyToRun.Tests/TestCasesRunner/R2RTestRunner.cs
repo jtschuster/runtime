@@ -5,13 +5,15 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using ILCompiler.ReadyToRun.Tests.Expectations;
+using System.Reflection.PortableExecutable;
+using ILCompiler.Reflection.ReadyToRun;
 using Xunit;
 
 namespace ILCompiler.ReadyToRun.Tests.TestCasesRunner;
 
 /// <summary>
-/// Describes a test case: a main source file with its dependencies and expectations.
+/// Describes a test case: a main source file with its dependencies and compilation options.
+/// Validation is done via the <see cref="Validate"/> callback which receives the <see cref="ReadyToRunReader"/>.
 /// </summary>
 internal sealed class R2RTestCase
 {
@@ -22,7 +24,20 @@ internal sealed class R2RTestCase
     /// </summary>
     public string[]? MainExtraSourceResourceNames { get; init; }
     public required List<CompiledAssembly> Dependencies { get; init; }
-    public required R2RExpectations Expectations { get; init; }
+
+    // Compilation config
+    public bool CompositeMode { get; init; }
+    public List<Crossgen2Option> Crossgen2Options { get; init; } = new();
+    /// <summary>
+    /// Roslyn feature flags for the main assembly (e.g. runtime-async=on).
+    /// </summary>
+    public List<KeyValuePair<string, string>> Features { get; init; } = new();
+
+    /// <summary>
+    /// Callback that receives the <see cref="ReadyToRunReader"/> for the main R2R image.
+    /// Use <see cref="R2RAssert"/> helpers or raw xUnit assertions to validate the output.
+    /// </summary>
+    public required Action<ReadyToRunReader> Validate { get; init; }
 }
 
 /// <summary>
@@ -95,7 +110,7 @@ internal sealed class R2RTestRunner
             var mainRefs = compiledDeps.Select(d => d.IlPath).ToList();
             string mainIlPath = compiler.CompileAssembly(testCase.Name, mainSources, mainRefs,
                 outputKind: Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary,
-                features: testCase.Expectations.Features.Count > 0 ? testCase.Expectations.Features : null);
+                features: testCase.Features.Count > 0 ? testCase.Features : null);
 
             // Step 3: Crossgen2 dependencies
             var driver = new R2RDriver();
@@ -121,9 +136,9 @@ internal sealed class R2RTestRunner
             // Step 4: Crossgen2 main assembly
             string mainR2RPath = Path.Combine(r2rDir, Path.GetFileName(mainIlPath));
 
-            if (testCase.Expectations.CompositeMode)
+            if (testCase.CompositeMode)
             {
-                RunCompositeCompilation(testCase, driver, ilDir, r2rDir, mainIlPath, mainR2RPath, allRefPaths, compiledDeps);
+                RunCompositeCompilation(testCase, driver, mainIlPath, mainR2RPath, allRefPaths, compiledDeps);
             }
             else
             {
@@ -131,8 +146,10 @@ internal sealed class R2RTestRunner
             }
 
             // Step 5: Validate R2R output
-            var checker = new R2RResultChecker();
-            checker.Check(mainR2RPath, testCase.Expectations);
+            Assert.True(File.Exists(mainR2RPath), $"R2R image not found: {mainR2RPath}");
+
+            var reader = new ReadyToRunReader(new SimpleAssemblyResolver(), mainR2RPath);
+            testCase.Validate(reader);
         }
         finally
         {
@@ -157,7 +174,7 @@ internal sealed class R2RTestRunner
             InputPath = mainIlPath,
             OutputPath = mainR2RPath,
             ReferencePaths = allRefPaths,
-            ExtraArgs = testCase.Expectations.Crossgen2Options.SelectMany(o => o.ToArgs()).ToList(),
+            ExtraArgs = testCase.Crossgen2Options.SelectMany(o => o.ToArgs()).ToList(),
         };
 
         var result = driver.Compile(options);
@@ -168,8 +185,6 @@ internal sealed class R2RTestRunner
     private static void RunCompositeCompilation(
         R2RTestCase testCase,
         R2RDriver driver,
-        string ilDir,
-        string r2rDir,
         string mainIlPath,
         string mainR2RPath,
         List<string> allRefPaths,
@@ -189,7 +204,7 @@ internal sealed class R2RTestRunner
             ReferencePaths = allRefPaths,
             Composite = true,
             CompositeInputPaths = compositeInputs,
-            ExtraArgs = testCase.Expectations.Crossgen2Options.SelectMany(o => o.ToArgs()).ToList(),
+            ExtraArgs = testCase.Crossgen2Options.SelectMany(o => o.ToArgs()).ToList(),
         };
 
         var result = driver.Compile(options);
