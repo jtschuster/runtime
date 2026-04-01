@@ -22,6 +22,30 @@ internal sealed class R2RExpectations
     public List<ExpectedInlinedMethod> ExpectedInlinedMethods { get; } = new();
     public bool CompositeMode { get; set; }
     public List<string> Crossgen2Options { get; } = new();
+    /// <summary>
+    /// Roslyn feature flags for the main assembly (e.g. runtime-async=on).
+    /// </summary>
+    public List<KeyValuePair<string, string>> Features { get; } = new();
+    /// <summary>
+    /// Method names expected to have [ASYNC] variant entries in the R2R image.
+    /// </summary>
+    public List<string> ExpectedAsyncVariantMethods { get; } = new();
+    /// <summary>
+    /// Method names expected to have [RESUME] (resumption stub) entries.
+    /// </summary>
+    public List<string> ExpectedResumptionStubs { get; } = new();
+    /// <summary>
+    /// If true, expect at least one ContinuationLayout fixup in the image.
+    /// </summary>
+    public bool ExpectContinuationLayout { get; set; }
+    /// <summary>
+    /// If true, expect at least one ResumptionStubEntryPoint fixup in the image.
+    /// </summary>
+    public bool ExpectResumptionStubFixup { get; set; }
+    /// <summary>
+    /// Fixup kinds that must be present somewhere in the image.
+    /// </summary>
+    public List<ReadyToRunFixupKind> ExpectedFixupKinds { get; } = new();
 }
 
 internal sealed record ExpectedInlinedMethod(string MethodName);
@@ -48,6 +72,9 @@ internal sealed class R2RResultChecker
 
         CheckManifestRefs(reader, expectations, r2rImagePath);
         CheckInlinedMethods(reader, expectations, r2rImagePath);
+        CheckAsyncVariantMethods(reader, expectations, r2rImagePath);
+        CheckResumptionStubs(reader, expectations, r2rImagePath);
+        CheckFixupKinds(reader, expectations, r2rImagePath);
     }
 
     private static void CheckManifestRefs(ReadyToRunReader reader, R2RExpectations expectations, string imagePath)
@@ -126,6 +153,107 @@ internal sealed class R2RResultChecker
                 $"Expected CHECK_IL_BODY fixup for '{expected.MethodName}' not found in '{Path.GetFileName(imagePath)}'. " +
                 $"CHECK_IL_BODY fixups: [{string.Join(", ", checkIlBodySignatures)}]. " +
                 $"All fixups: [{string.Join("; ", allFixupSummary)}]");
+        }
+    }
+
+    private static List<ReadyToRunMethod> GetAllMethods(ReadyToRunReader reader)
+    {
+        var methods = new List<ReadyToRunMethod>();
+        foreach (var assembly in reader.ReadyToRunAssemblies)
+            methods.AddRange(assembly.Methods);
+        foreach (var instanceMethod in reader.InstanceMethods)
+            methods.Add(instanceMethod.Method);
+
+        return methods;
+    }
+
+    private static void CheckAsyncVariantMethods(ReadyToRunReader reader, R2RExpectations expectations, string imagePath)
+    {
+        if (expectations.ExpectedAsyncVariantMethods.Count == 0)
+            return;
+
+        var allMethods = GetAllMethods(reader);
+        var asyncMethods = allMethods
+            .Where(m => m.SignatureString.Contains("[ASYNC]", StringComparison.OrdinalIgnoreCase))
+            .Select(m => m.SignatureString)
+            .ToList();
+
+        foreach (string expected in expectations.ExpectedAsyncVariantMethods)
+        {
+            bool found = asyncMethods.Any(sig =>
+                sig.Contains(expected, StringComparison.OrdinalIgnoreCase));
+
+            Assert.True(found,
+                $"Expected [ASYNC] variant for '{expected}' not found in '{Path.GetFileName(imagePath)}'. " +
+                $"Async methods: [{string.Join(", ", asyncMethods)}]. " +
+                $"All methods: [{string.Join(", ", allMethods.Select(m => m.SignatureString).Take(30))}]");
+        }
+    }
+
+    private static void CheckResumptionStubs(ReadyToRunReader reader, R2RExpectations expectations, string imagePath)
+    {
+        if (expectations.ExpectedResumptionStubs.Count == 0 && !expectations.ExpectResumptionStubFixup)
+            return;
+
+        var allMethods = GetAllMethods(reader);
+        var resumeMethods = allMethods
+            .Where(m => m.SignatureString.Contains("[RESUME]", StringComparison.OrdinalIgnoreCase))
+            .Select(m => m.SignatureString)
+            .ToList();
+
+        foreach (string expected in expectations.ExpectedResumptionStubs)
+        {
+            bool found = resumeMethods.Any(sig =>
+                sig.Contains(expected, StringComparison.OrdinalIgnoreCase));
+
+            Assert.True(found,
+                $"Expected [RESUME] stub for '{expected}' not found in '{Path.GetFileName(imagePath)}'. " +
+                $"Resume methods: [{string.Join(", ", resumeMethods)}]. " +
+                $"All methods: [{string.Join(", ", allMethods.Select(m => m.SignatureString).Take(30))}]");
+        }
+
+        if (expectations.ExpectResumptionStubFixup)
+        {
+            var formattingOptions = new SignatureFormattingOptions();
+            bool hasResumptionFixup = allMethods.Any(m =>
+                m.Fixups.Any(c =>
+                    c.Signature?.FixupKind == ReadyToRunFixupKind.ResumptionStubEntryPoint));
+
+            Assert.True(hasResumptionFixup,
+                $"Expected ResumptionStubEntryPoint fixup not found in '{Path.GetFileName(imagePath)}'.");
+        }
+    }
+
+    private static void CheckFixupKinds(ReadyToRunReader reader, R2RExpectations expectations, string imagePath)
+    {
+        if (expectations.ExpectedFixupKinds.Count == 0 && !expectations.ExpectContinuationLayout)
+            return;
+
+        var allMethods = GetAllMethods(reader);
+        var presentKinds = new HashSet<ReadyToRunFixupKind>();
+        foreach (var method in allMethods)
+        {
+            if (method.Fixups is null)
+                continue;
+            foreach (var cell in method.Fixups)
+            {
+                if (cell.Signature is not null)
+                    presentKinds.Add(cell.Signature.FixupKind);
+            }
+        }
+
+        if (expectations.ExpectContinuationLayout)
+        {
+            Assert.True(presentKinds.Contains(ReadyToRunFixupKind.ContinuationLayout),
+                $"Expected ContinuationLayout fixup not found in '{Path.GetFileName(imagePath)}'. " +
+                $"Present fixup kinds: [{string.Join(", ", presentKinds)}]");
+        }
+
+        foreach (var expectedKind in expectations.ExpectedFixupKinds)
+        {
+            Assert.True(presentKinds.Contains(expectedKind),
+                $"Expected fixup kind '{expectedKind}' not found in '{Path.GetFileName(imagePath)}'. " +
+                $"Present fixup kinds: [{string.Join(", ", presentKinds)}]");
         }
     }
 }

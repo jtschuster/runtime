@@ -53,18 +53,25 @@ internal sealed class R2RTestCaseCompiler
     /// <param name="additionalReferences">Paths to additional assembly references.</param>
     /// <param name="outputKind">Library or ConsoleApplication.</param>
     /// <param name="additionalDefines">Additional preprocessor defines.</param>
+    /// <param name="features">Roslyn feature flags (e.g. "runtime-async=on").</param>
     /// <returns>Path to the compiled assembly.</returns>
     public string CompileAssembly(
         string assemblyName,
         IEnumerable<string> sources,
         IEnumerable<string>? additionalReferences = null,
         OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary,
-        IEnumerable<string>? additionalDefines = null)
+        IEnumerable<string>? additionalDefines = null,
+        IEnumerable<KeyValuePair<string, string>>? features = null)
     {
+        var parseOptions = new CSharpParseOptions(
+            LanguageVersion.Latest,
+            preprocessorSymbols: additionalDefines);
+
+        if (features is not null)
+            parseOptions = parseOptions.WithFeatures(features);
+
         var syntaxTrees = sources.Select(src =>
-            CSharpSyntaxTree.ParseText(src, new CSharpParseOptions(
-                LanguageVersion.Latest,
-                preprocessorSymbols: additionalDefines)));
+            CSharpSyntaxTree.ParseText(src, parseOptions));
 
         var references = new List<MetadataReference>(_frameworkReferences);
         if (additionalReferences is not null)

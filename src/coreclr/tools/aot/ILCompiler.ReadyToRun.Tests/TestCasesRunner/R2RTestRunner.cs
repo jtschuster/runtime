@@ -17,6 +17,10 @@ internal sealed class R2RTestCase
 {
     public required string Name { get; init; }
     public required string MainSourceResourceName { get; init; }
+    /// <summary>
+    /// Additional source files to compile with the main assembly (e.g. shared attribute files).
+    /// </summary>
+    public string[]? MainExtraSourceResourceNames { get; init; }
     public required List<DependencyInfo> Dependencies { get; init; }
     public required R2RExpectations Expectations { get; init; }
 }
@@ -31,6 +35,10 @@ internal sealed class DependencyInfo
     public bool Crossgen { get; init; }
     public List<string> CrossgenOptions { get; init; } = new();
     public List<string> AdditionalReferences { get; init; } = new();
+    /// <summary>
+    /// Roslyn feature flags for this dependency (e.g. runtime-async=on).
+    /// </summary>
+    public List<KeyValuePair<string, string>> Features { get; init; } = new();
 }
 
 /// <summary>
@@ -66,15 +74,26 @@ internal sealed class R2RTestRunner
                     .Select(r => compiledDeps.First(d => d.Dep.AssemblyName == r).IlPath)
                     .ToList();
 
-                string ilPath = compiler.CompileAssembly(dep.AssemblyName, sources, refs);
+                string ilPath = compiler.CompileAssembly(dep.AssemblyName, sources, refs,
+                    features: dep.Features.Count > 0 ? dep.Features : null);
                 compiledDeps.Add((dep, ilPath));
             }
 
             // Step 2: Compile main assembly with Roslyn
-            string mainSource = R2RTestCaseCompiler.ReadEmbeddedSource(testCase.MainSourceResourceName);
+            var mainSources = new List<string>
+            {
+                R2RTestCaseCompiler.ReadEmbeddedSource(testCase.MainSourceResourceName)
+            };
+            if (testCase.MainExtraSourceResourceNames is not null)
+            {
+                foreach (string extra in testCase.MainExtraSourceResourceNames)
+                    mainSources.Add(R2RTestCaseCompiler.ReadEmbeddedSource(extra));
+            }
+
             var mainRefs = compiledDeps.Select(d => d.IlPath).ToList();
-            string mainIlPath = compiler.CompileAssembly(testCase.Name, new[] { mainSource }, mainRefs,
-                outputKind: Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary);
+            string mainIlPath = compiler.CompileAssembly(testCase.Name, mainSources, mainRefs,
+                outputKind: Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary,
+                features: testCase.Expectations.Features.Count > 0 ? testCase.Expectations.Features : null);
 
             // Step 3: Crossgen2 dependencies
             var driver = new R2RDriver();
