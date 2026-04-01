@@ -69,7 +69,7 @@ namespace ILCompiler.DependencyAnalysisFramework
                 Reason = reason;
             }
 
-            // Used by HashSet, so must have good Equals/GetHashCode
+
             public readonly DependencyNodeCore<DependencyContextType> Node;
             public readonly DependencyNodeCore<DependencyContextType> OtherReasonNode;
             public readonly string Reason;

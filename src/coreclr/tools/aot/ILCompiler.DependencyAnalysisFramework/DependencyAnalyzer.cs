@@ -39,7 +39,7 @@ namespace ILCompiler.DependencyAnalysisFramework
         private List<DynamicDependencyNode> _markedNodesWithDynamicDependencies = new List<DynamicDependencyNode>();
         private bool _newDynamicDependenciesMayHaveAppeared;
 
-        private Dictionary<DependencyNodeCore<DependencyContextType>, HashSet<DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry>> _conditional_dependency_store = new Dictionary<DependencyNodeCore<DependencyContextType>, HashSet<DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry>>();
+        private Dictionary<DependencyNodeCore<DependencyContextType>, List<DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry>> _conditional_dependency_store = new Dictionary<DependencyNodeCore<DependencyContextType>, List<DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry>>();
         private bool _markingCompleted;
 
         private sealed class RandomInsertStack<T>
@@ -198,10 +198,12 @@ namespace ILCompiler.DependencyAnalysisFramework
                     }
                     else
                     {
-                        HashSet<DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry> storedDependencySet;
+                        // Dedup is unnecessary: AddToMarkStack rejects already-marked nodes,
+                        // and duplicate un-marked entries just result in a redundant no-op push.
+                        List<DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry> storedDependencySet;
                         if (!_conditional_dependency_store.TryGetValue(dependency.OtherReasonNode, out storedDependencySet))
                         {
-                            storedDependencySet = new HashSet<DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry>();
+                            storedDependencySet = new List<DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry>();
                             _conditional_dependency_store.Add(dependency.OtherReasonNode, storedDependencySet);
                         }
                         // Swap out other reason node as we're storing that as the dictionary key
@@ -265,7 +267,7 @@ namespace ILCompiler.DependencyAnalysisFramework
 
                     // If this new node satisfies any stored conditional dependencies,
                     // add them to the mark stack
-                    HashSet<DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry> storedDependencySet;
+                    List<DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry> storedDependencySet;
                     if (_conditional_dependency_store.TryGetValue(currentNode, out storedDependencySet))
                     {
                         foreach (DependencyNodeCore<DependencyContextType>.CombinedDependencyListEntry newlySatisfiedDependency in storedDependencySet)
