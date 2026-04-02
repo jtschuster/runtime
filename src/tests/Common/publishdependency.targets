@@ -10,14 +10,15 @@
     <MinOSForArch>win7</MinOSForArch>
     <MinOSForArch Condition="'$(PackagePlatform)' == 'arm'">win8</MinOSForArch>
     <MinOSForArch Condition="'$(PackagePlatform)' == 'arm64'">win10</MinOSForArch>
-    <!-- Non-desktop OS's use a custom dotnet host, instead of corerun -->
+    <!-- Non-desktop OS's use a custom dotnet host, instead of corerun.
+         Also defined in Common/Directory.Build.targets (different MSBuild context). Keep in sync. -->
     <IsDesktopOS Condition="'$(TargetsBrowser)' != 'true' and '$(TargetsAndroid)' != 'true' and '$(TargetstvOS)' != 'true' and '$(TargetsiOS)' != 'true' and '$(TargetsMacCatalyst)' != 'true'">true</IsDesktopOS>
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- These projects are individually restored in order. Each
-         subsequent restore only copies files that don't already exist
-         in CORE_ROOT, so assets from the first project file win. -->
+    <!-- These projects are restored and built to resolve NuGet-sourced test dependencies.
+         The Copy task uses SkipUnchangedFiles, so if both projects provide the same file
+         the last one to copy wins (test_dependencies.csproj). -->
     <CoreRootProjectFiles Include="$(RepoRoot)src\tests\Common\test_dependencies_fs\test_dependencies.fsproj" />
     <CoreRootProjectFiles Include="$(RepoRoot)src\tests\Common\test_dependencies\test_dependencies.csproj" />
   </ItemGroup>
@@ -31,6 +32,11 @@
     CopyDependencyToCoreRoot is the original entry point called by CreateTestOverlay.
     It delegates to two sub-targets so that CopyRuntimeToCoreRoot can run
     independently (e.g. for GenerateLayoutOnly) without requiring NuGet restore.
+
+    NOTE: Common/Directory.Build.targets also defines a target named CopyDependencyToCoreRoot
+    (for copying NuGet items inside test_dependencies project context). This definition
+    overrides that one in build.proj context because publishdependency.targets is imported
+    after Directory.Build.targets. Do not reorder the imports in build.proj.
   -->
   <Target Name="CopyDependencyToCoreRoot"
           DependsOnTargets="CopyRuntimeToCoreRoot;CopyTestDependenciesToCoreRoot" />

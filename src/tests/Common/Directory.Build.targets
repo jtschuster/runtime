@@ -17,7 +17,8 @@
     <GCStressDependsOnCoreDisTools Condition="'$(TargetOS)' == 'linux' And '$(TargetArchitecture)' == 'x64'">true</GCStressDependsOnCoreDisTools>
     <CopyCoreDisToolsToCoreRoot>false</CopyCoreDisToolsToCoreRoot>
     <CopyCoreDisToolsToCoreRoot Condition="$(GCStressDependsOnCoreDisTools) And '$(DotNetBuildSourceOnly)' != 'true'">true</CopyCoreDisToolsToCoreRoot>
-    <!-- Non-desktop OS's use a custom dotnet host, instead of corerun -->
+    <!-- Non-desktop OS's use a custom dotnet host, instead of corerun.
+         Also defined in publishdependency.targets (different MSBuild context). Keep in sync. -->
     <IsDesktopOS Condition="'$(TargetsBrowser)' != 'true' and '$(TargetsAndroid)' != 'true' and '$(TargetstvOS)' != 'true' and '$(TargetsiOS)' != 'true' and '$(TargetsMacCatalyst)' != 'true'">true</IsDesktopOS>
   </PropertyGroup>
 
@@ -28,6 +29,10 @@
     <KnownFrameworkReference Remove="Microsoft.WindowsDesktop.App" />
   </ItemGroup>
 
+  <!-- This target has the same name as the router in publishdependency.targets.
+       In build.proj context, publishdependency.targets is imported later and overrides this.
+       In test_dependencies project context (invoked via CopyTestDependenciesToCoreRoot),
+       only this file is visible, so this definition runs to copy NuGet-sourced items. -->
   <Target Name="CopyDependencyToCoreRoot"
     DependsOnTargets="ResolveAssemblyReferences">
 
