@@ -1,6 +1,6 @@
 // Test: Cross-module async method inlining
-// Validates that async methods from a dependency library can be
-// cross-module inlined, creating manifest refs and CHECK_IL_BODY fixups.
+// Validates that cross-module async compilation produces manifest refs
+// and [ASYNC] variants for methods calling into a dependency library.
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;

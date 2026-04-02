@@ -13,7 +13,7 @@ using Internal.ReadyToRunConstants;
 namespace ILCompiler.Reflection.ReadyToRun
 {
     /// <summary>
-    /// Parser for the CrossModuleInlineInfo section (ReadyToRunSectionType 119, added in R2R v6.3).
+    /// Parser for the CrossModuleInlineInfo section (ReadyToRunSectionType 119, added in R2R v6.2).
     /// This format differs from InliningInfo2 (section 114) — it uses a stream-size counted
     /// encoding with 2-bit flags on the inlinee index and supports ILBody import indices for
     /// cross-module inlinees and inliners.

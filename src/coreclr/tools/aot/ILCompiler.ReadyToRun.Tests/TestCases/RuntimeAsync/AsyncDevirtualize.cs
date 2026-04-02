@@ -1,6 +1,6 @@
 // Test: Async virtual method devirtualization in R2R
-// Validates that sealed class and interface dispatch of async methods
-// produces devirtualized direct call entries in the R2R image.
+// Validates that async methods on sealed/interface types
+// produce [ASYNC] variant entries in the R2R image.
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;

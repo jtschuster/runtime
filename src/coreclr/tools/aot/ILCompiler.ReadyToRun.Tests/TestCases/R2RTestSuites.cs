@@ -243,8 +243,8 @@ public class R2RTestSuites
     }
 
     /// <summary>
-    /// PR #125420: Devirtualization of async methods through
-    /// AsyncAwareVirtualMethodResolutionAlgorithm.
+    /// PR #125420: [ASYNC] variant generation for devirtualizable async call patterns
+    /// (sealed class and interface dispatch through AsyncAwareVirtualMethodResolutionAlgorithm).
     /// </summary>
     [Fact]
     public void RuntimeAsyncDevirtualize()
@@ -368,8 +368,8 @@ public class R2RTestSuites
 
     /// <summary>
     /// Composite mode with sync cross-module inlining.
-    /// Validates that InliningInfo2 and CrossModuleInlineInfo sections
-    /// are properly populated (CompositeBasic only validates ManifestRef).
+    /// Validates that inlining info (CrossModuleInlineInfo or InliningInfo2) is
+    /// properly populated (CompositeBasic only validates ManifestRef).
     /// </summary>
     [Fact]
     public void CompositeCrossModuleInlining()
@@ -552,7 +552,7 @@ public class R2RTestSuites
     }
 
     /// <summary>
-    /// Two-step compilation: composite A+B, then non-composite C referencing A+B.
+    /// Two-step compilation: composite A+B, then non-composite C referencing A.
     /// Exercises the multi-compilation model.
     /// </summary>
     [Fact]

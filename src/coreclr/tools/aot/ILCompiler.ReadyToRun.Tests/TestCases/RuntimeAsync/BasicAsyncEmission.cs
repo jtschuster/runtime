@@ -1,6 +1,6 @@
 // Test: Basic async method emission in R2R
-// Validates that runtime-async methods produce [ASYNC] variant entries and
-// resumption stubs in the R2R image.
+// Validates that runtime-async methods produce [ASYNC] variant entries
+// in the R2R image.
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;

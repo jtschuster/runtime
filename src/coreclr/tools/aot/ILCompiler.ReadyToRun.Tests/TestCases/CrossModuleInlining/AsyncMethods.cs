@@ -1,6 +1,6 @@
-// Test: Async method thunks in R2R
-// Validates that runtime-async compiled methods produce the expected
-// RuntimeFunction layout (thunk + async body + resumption stub).
+// Test: Cross-module inlining of async methods
+// Validates that async methods from AsyncInlineableLib are cross-module
+// inlined into this assembly with CHECK_IL_BODY fixups.
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;

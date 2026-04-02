@@ -1,6 +1,6 @@
 // Test: Non-composite runtime-async cross-module inlining with continuation layouts.
-// The inlinee methods capture GC refs across await points, which forces
-// ContinuationLayout fixups that reference cross-module types.
+// The dependency methods capture GC refs across await points.
+// Validates manifest refs and [ASYNC] variants for cross-module async calls.
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;

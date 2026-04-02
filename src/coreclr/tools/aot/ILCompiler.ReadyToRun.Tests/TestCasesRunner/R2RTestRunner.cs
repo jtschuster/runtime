@@ -295,7 +295,7 @@ internal sealed class R2RTestRunner
         foreach (var option in compilation.Options)
             args.Add(option.ToArg());
 
-        // Global refs (all compiled IL assemblies + runtime pack)
+        // Global refs (runtime pack + System.Private.CoreLib)
         AddRefArgs(args, refPaths);
 
         EnsureDirectoryExists(Path.GetDirectoryName(outputFile));

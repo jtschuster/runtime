@@ -16,7 +16,7 @@ namespace ILCompiler.ReadyToRun.Tests.TestCasesRunner;
 
 /// <summary>
 /// Static assertion helpers for validating R2R images via <see cref="ReadyToRunReader"/>.
-/// Use these in <see cref="R2RTestCase.Validate"/> callbacks.
+/// Use these in <see cref="CrossgenCompilation.Validate"/> callbacks.
 /// </summary>
 internal static class R2RAssert
 {
