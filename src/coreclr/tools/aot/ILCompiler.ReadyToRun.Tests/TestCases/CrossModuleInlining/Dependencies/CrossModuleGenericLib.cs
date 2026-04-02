@@ -10,9 +10,6 @@ public static class Utility
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static int GetValue() => 42;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static string GetName() => "hello";
 }
 
 public class GenericWrapperA<T>
