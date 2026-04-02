@@ -121,8 +121,11 @@ internal sealed class R2RDriver
         }
 
         using var process = Process.Start(psi)!;
-        string stdout = process.StandardOutput.ReadToEnd();
-        string stderr = process.StandardError.ReadToEnd();
+
+        // Read stdout and stderr concurrently to avoid pipe buffer deadlock.
+        // If crossgen2 fills one pipe while we block reading the other, both processes hang.
+        var stdoutTask = process.StandardOutput.ReadToEndAsync();
+        var stderrTask = process.StandardError.ReadToEndAsync();
 
         if (!process.WaitForExit(ProcessTimeout))
         {
@@ -130,6 +133,9 @@ internal sealed class R2RDriver
             catch { /* best effort */ }
             throw new TimeoutException($"crossgen2 timed out after {ProcessTimeout.TotalMinutes} minutes");
         }
+
+        string stdout = stdoutTask.GetAwaiter().GetResult();
+        string stderr = stderrTask.GetAwaiter().GetResult();
 
         if (process.ExitCode != 0)
         {

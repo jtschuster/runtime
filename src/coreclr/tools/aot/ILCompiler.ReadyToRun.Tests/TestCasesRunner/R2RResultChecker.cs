@@ -349,26 +349,21 @@ internal sealed class SimpleAssemblyResolver : IAssemblyResolver
 }
 
 /// <summary>
-/// Simple assembly metadata wrapper.
+/// Simple assembly metadata wrapper that loads the PE image into memory
+/// to avoid holding file handles open (IAssemblyMetadata has no disposal contract,
+/// and ReadyToRunReader caches these indefinitely).
 /// </summary>
-internal sealed class SimpleAssemblyMetadata : IAssemblyMetadata, IDisposable
+internal sealed class SimpleAssemblyMetadata : IAssemblyMetadata
 {
-    private readonly FileStream _stream;
     private readonly PEReader _peReader;
 
     public SimpleAssemblyMetadata(string path)
     {
-        _stream = File.OpenRead(path);
-        _peReader = new PEReader(_stream);
+        byte[] imageBytes = File.ReadAllBytes(path);
+        _peReader = new PEReader(new MemoryStream(imageBytes));
     }
 
     public PEReader ImageReader => _peReader;
 
     public MetadataReader MetadataReader => _peReader.GetMetadataReader();
-
-    public void Dispose()
-    {
-        _peReader.Dispose();
-        _stream.Dispose();
-    }
 }

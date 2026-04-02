@@ -127,13 +127,13 @@ namespace ILCompiler.Reflection.ReadyToRun
                     uint crossModuleInlinerCount = curParser.GetUnsigned();
                     streamSize--;
 
-                    uint baseIndex = 0;
+                    // Cross-module inliner indices are absolute ILBody import indices,
+                    // not delta-encoded (the writer never updates baseIndex between entries).
                     for (uint i = 0; i < crossModuleInlinerCount && streamSize > 0; i++)
                     {
-                        uint inlinerDelta = curParser.GetUnsigned();
+                        uint inlinerIndex = curParser.GetUnsigned();
                         streamSize--;
-                        baseIndex += inlinerDelta;
-                        inliners.Add(new MethodRef(isCrossModule: true, index: baseIndex));
+                        inliners.Add(new MethodRef(isCrossModule: true, index: inlinerIndex));
                     }
                 }
 
