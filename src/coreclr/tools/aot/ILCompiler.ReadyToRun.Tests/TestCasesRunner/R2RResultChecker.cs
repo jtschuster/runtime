@@ -91,11 +91,15 @@ internal static class R2RAssert
 
     /// <summary>
     /// Asserts that the CrossModuleInlineInfo section has an entry for an inlinee matching
-    /// <paramref name="inlineeMethodName"/> with at least <paramref name="minCount"/> cross-module
-    /// inliners. This exercises the cross-module inliner parsing path where inliner indices
-    /// are encoded as absolute ILBody import indices.
+    /// <paramref name="inlineeMethodName"/> with cross-module inliners whose resolved names
+    /// contain each of the <paramref name="expectedInlinerNames"/>. This validates that
+    /// cross-module inliner indices (encoded as absolute ILBody import indices) resolve
+    /// to the correct method names.
     /// </summary>
-    public static void HasMultipleCrossModuleInliners(ReadyToRunReader reader, string inlineeMethodName, int minCount)
+    public static void HasCrossModuleInliners(
+        ReadyToRunReader reader,
+        string inlineeMethodName,
+        params string[] expectedInlinerNames)
     {
         var inliningInfo = GetCrossModuleInliningInfoSection(reader);
 
@@ -105,19 +109,21 @@ internal static class R2RAssert
             if (!inlineeName.Contains(inlineeMethodName, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            int crossModuleInlinerCount = 0;
-            var inlinerNames = new List<string>();
+            var crossModuleInlinerNames = new List<string>();
             foreach (var inliner in entry.Inliners)
             {
-                string name = inliningInfo.ResolveMethodName(inliner);
-                inlinerNames.Add($"{name} (crossModule={inliner.IsCrossModule})");
                 if (inliner.IsCrossModule)
-                    crossModuleInlinerCount++;
+                    crossModuleInlinerNames.Add(inliningInfo.ResolveMethodName(inliner));
             }
 
-            Assert.True(crossModuleInlinerCount >= minCount,
-                $"Inlinee '{inlineeName}' has {crossModuleInlinerCount} cross-module inliners, " +
-                $"expected at least {minCount}.\nInliners:\n  {string.Join("\n  ", inlinerNames)}");
+            foreach (string expected in expectedInlinerNames)
+            {
+                Assert.True(
+                    crossModuleInlinerNames.Any(n => n.Contains(expected, StringComparison.OrdinalIgnoreCase)),
+                    $"Inlinee '{inlineeName}': expected a cross-module inliner matching '{expected}' " +
+                    $"but found only:\n  {string.Join("\n  ", crossModuleInlinerNames)}");
+            }
+
             return;
         }
 

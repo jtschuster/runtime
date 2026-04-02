@@ -936,11 +936,11 @@ public class R2RTestSuites
             R2RAssert.HasManifestRef(reader, "CrossModuleGenericLib");
             R2RAssert.HasCrossModuleInliningInfo(reader);
 
-            // Verify that GetValue has at least 2 cross-module inliners
-            // (GenericWrapper<int>.InvokeGetValue and GenericWrapper<string>.InvokeGetValue).
+            // Verify that GetValue has cross-module inliners from both GenericWrapperA and GenericWrapperB.
             // This exercises the cross-module inliner parsing path where indices
-            // must be read as absolute values, not delta-accumulated.
-            R2RAssert.HasMultipleCrossModuleInliners(reader, "GetValue", 2);
+            // must be read as absolute values, not delta-accumulated, and validates
+            // that the resolved method names match the expected inliners.
+            R2RAssert.HasCrossModuleInliners(reader, "GetValue", "GenericWrapperA", "GenericWrapperB");
         }
     }
 }
