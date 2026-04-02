@@ -1,9 +1,13 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+#pragma warning disable xUnit1004 // Test methods should not be skipped — composite+async tests are intentionally deferred
+
 using System.Collections.Generic;
 using ILCompiler.ReadyToRun.Tests.TestCasesRunner;
+using ILCompiler.Reflection.ReadyToRun;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace ILCompiler.ReadyToRun.Tests.TestCases;
 
@@ -14,136 +18,190 @@ namespace ILCompiler.ReadyToRun.Tests.TestCases;
 public class R2RTestSuites
 {
     private static readonly KeyValuePair<string, string> RuntimeAsyncFeature = new("runtime-async", "on");
+    private readonly ITestOutputHelper _output;
+
+    public R2RTestSuites(ITestOutputHelper output)
+    {
+        _output = output;
+    }
 
     [Fact]
     public void BasicCrossModuleInlining()
     {
-        new R2RTestRunner().Run(new R2RTestCase
+        var InlineableLib = new CompiledAssembly
         {
-            Name = "BasicCrossModuleInlining",
-            MainSourceResourceName = "CrossModuleInlining/BasicInlining.cs",
-            Crossgen2Options = { Crossgen2Option.CrossModuleOptimization("InlineableLib") },
-            Dependencies = new List<CompiledAssembly>
-            {
-                new()
-                {
-                    AssemblyName = "InlineableLib",
-                    SourceResourceNames = ["CrossModuleInlining/Dependencies/InlineableLib.cs"],
-                    IsCrossgenInput = true,
-                }
-            },
-            Validate = reader =>
-            {
-                R2RAssert.HasManifestRef(reader, "InlineableLib");
-                R2RAssert.HasInlinedMethod(reader, "GetValue");
-                R2RAssert.HasInlinedMethod(reader, "GetString");
-            },
-        });
+            AssemblyName = "InlineableLib",
+            SourceResourceNames = ["CrossModuleInlining/Dependencies/InlineableLib.cs"],
+        };
+        var basicCrossModuleInlining = new CompiledAssembly
+        {
+            AssemblyName = "BasicCrossModuleInlining",
+            SourceResourceNames = ["CrossModuleInlining/BasicInlining.cs"],
+            References = [InlineableLib]
+        };
+
+        var cgInlineableLib = new CrossgenAssembly(InlineableLib){ Kind = Crossgen2InputKind.Reference, Options = [Crossgen2AssemblyOption.CrossModuleOptimization] };
+        var cgBasicCrossModuleInlining = new CrossgenAssembly(basicCrossModuleInlining);
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(BasicCrossModuleInlining),
+            [new CrossgenCompilation(basicCrossModuleInlining.AssemblyName, [cgInlineableLib, cgBasicCrossModuleInlining]) { Validate = Validate }])
+        );
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasManifestRef(reader, "InlineableLib");
+            R2RAssert.HasCrossModuleInlinedMethod(reader, "TestGetValue", "GetValue");
+            R2RAssert.HasCrossModuleInlinedMethod(reader, "TestGetString", "GetString");
+            R2RAssert.HasCrossModuleInliningInfo(reader);
+        }
     }
 
     [Fact]
     public void TransitiveReferences()
     {
-        new R2RTestRunner().Run(new R2RTestCase
+        var externalLib = new CompiledAssembly()
         {
-            Name = "TransitiveReferences",
-            MainSourceResourceName = "CrossModuleInlining/TransitiveReferences.cs",
-            Crossgen2Options = { Crossgen2Option.CrossModuleOptimization("InlineableLibTransitive") },
-            Dependencies = new List<CompiledAssembly>
-            {
-                new()
+            AssemblyName = "ExternalLib",
+            SourceResourceNames = ["CrossModuleInlining/Dependencies/ExternalLib.cs"],
+        };
+        var inlineableLibTransitive = new CompiledAssembly()
+        {
+            AssemblyName = "InlineableLibTransitive",
+            SourceResourceNames = ["CrossModuleInlining/Dependencies/InlineableLibTransitive.cs"],
+            References = [externalLib]
+        };
+        var transitiveReferences = new CompiledAssembly()
+        {
+            AssemblyName = "TransitiveReferences",
+            SourceResourceNames = ["CrossModuleInlining/TransitiveReferences.cs"],
+            References = [inlineableLibTransitive, externalLib]
+        };
+        new R2RTestRunner(_output).Run(new R2RTestCase(nameof(TransitiveReferences),
+            [
+                new("TransitiveReferences", [
+                        new CrossgenAssembly(transitiveReferences),
+                        new CrossgenAssembly(externalLib) { Kind = Crossgen2InputKind.Reference },
+                        new CrossgenAssembly(inlineableLibTransitive)
+                        {
+                            Kind = Crossgen2InputKind.Reference,
+                            Options = [Crossgen2AssemblyOption.CrossModuleOptimization],
+                        },
+                ])
                 {
-                    AssemblyName = "ExternalLib",
-                    SourceResourceNames = ["CrossModuleInlining/Dependencies/ExternalLib.cs"],
-                    IsCrossgenInput = false,
+                    Validate = reader =>
+                    {
+                        R2RAssert.HasManifestRef(reader, "InlineableLibTransitive");
+                        R2RAssert.HasManifestRef(reader, "ExternalLib");
+                        R2RAssert.HasCrossModuleInlinedMethod(reader, "TestTransitiveValue", "GetExternalValue");
+                    },
                 },
-                new()
-                {
-                    AssemblyName = "InlineableLibTransitive",
-                    SourceResourceNames = ["CrossModuleInlining/Dependencies/InlineableLibTransitive.cs"],
-                    IsCrossgenInput = true,
-                }
-            },
-            Validate = reader =>
-            {
-                R2RAssert.HasManifestRef(reader, "InlineableLibTransitive");
-                R2RAssert.HasManifestRef(reader, "ExternalLib");
-                R2RAssert.HasInlinedMethod(reader, "GetExternalValue");
-            },
-        });
+            ]));
     }
 
     [Fact]
     public void AsyncCrossModuleInlining()
     {
-        new R2RTestRunner().Run(new R2RTestCase
+        var asyncInlineableLib = new CompiledAssembly
         {
-            Name = "AsyncCrossModuleInlining",
-            MainSourceResourceName = "CrossModuleInlining/AsyncMethods.cs",
-            Crossgen2Options = { Crossgen2Option.CrossModuleOptimization("AsyncInlineableLib") },
-            Dependencies = new List<CompiledAssembly>
-            {
-                new()
+            AssemblyName = "AsyncInlineableLib",
+            SourceResourceNames = ["CrossModuleInlining/Dependencies/AsyncInlineableLib.cs"],
+        };
+        var asyncCrossModuleInlining = new CompiledAssembly
+        {
+            AssemblyName = nameof(AsyncCrossModuleInlining),
+            SourceResourceNames = ["CrossModuleInlining/AsyncMethods.cs"],
+            References = [asyncInlineableLib]
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(AsyncCrossModuleInlining),
+            [
+                new(nameof(AsyncCrossModuleInlining),
+                [
+                    new CrossgenAssembly(asyncCrossModuleInlining),
+                    new CrossgenAssembly(asyncInlineableLib)
+                    {
+                        Kind = Crossgen2InputKind.Reference,
+                        Options = [Crossgen2AssemblyOption.CrossModuleOptimization],
+                    },
+                ])
                 {
-                    AssemblyName = "AsyncInlineableLib",
-                    SourceResourceNames = ["CrossModuleInlining/Dependencies/AsyncInlineableLib.cs"],
-                    IsCrossgenInput = true,
-                }
-            },
-            Validate = reader =>
-            {
-                R2RAssert.HasManifestRef(reader, "AsyncInlineableLib");
-                R2RAssert.HasInlinedMethod(reader, "GetValueAsync");
-            },
-        });
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasManifestRef(reader, "AsyncInlineableLib");
+            R2RAssert.HasCrossModuleInlinedMethod(reader, "TestAsyncInline", "GetValueAsync");
+        }
     }
 
     [Fact]
     public void CompositeBasic()
     {
-        new R2RTestRunner().Run(new R2RTestCase
+        var compositeLib = new CompiledAssembly
         {
-            Name = "CompositeBasic",
-            MainSourceResourceName = "CrossModuleInlining/CompositeBasic.cs",
-            CompositeMode = true,
-            Dependencies = new List<CompiledAssembly>
-            {
-                new()
+            AssemblyName = "CompositeLib",
+            SourceResourceNames = ["CrossModuleInlining/Dependencies/CompositeLib.cs"],
+        };
+        var compositeBasic = new CompiledAssembly
+        {
+            AssemblyName = nameof(CompositeBasic),
+            SourceResourceNames = ["CrossModuleInlining/CompositeBasic.cs"],
+            References = [compositeLib]
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(CompositeBasic),
+            [
+                new(nameof(CompositeBasic),
+                [
+                    new CrossgenAssembly(compositeLib),
+                    new CrossgenAssembly(compositeBasic),
+                ])
                 {
-                    AssemblyName = "CompositeLib",
-                    SourceResourceNames = ["CrossModuleInlining/Dependencies/CompositeLib.cs"],
-                    IsCrossgenInput = true,
-                }
-            },
-            Validate = reader =>
-            {
-                R2RAssert.HasManifestRef(reader, "CompositeLib");
-            },
-        });
+                    Options = [Crossgen2Option.Composite],
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasManifestRef(reader, "CompositeLib");
+        }
     }
 
-    /// <summary>
-    /// PR #124203: Async methods produce [ASYNC] variant entries with resumption stubs.
-    /// PR #121456: Resumption stubs are emitted as ResumptionStubEntryPoint fixups.
-    /// PR #123643: Methods with GC refs across awaits produce ContinuationLayout fixups.
-    /// </summary>
     [Fact]
     public void RuntimeAsyncMethodEmission()
     {
-        new R2RTestRunner().Run(new R2RTestCase
+        var runtimeAsyncMethodEmission = new CompiledAssembly
         {
-            Name = "RuntimeAsyncMethodEmission",
-            MainSourceResourceName = "RuntimeAsync/BasicAsyncEmission.cs",
-            MainExtraSourceResourceNames = ["RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs"],
+            AssemblyName = nameof(RuntimeAsyncMethodEmission),
+            SourceResourceNames =
+            [
+                "RuntimeAsync/BasicAsyncEmission.cs",
+                "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs",
+            ],
             Features = { RuntimeAsyncFeature },
-            Dependencies = new List<CompiledAssembly>(),
-            Validate = reader =>
-            {
-                R2RAssert.HasAsyncVariant(reader, "SimpleAsyncMethod");
-                R2RAssert.HasAsyncVariant(reader, "AsyncVoidReturn");
-                R2RAssert.HasAsyncVariant(reader, "ValueTaskMethod");
-            },
-        });
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(RuntimeAsyncMethodEmission),
+            [
+                new(nameof(RuntimeAsyncMethodEmission), [new CrossgenAssembly(runtimeAsyncMethodEmission)])
+                {
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasAsyncVariant(reader, "SimpleAsyncMethod");
+            R2RAssert.HasAsyncVariant(reader, "AsyncVoidReturn");
+            R2RAssert.HasAsyncVariant(reader, "ValueTaskMethod");
+        }
     }
 
     /// <summary>
@@ -154,21 +212,34 @@ public class R2RTestSuites
     [Fact]
     public void RuntimeAsyncContinuationLayout()
     {
-        new R2RTestRunner().Run(new R2RTestCase
+        var runtimeAsyncContinuationLayout = new CompiledAssembly
         {
-            Name = "RuntimeAsyncContinuationLayout",
-            MainSourceResourceName = "RuntimeAsync/AsyncWithContinuation.cs",
-            MainExtraSourceResourceNames = ["RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs"],
+            AssemblyName = nameof(RuntimeAsyncContinuationLayout),
+            SourceResourceNames =
+            [
+                "RuntimeAsync/AsyncWithContinuation.cs",
+                "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs",
+            ],
             Features = { RuntimeAsyncFeature },
-            Dependencies = new List<CompiledAssembly>(),
-            Validate = reader =>
-            {
-                R2RAssert.HasAsyncVariant(reader, "CaptureObjectAcrossAwait");
-                R2RAssert.HasAsyncVariant(reader, "CaptureMultipleRefsAcrossAwait");
-                R2RAssert.HasContinuationLayout(reader);
-                R2RAssert.HasResumptionStubFixup(reader);
-            },
-        });
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(RuntimeAsyncContinuationLayout),
+            [
+                new(nameof(RuntimeAsyncContinuationLayout), [new CrossgenAssembly(runtimeAsyncContinuationLayout)])
+                {
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasAsyncVariant(reader, "CaptureObjectAcrossAwait");
+            R2RAssert.HasAsyncVariant(reader, "CaptureMultipleRefsAcrossAwait");
+            R2RAssert.HasContinuationLayout(reader, "CaptureObjectAcrossAwait");
+            R2RAssert.HasContinuationLayout(reader, "CaptureMultipleRefsAcrossAwait");
+            R2RAssert.HasResumptionStubFixup(reader, "CaptureObjectAcrossAwait");
+        }
     }
 
     /// <summary>
@@ -178,18 +249,30 @@ public class R2RTestSuites
     [Fact]
     public void RuntimeAsyncDevirtualize()
     {
-        new R2RTestRunner().Run(new R2RTestCase
+        var runtimeAsyncDevirtualize = new CompiledAssembly
         {
-            Name = "RuntimeAsyncDevirtualize",
-            MainSourceResourceName = "RuntimeAsync/AsyncDevirtualize.cs",
-            MainExtraSourceResourceNames = ["RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs"],
+            AssemblyName = nameof(RuntimeAsyncDevirtualize),
+            SourceResourceNames =
+            [
+                "RuntimeAsync/AsyncDevirtualize.cs",
+                "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs",
+            ],
             Features = { RuntimeAsyncFeature },
-            Dependencies = new List<CompiledAssembly>(),
-            Validate = reader =>
-            {
-                R2RAssert.HasAsyncVariant(reader, "GetValueAsync");
-            },
-        });
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(RuntimeAsyncDevirtualize),
+            [
+                new(nameof(RuntimeAsyncDevirtualize), [new CrossgenAssembly(runtimeAsyncDevirtualize)])
+                {
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasAsyncVariant(reader, "GetValueAsync");
+        }
     }
 
     /// <summary>
@@ -199,19 +282,31 @@ public class R2RTestSuites
     [Fact]
     public void RuntimeAsyncNoYield()
     {
-        new R2RTestRunner().Run(new R2RTestCase
+        var runtimeAsyncNoYield = new CompiledAssembly
         {
-            Name = "RuntimeAsyncNoYield",
-            MainSourceResourceName = "RuntimeAsync/AsyncNoYield.cs",
-            MainExtraSourceResourceNames = ["RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs"],
+            AssemblyName = nameof(RuntimeAsyncNoYield),
+            SourceResourceNames =
+            [
+                "RuntimeAsync/AsyncNoYield.cs",
+                "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs",
+            ],
             Features = { RuntimeAsyncFeature },
-            Dependencies = new List<CompiledAssembly>(),
-            Validate = reader =>
-            {
-                R2RAssert.HasAsyncVariant(reader, "AsyncButNoAwait");
-                R2RAssert.HasAsyncVariant(reader, "AsyncWithConditionalAwait");
-            },
-        });
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(RuntimeAsyncNoYield),
+            [
+                new(nameof(RuntimeAsyncNoYield), [new CrossgenAssembly(runtimeAsyncNoYield)])
+                {
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasAsyncVariant(reader, "AsyncButNoAwait");
+            R2RAssert.HasAsyncVariant(reader, "AsyncWithConditionalAwait");
+        }
     }
 
     /// <summary>
@@ -221,32 +316,578 @@ public class R2RTestSuites
     [Fact]
     public void RuntimeAsyncCrossModule()
     {
-        new R2RTestRunner().Run(new R2RTestCase
+        var asyncDepLib = new CompiledAssembly
         {
-            Name = "RuntimeAsyncCrossModule",
-            MainSourceResourceName = "RuntimeAsync/AsyncCrossModule.cs",
-            MainExtraSourceResourceNames = ["RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs"],
+            AssemblyName = "AsyncDepLib",
+            SourceResourceNames =
+            [
+                "RuntimeAsync/Dependencies/AsyncDepLib.cs",
+                "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs",
+            ],
             Features = { RuntimeAsyncFeature },
-            Crossgen2Options = { Crossgen2Option.CrossModuleOptimization("AsyncDepLib") },
-            Dependencies = new List<CompiledAssembly>
-            {
-                new()
+        };
+        var runtimeAsyncCrossModule = new CompiledAssembly
+        {
+            AssemblyName = nameof(RuntimeAsyncCrossModule),
+            SourceResourceNames =
+            [
+                "RuntimeAsync/AsyncCrossModule.cs",
+                "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs",
+            ],
+            Features = { RuntimeAsyncFeature },
+            References = [asyncDepLib]
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(RuntimeAsyncCrossModule),
+            [
+                new(nameof(RuntimeAsyncCrossModule),
+                [
+                    new CrossgenAssembly(runtimeAsyncCrossModule),
+                    new CrossgenAssembly(asyncDepLib)
+                    {
+                        Kind = Crossgen2InputKind.Reference,
+                        Options = [Crossgen2AssemblyOption.CrossModuleOptimization],
+                    },
+                ])
                 {
-                    AssemblyName = "AsyncDepLib",
-                    SourceResourceNames =
-                    [
-                        "RuntimeAsync/Dependencies/AsyncDepLib.cs",
-                        "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs"
-                    ],
-                    IsCrossgenInput = true,
-                    Features = { RuntimeAsyncFeature },
-                }
-            },
-            Validate = reader =>
-            {
-                R2RAssert.HasManifestRef(reader, "AsyncDepLib");
-                R2RAssert.HasAsyncVariant(reader, "CallCrossModuleAsync");
-            },
-        });
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasManifestRef(reader, "AsyncDepLib");
+            R2RAssert.HasAsyncVariant(reader, "CallCrossModuleAsync");
+        }
+    }
+
+    // =====================================================================
+    // Tier 1: Critical intersection tests
+    // =====================================================================
+
+    /// <summary>
+    /// Composite mode with sync cross-module inlining.
+    /// Validates that InliningInfo2 and CrossModuleInlineInfo sections
+    /// are properly populated (CompositeBasic only validates ManifestRef).
+    /// </summary>
+    [Fact]
+    public void CompositeCrossModuleInlining()
+    {
+        var inlineableLib = new CompiledAssembly
+        {
+            AssemblyName = "InlineableLib",
+            SourceResourceNames = ["CrossModuleInlining/Dependencies/InlineableLib.cs"],
+        };
+        var compositeMain = new CompiledAssembly
+        {
+            AssemblyName = "CompositeCrossModuleInlining",
+            SourceResourceNames = ["CrossModuleInlining/BasicInlining.cs"],
+            References = [inlineableLib]
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(CompositeCrossModuleInlining),
+            [
+                new(nameof(CompositeCrossModuleInlining),
+                [
+                    new CrossgenAssembly(inlineableLib),
+                    new CrossgenAssembly(compositeMain),
+                ])
+                {
+                    Options = [Crossgen2Option.Composite],
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasManifestRef(reader, "InlineableLib");
+        }
+    }
+
+    /// <summary>
+    /// Composite mode with runtime-async methods in both assemblies.
+    /// Validates async variants exist in composite output.
+    /// </summary>
+    [Fact(Skip = "Runtime-async methods are not generated in composite mode")]
+    public void CompositeAsync()
+    {
+        var asyncCompositeLib = new CompiledAssembly
+        {
+            AssemblyName = "AsyncCompositeLib",
+            SourceResourceNames = ["CrossModuleInlining/Dependencies/AsyncCompositeLib.cs"],
+            Features = { RuntimeAsyncFeature },
+        };
+        var compositeAsyncMain = new CompiledAssembly
+        {
+            AssemblyName = "CompositeAsyncMain",
+            SourceResourceNames = ["CrossModuleInlining/CompositeAsync.cs"],
+            Features = { RuntimeAsyncFeature },
+            References = [asyncCompositeLib]
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(CompositeAsync),
+            [
+                new(nameof(CompositeAsync),
+                [
+                    new CrossgenAssembly(asyncCompositeLib),
+                    new CrossgenAssembly(compositeAsyncMain),
+                ])
+                {
+                    Options = [Crossgen2Option.Composite],
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasManifestRef(reader, "AsyncCompositeLib");
+            R2RAssert.HasAsyncVariant(reader, "CallCompositeAsync");
+            R2RAssert.HasAsyncVariant(reader, "GetValueAsync");
+        }
+    }
+
+    /// <summary>
+    /// The full intersection: composite + runtime-async + cross-module inlining.
+    /// Async methods from AsyncCompositeLib are inlined into CompositeAsyncMain
+    /// within a composite image, exercising MutableModule token encoding for
+    /// cross-module async continuation layouts.
+    /// </summary>
+    [Fact(Skip = "Runtime-async methods are not generated in composite mode")]
+    public void CompositeAsyncCrossModuleInlining()
+    {
+        var asyncCompositeLib = new CompiledAssembly
+        {
+            AssemblyName = "AsyncCompositeLib",
+            SourceResourceNames = ["CrossModuleInlining/Dependencies/AsyncCompositeLib.cs"],
+            Features = { RuntimeAsyncFeature },
+        };
+        var compositeAsyncMain = new CompiledAssembly
+        {
+            AssemblyName = "CompositeAsyncMain",
+            SourceResourceNames = ["CrossModuleInlining/CompositeAsync.cs"],
+            Features = { RuntimeAsyncFeature },
+            References = [asyncCompositeLib]
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(CompositeAsyncCrossModuleInlining),
+            [
+                new(nameof(CompositeAsyncCrossModuleInlining),
+                [
+                    new CrossgenAssembly(asyncCompositeLib),
+                    new CrossgenAssembly(compositeAsyncMain),
+                ])
+                {
+                    Options = [Crossgen2Option.Composite],
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasManifestRef(reader, "AsyncCompositeLib");
+            R2RAssert.HasAsyncVariant(reader, "CallCompositeAsync");
+            R2RAssert.HasInlinedMethod(reader, "CallCompositeAsync", "GetValueAsync");
+            R2RAssert.HasContinuationLayout(reader, "CallCompositeAsync");
+        }
+    }
+
+    /// <summary>
+    /// Non-composite runtime-async + cross-module inlining where the inlinee
+    /// captures GC refs across await points. Validates that ContinuationLayout
+    /// fixups correctly reference cross-module types via MutableModule tokens.
+    /// </summary>
+    [Fact]
+    public void AsyncCrossModuleContinuation()
+    {
+        var asyncDepLibCont = new CompiledAssembly
+        {
+            AssemblyName = "AsyncDepLibContinuation",
+            SourceResourceNames =
+            [
+                "RuntimeAsync/Dependencies/AsyncDepLibContinuation.cs",
+                "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs",
+            ],
+            Features = { RuntimeAsyncFeature },
+        };
+        var asyncCrossModuleCont = new CompiledAssembly
+        {
+            AssemblyName = nameof(AsyncCrossModuleContinuation),
+            SourceResourceNames =
+            [
+                "RuntimeAsync/AsyncCrossModuleContinuation.cs",
+                "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs",
+            ],
+            Features = { RuntimeAsyncFeature },
+            References = [asyncDepLibCont]
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(AsyncCrossModuleContinuation),
+            [
+                new(nameof(AsyncCrossModuleContinuation),
+                [
+                    new CrossgenAssembly(asyncCrossModuleCont),
+                    new CrossgenAssembly(asyncDepLibCont)
+                    {
+                        Kind = Crossgen2InputKind.Reference,
+                        Options = [Crossgen2AssemblyOption.CrossModuleOptimization],
+                    },
+                ])
+                {
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasManifestRef(reader, "AsyncDepLibContinuation");
+            R2RAssert.HasAsyncVariant(reader, "CallCrossModuleCaptureRef");
+            R2RAssert.HasAsyncVariant(reader, "CallCrossModuleCaptureArray");
+        }
+    }
+
+    /// <summary>
+    /// Two-step compilation: composite A+B, then non-composite C referencing A+B.
+    /// Exercises the multi-compilation model.
+    /// </summary>
+    [Fact]
+    public void MultiStepCompositeAndNonComposite()
+    {
+        var libA = new CompiledAssembly
+        {
+            AssemblyName = "MultiStepLibA",
+            SourceResourceNames = ["CrossModuleInlining/Dependencies/MultiStepLibA.cs"],
+        };
+        var libB = new CompiledAssembly
+        {
+            AssemblyName = "MultiStepLibB",
+            SourceResourceNames = ["CrossModuleInlining/Dependencies/MultiStepLibB.cs"],
+            References = [libA]
+        };
+        var consumer = new CompiledAssembly
+        {
+            AssemblyName = "MultiStepConsumer",
+            SourceResourceNames = ["CrossModuleInlining/MultiStepConsumer.cs"],
+            References = [libA]
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(MultiStepCompositeAndNonComposite),
+            [
+                new("CompositeStep",
+                [
+                    new CrossgenAssembly(libA),
+                    new CrossgenAssembly(libB),
+                ])
+                {
+                    Options = [Crossgen2Option.Composite],
+                    Validate = reader =>
+                    {
+                        R2RAssert.HasManifestRef(reader, "MultiStepLibA");
+                    },
+                },
+                new("NonCompositeStep",
+                [
+                    new CrossgenAssembly(consumer),
+                    new CrossgenAssembly(libA)
+                    {
+                        Kind = Crossgen2InputKind.Reference,
+                        Options = [Crossgen2AssemblyOption.CrossModuleOptimization],
+                    },
+                ])
+                {
+                    Validate = reader =>
+                    {
+                        R2RAssert.HasManifestRef(reader, "MultiStepLibA");
+                        R2RAssert.HasCrossModuleInlinedMethod(reader, "GetValueFromLibA", "GetValue");
+                    },
+                },
+            ]));
+    }
+
+    // =====================================================================
+    // Tier 2: Depth coverage
+    // =====================================================================
+
+    /// <summary>
+    /// Composite + runtime-async + cross-module devirtualization.
+    /// Interface defined in AsyncInterfaceLib, call sites in CompositeAsyncDevirtMain.
+    /// </summary>
+    [Fact(Skip = "Runtime-async methods are not generated in composite mode")]
+    public void CompositeAsyncDevirtualize()
+    {
+        var asyncInterfaceLib = new CompiledAssembly
+        {
+            AssemblyName = "AsyncInterfaceLib",
+            SourceResourceNames = ["RuntimeAsync/Dependencies/AsyncInterfaceLib.cs"],
+            Features = { RuntimeAsyncFeature },
+        };
+        var compositeDevirtMain = new CompiledAssembly
+        {
+            AssemblyName = "CompositeAsyncDevirtMain",
+            SourceResourceNames =
+            [
+                "RuntimeAsync/CompositeAsyncDevirtMain.cs",
+                "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs",
+            ],
+            Features = { RuntimeAsyncFeature },
+            References = [asyncInterfaceLib]
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(CompositeAsyncDevirtualize),
+            [
+                new(nameof(CompositeAsyncDevirtualize),
+                [
+                    new CrossgenAssembly(asyncInterfaceLib),
+                    new CrossgenAssembly(compositeDevirtMain),
+                ])
+                {
+                    Options = [Crossgen2Option.Composite],
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasManifestRef(reader, "AsyncInterfaceLib");
+            R2RAssert.HasAsyncVariant(reader, "CallOnSealed");
+        }
+    }
+
+    /// <summary>
+    /// Composite with 3 assemblies in A→B→C transitive chain.
+    /// Validates manifest refs for all three and transitive inlining.
+    /// </summary>
+    [Fact]
+    public void CompositeTransitive()
+    {
+        var externalLib = new CompiledAssembly
+        {
+            AssemblyName = "ExternalLib",
+            SourceResourceNames = ["CrossModuleInlining/Dependencies/ExternalLib.cs"],
+        };
+        var inlineableLibTransitive = new CompiledAssembly
+        {
+            AssemblyName = "InlineableLibTransitive",
+            SourceResourceNames = ["CrossModuleInlining/Dependencies/InlineableLibTransitive.cs"],
+            References = [externalLib]
+        };
+        var compositeTransitiveMain = new CompiledAssembly
+        {
+            AssemblyName = "CompositeTransitive",
+            SourceResourceNames = ["CrossModuleInlining/TransitiveReferences.cs"],
+            References = [inlineableLibTransitive, externalLib]
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(CompositeTransitive),
+            [
+                new(nameof(CompositeTransitive),
+                [
+                    new CrossgenAssembly(externalLib),
+                    new CrossgenAssembly(inlineableLibTransitive),
+                    new CrossgenAssembly(compositeTransitiveMain),
+                ])
+                {
+                    Options = [Crossgen2Option.Composite],
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasManifestRef(reader, "InlineableLibTransitive");
+            R2RAssert.HasManifestRef(reader, "ExternalLib");
+        }
+    }
+
+    /// <summary>
+    /// Non-composite runtime-async + transitive cross-module inlining.
+    /// Chain: AsyncTransitiveMain → AsyncTransitiveLib → AsyncExternalLib.
+    /// </summary>
+    [Fact]
+    public void AsyncCrossModuleTransitive()
+    {
+        var asyncExternalLib = new CompiledAssembly
+        {
+            AssemblyName = "AsyncExternalLib",
+            SourceResourceNames = ["RuntimeAsync/Dependencies/AsyncExternalLib.cs"],
+        };
+        var asyncTransitiveLib = new CompiledAssembly
+        {
+            AssemblyName = "AsyncTransitiveLib",
+            SourceResourceNames =
+            [
+                "RuntimeAsync/Dependencies/AsyncTransitiveLib.cs",
+                "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs",
+            ],
+            Features = { RuntimeAsyncFeature },
+            References = [asyncExternalLib]
+        };
+        var asyncTransitiveMain = new CompiledAssembly
+        {
+            AssemblyName = nameof(AsyncCrossModuleTransitive),
+            SourceResourceNames =
+            [
+                "RuntimeAsync/AsyncTransitiveMain.cs",
+                "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs",
+            ],
+            Features = { RuntimeAsyncFeature },
+            References = [asyncTransitiveLib, asyncExternalLib]
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(AsyncCrossModuleTransitive),
+            [
+                new(nameof(AsyncCrossModuleTransitive),
+                [
+                    new CrossgenAssembly(asyncTransitiveMain),
+                    new CrossgenAssembly(asyncExternalLib) { Kind = Crossgen2InputKind.Reference },
+                    new CrossgenAssembly(asyncTransitiveLib)
+                    {
+                        Kind = Crossgen2InputKind.Reference,
+                        Options = [Crossgen2AssemblyOption.CrossModuleOptimization],
+                    },
+                ])
+                {
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasManifestRef(reader, "AsyncTransitiveLib");
+            R2RAssert.HasAsyncVariant(reader, "CallTransitiveValueAsync");
+        }
+    }
+
+    /// <summary>
+    /// Composite + runtime-async + transitive (3 assemblies).
+    /// Full combination of composite, async, and transitive references.
+    /// </summary>
+    [Fact(Skip = "Runtime-async methods are not generated in composite mode")]
+    public void CompositeAsyncTransitive()
+    {
+        var asyncExternalLib = new CompiledAssembly
+        {
+            AssemblyName = "AsyncExternalLib",
+            SourceResourceNames = ["RuntimeAsync/Dependencies/AsyncExternalLib.cs"],
+        };
+        var asyncTransitiveLib = new CompiledAssembly
+        {
+            AssemblyName = "AsyncTransitiveLib",
+            SourceResourceNames =
+            [
+                "RuntimeAsync/Dependencies/AsyncTransitiveLib.cs",
+                "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs",
+            ],
+            Features = { RuntimeAsyncFeature },
+            References = [asyncExternalLib]
+        };
+        var compositeAsyncTransitiveMain = new CompiledAssembly
+        {
+            AssemblyName = "CompositeAsyncTransitive",
+            SourceResourceNames =
+            [
+                "RuntimeAsync/AsyncTransitiveMain.cs",
+                "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs",
+            ],
+            Features = { RuntimeAsyncFeature },
+            References = [asyncTransitiveLib, asyncExternalLib]
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(CompositeAsyncTransitive),
+            [
+                new(nameof(CompositeAsyncTransitive),
+                [
+                    new CrossgenAssembly(asyncExternalLib),
+                    new CrossgenAssembly(asyncTransitiveLib),
+                    new CrossgenAssembly(compositeAsyncTransitiveMain),
+                ])
+                {
+                    Options = [Crossgen2Option.Composite],
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasManifestRef(reader, "AsyncTransitiveLib");
+            R2RAssert.HasAsyncVariant(reader, "CallTransitiveValueAsync");
+        }
+    }
+
+    /// <summary>
+    /// Multi-step compilation with runtime-async in all assemblies.
+    /// Step 1: Composite of async libs. Step 2: Non-composite consumer
+    /// with cross-module inlining of async methods.
+    /// </summary>
+    [Fact(Skip = "Runtime-async methods are not generated in composite mode")]
+    public void MultiStepCompositeAndNonCompositeAsync()
+    {
+        var asyncCompositeLib = new CompiledAssembly
+        {
+            AssemblyName = "AsyncCompositeLib",
+            SourceResourceNames = ["CrossModuleInlining/Dependencies/AsyncCompositeLib.cs"],
+            Features = { RuntimeAsyncFeature },
+        };
+        var compositeAsyncMain = new CompiledAssembly
+        {
+            AssemblyName = "CompositeAsyncMain",
+            SourceResourceNames = ["CrossModuleInlining/CompositeAsync.cs"],
+            Features = { RuntimeAsyncFeature },
+            References = [asyncCompositeLib]
+        };
+        var asyncConsumer = new CompiledAssembly
+        {
+            AssemblyName = "MultiStepAsyncConsumer",
+            SourceResourceNames =
+            [
+                "RuntimeAsync/AsyncCrossModuleContinuation.cs",
+                "RuntimeAsync/RuntimeAsyncMethodGenerationAttribute.cs",
+            ],
+            Features = { RuntimeAsyncFeature },
+            References = [asyncCompositeLib]
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(MultiStepCompositeAndNonCompositeAsync),
+            [
+                new("CompositeAsyncStep",
+                [
+                    new CrossgenAssembly(asyncCompositeLib),
+                    new CrossgenAssembly(compositeAsyncMain),
+                ])
+                {
+                    Options = [Crossgen2Option.Composite],
+                    Validate = reader =>
+                    {
+                        R2RAssert.HasManifestRef(reader, "AsyncCompositeLib");
+                        R2RAssert.HasAsyncVariant(reader, "CallCompositeAsync");
+                    },
+                },
+                new("NonCompositeAsyncStep",
+                [
+                    new CrossgenAssembly(asyncConsumer),
+                    new CrossgenAssembly(asyncCompositeLib)
+                    {
+                        Kind = Crossgen2InputKind.Reference,
+                        Options = [Crossgen2AssemblyOption.CrossModuleOptimization],
+                    },
+                ])
+                {
+                    Validate = reader =>
+                    {
+                        R2RAssert.HasManifestRef(reader, "AsyncCompositeLib");
+                        R2RAssert.HasAsyncVariant(reader, "CallCrossModuleCaptureRef");
+                    },
+                },
+            ]));
     }
 }
