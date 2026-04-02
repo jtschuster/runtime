@@ -90,6 +90,47 @@ internal static class R2RAssert
     }
 
     /// <summary>
+    /// Asserts that the CrossModuleInlineInfo section has an entry for an inlinee matching
+    /// <paramref name="inlineeMethodName"/> with at least <paramref name="minCount"/> cross-module
+    /// inliners. This exercises the cross-module inliner parsing path where inliner indices
+    /// are encoded as absolute ILBody import indices.
+    /// </summary>
+    public static void HasMultipleCrossModuleInliners(ReadyToRunReader reader, string inlineeMethodName, int minCount)
+    {
+        var inliningInfo = GetCrossModuleInliningInfoSection(reader);
+
+        foreach (var entry in inliningInfo.GetEntries())
+        {
+            string inlineeName = inliningInfo.ResolveMethodName(entry.Inlinee);
+            if (!inlineeName.Contains(inlineeMethodName, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            int crossModuleInlinerCount = 0;
+            var inlinerNames = new List<string>();
+            foreach (var inliner in entry.Inliners)
+            {
+                string name = inliningInfo.ResolveMethodName(inliner);
+                inlinerNames.Add($"{name} (crossModule={inliner.IsCrossModule})");
+                if (inliner.IsCrossModule)
+                    crossModuleInlinerCount++;
+            }
+
+            Assert.True(crossModuleInlinerCount >= minCount,
+                $"Inlinee '{inlineeName}' has {crossModuleInlinerCount} cross-module inliners, " +
+                $"expected at least {minCount}.\nInliners:\n  {string.Join("\n  ", inlinerNames)}");
+            return;
+        }
+
+        var allEntries = new List<string>();
+        foreach (var (inlinerName, inlineeName, _) in inliningInfo.GetInliningPairs())
+            allEntries.Add($"{inlinerName} → {inlineeName}");
+
+        Assert.Fail(
+            $"No CrossModuleInlineInfo entry found for inlinee matching '{inlineeMethodName}'.\n" +
+            $"All inlining pairs:\n  {string.Join("\n  ", allEntries)}");
+    }
+
+    /// <summary>
     /// Asserts that any inlining info section (CrossModuleInlineInfo or InliningInfo2) records that
     /// <paramref name="inlinerMethodName"/> inlined <paramref name="inlineeMethodName"/>.
     /// Does not check whether the encoding is cross-module or local.

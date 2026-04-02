@@ -891,4 +891,56 @@ public class R2RTestSuites
                 },
             ]));
     }
+
+    /// <summary>
+    /// Tests cross-module generic compilation where multiple generic instantiations
+    /// from an --opt-cross-module library each inline the same utility method.
+    /// This produces multiple cross-module inliners for the same inlinee in the
+    /// CrossModuleInlineInfo section, exercising the absolute-index encoding
+    /// (not delta-encoded) for cross-module inliner entries.
+    /// </summary>
+    [Fact]
+    public void CrossModuleGenericMultiInliner()
+    {
+        var crossModuleGenericLib = new CompiledAssembly
+        {
+            AssemblyName = "CrossModuleGenericLib",
+            SourceResourceNames = ["CrossModuleInlining/Dependencies/CrossModuleGenericLib.cs"],
+        };
+        var consumer = new CompiledAssembly
+        {
+            AssemblyName = "MultiInlinerConsumer",
+            SourceResourceNames = ["CrossModuleInlining/MultiInlinerConsumer.cs"],
+            References = [crossModuleGenericLib]
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(CrossModuleGenericMultiInliner),
+            [
+                new(consumer.AssemblyName,
+                [
+                    new CrossgenAssembly(crossModuleGenericLib)
+                    {
+                        Kind = Crossgen2InputKind.Reference,
+                        Options = [Crossgen2AssemblyOption.CrossModuleOptimization],
+                    },
+                    new CrossgenAssembly(consumer),
+                ])
+                {
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            R2RAssert.HasManifestRef(reader, "CrossModuleGenericLib");
+            R2RAssert.HasCrossModuleInliningInfo(reader);
+
+            // Verify that GetValue has at least 2 cross-module inliners
+            // (GenericWrapper<int>.InvokeGetValue and GenericWrapper<string>.InvokeGetValue).
+            // This exercises the cross-module inliner parsing path where indices
+            // must be read as absolute values, not delta-accumulated.
+            R2RAssert.HasMultipleCrossModuleInliners(reader, "GetValue", 2);
+        }
+    }
 }
