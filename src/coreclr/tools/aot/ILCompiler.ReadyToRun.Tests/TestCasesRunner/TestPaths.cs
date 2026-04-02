@@ -48,9 +48,16 @@ internal static class TestPaths
     }
 
     /// <summary>
-    /// Path to the crossgen2.dll managed assembly.
+    /// Path to the native crossgen2 executable (apphost).
     /// </summary>
-    public static string Crossgen2Dll => Path.Combine(Crossgen2Dir, "crossgen2.dll");
+    public static string Crossgen2Exe
+    {
+        get
+        {
+            string exe = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "crossgen2.exe" : "crossgen2";
+            return Path.Combine(Crossgen2Dir, exe);
+        }
+    }
 
     /// <summary>
     /// Path to the runtime pack managed assemblies directory.
@@ -127,25 +134,6 @@ internal static class TestPaths
             }
 
             return dir;
-        }
-    }
-
-    /// <summary>
-    /// Returns the dotnet host executable path suitable for running crossgen2.
-    /// </summary>
-    public static string DotNetHost
-    {
-        get
-        {
-            string repoRoot = Path.GetFullPath(Path.Combine(CoreCLRArtifactsDir, "..", "..", "..", ".."));
-            string dotnetDir = Path.Combine(repoRoot, ".dotnet");
-            string exe = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "dotnet.exe" : "dotnet";
-            string path = Path.Combine(dotnetDir, exe);
-            if (File.Exists(path))
-                return path;
-
-            // Fallback to PATH
-            return exe;
         }
     }
 

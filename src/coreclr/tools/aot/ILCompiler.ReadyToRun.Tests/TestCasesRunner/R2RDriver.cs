@@ -6,31 +6,65 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Text;
+using Xunit.Abstractions;
 
 namespace ILCompiler.ReadyToRun.Tests.TestCasesRunner;
 
 /// <summary>
 /// Known crossgen2 option kinds.
 /// </summary>
-internal enum Crossgen2OptionKind
+internal enum Crossgen2AssemblyOption
 {
-    /// <summary>Enables cross-module inlining for a named assembly (--opt-cross-module:AssemblyName).</summary>
+    /// <summary>Enables cross-module inlining for a named assembly (--opt-cross-module AssemblyName).</summary>
     CrossModuleOptimization,
 }
 
-/// <summary>
-/// A typed crossgen2 option with optional parameter value.
-/// </summary>
-internal sealed record Crossgen2Option(Crossgen2OptionKind Kind, string? Value = null)
+internal enum Crossgen2InputKind
 {
-    public static Crossgen2Option CrossModuleOptimization(string assemblyName)
-        => new(Crossgen2OptionKind.CrossModuleOptimization, assemblyName);
+    InputAssembly,
+    Reference,
+    InputBubbleReference,
+    UnrootedInputFile,
+}
 
-    public IEnumerable<string> ToArgs() => Kind switch
+internal enum Crossgen2Option
+{
+    Composite,
+    InputBubble,
+    ObjectFormat,
+    HotColdSplitting,
+    Optimize,
+    TargetArch,
+    TargetOS,
+}
+
+internal static class Crossgen2OptionsExtensions
+{
+    public static string ToArg(this Crossgen2AssemblyOption kind) => kind switch
     {
-        Crossgen2OptionKind.CrossModuleOptimization => [$"--opt-cross-module:{Value}"],
-        _ => throw new ArgumentOutOfRangeException(nameof(Kind)),
+        Crossgen2AssemblyOption.CrossModuleOptimization => $"--opt-cross-module",
+        _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+    };
+
+    public static string ToArg(this Crossgen2InputKind kind) => kind switch
+    {
+        Crossgen2InputKind.InputAssembly => "", // positional argument
+        Crossgen2InputKind.Reference => $"--reference",
+        Crossgen2InputKind.InputBubbleReference => $"--inputbubbleref",
+        Crossgen2InputKind.UnrootedInputFile => $"--unrooted-input-file-paths",
+        _ => throw new ArgumentOutOfRangeException(nameof(kind)),
+    };
+
+    public static string ToArg(this Crossgen2Option kind) => kind switch
+    {
+        Crossgen2Option.Composite => $"--composite",
+        Crossgen2Option.InputBubble => $"--input-bubble",
+        Crossgen2Option.ObjectFormat => $"--object-format",
+        Crossgen2Option.HotColdSplitting => $"--hot-cold-splitting",
+        Crossgen2Option.Optimize => $"--optimize",
+        Crossgen2Option.TargetArch => $"--target-arch",
+        Crossgen2Option.TargetOS => $"--target-os",
+        _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 }
 
@@ -38,7 +72,6 @@ internal sealed record Crossgen2Option(Crossgen2OptionKind Kind, string? Value =
 /// Result of a crossgen2 compilation step.
 /// </summary>
 internal sealed record R2RCompilationResult(
-    string OutputPath,
     int ExitCode,
     string StandardOutput,
     string StandardError)
@@ -47,113 +80,40 @@ internal sealed record R2RCompilationResult(
 }
 
 /// <summary>
-/// Options for a single crossgen2 compilation step.
-/// </summary>
-internal sealed class R2RCompilationOptions
-{
-    public required string InputPath { get; init; }
-    public required string OutputPath { get; init; }
-    public List<string> ReferencePaths { get; init; } = new();
-    public List<string> ExtraArgs { get; init; } = new();
-    public bool Composite { get; init; }
-    public List<string>? CompositeInputPaths { get; init; }
-    public List<string>? InputBubbleRefs { get; init; }
-}
-
-/// <summary>
 /// Invokes crossgen2 out-of-process to produce R2R images.
 /// </summary>
 internal sealed class R2RDriver
 {
-    private readonly string _crossgen2Dir;
+    private static readonly TimeSpan ProcessTimeout = TimeSpan.FromMinutes(2);
+    private readonly ITestOutputHelper _output;
 
-    public R2RDriver()
+    public R2RDriver(ITestOutputHelper output)
     {
-        _crossgen2Dir = TestPaths.Crossgen2Dir;
+        _output = output;
 
-        if (!File.Exists(TestPaths.Crossgen2Dll))
-            throw new FileNotFoundException($"crossgen2.dll not found at {TestPaths.Crossgen2Dll}");
+        if (!File.Exists(TestPaths.Crossgen2Exe))
+            throw new FileNotFoundException($"crossgen2 executable not found at {TestPaths.Crossgen2Exe}");
     }
 
     /// <summary>
-    /// Runs crossgen2 on a single assembly.
+    /// Runs crossgen2 with the given arguments.
     /// </summary>
-    public R2RCompilationResult Compile(R2RCompilationOptions options)
+    public R2RCompilationResult Compile(List<string> args)
     {
-        var args = new List<string>();
-
-        if (options.Composite)
-        {
-            args.Add("--composite");
-            if (options.CompositeInputPaths is not null)
-            {
-                foreach (string input in options.CompositeInputPaths)
-                    args.Add(input);
-            }
-        }
-        else
-        {
-            args.Add(options.InputPath);
-        }
-
-        args.Add("-o");
-        args.Add(options.OutputPath);
-
-        foreach (string refPath in options.ReferencePaths)
-        {
-            args.Add("-r");
-            args.Add(refPath);
-        }
-
-        if (options.InputBubbleRefs is not null)
-        {
-            foreach (string bubbleRef in options.InputBubbleRefs)
-            {
-                args.Add("--inputbubbleref");
-                args.Add(bubbleRef);
-            }
-        }
-
-        args.AddRange(options.ExtraArgs);
-
-        return RunCrossgen2(args);
-    }
-
-    /// <summary>
-    /// Crossgen2 a dependency assembly (simple single-assembly R2R).
-    /// </summary>
-    public R2RCompilationResult CompileDependency(string inputPath, string outputPath, IEnumerable<string> referencePaths)
-    {
-        return Compile(new R2RCompilationOptions
-        {
-            InputPath = inputPath,
-            OutputPath = outputPath,
-            ReferencePaths = referencePaths.ToList()
-        });
+        var fullArgs = new List<string>(args);
+        return RunCrossgen2(fullArgs);
     }
 
     private R2RCompilationResult RunCrossgen2(List<string> crossgen2Args)
     {
-        // Use dotnet exec to invoke crossgen2.dll
-        string dotnetHost = TestPaths.DotNetHost;
-        string crossgen2Dll = TestPaths.Crossgen2Dll;
-
-        var allArgs = new List<string> { "exec", crossgen2Dll };
-        allArgs.AddRange(crossgen2Args);
-
-        string argsString = string.Join(" ", allArgs.Select(QuoteIfNeeded));
-
-        var psi = new ProcessStartInfo
+        var psi = new ProcessStartInfo(TestPaths.Crossgen2Exe, crossgen2Args)
         {
-            FileName = dotnetHost,
-            Arguments = argsString,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
             CreateNoWindow = true,
         };
 
-        // Strip environment variables that interfere with crossgen2
         string[] envVarsToStrip = { "DOTNET_GCName", "DOTNET_GCStress", "DOTNET_HeapVerify", "DOTNET_ReadyToRun" };
         foreach (string envVar in envVarsToStrip)
         {
@@ -163,24 +123,23 @@ internal sealed class R2RDriver
         using var process = Process.Start(psi)!;
         string stdout = process.StandardOutput.ReadToEnd();
         string stderr = process.StandardError.ReadToEnd();
-        process.WaitForExit();
 
-        string outputPath = crossgen2Args
-            .SkipWhile(a => a != "-o")
-            .Skip(1)
-            .FirstOrDefault() ?? "unknown";
+        if (!process.WaitForExit(ProcessTimeout))
+        {
+            try { process.Kill(entireProcessTree: true); }
+            catch { /* best effort */ }
+            throw new TimeoutException($"crossgen2 timed out after {ProcessTimeout.TotalMinutes} minutes");
+        }
+
+        if (process.ExitCode != 0)
+        {
+            _output.WriteLine($"  crossgen2 FAILED (exit code {process.ExitCode})");
+            _output.WriteLine(stderr);
+        }
 
         return new R2RCompilationResult(
-            outputPath,
             process.ExitCode,
             stdout,
             stderr);
-    }
-
-    private static string QuoteIfNeeded(string arg)
-    {
-        if (arg.Contains(' ') || arg.Contains('"'))
-            return $"\"{arg.Replace("\"", "\\\"")}\"";
-        return arg;
     }
 }

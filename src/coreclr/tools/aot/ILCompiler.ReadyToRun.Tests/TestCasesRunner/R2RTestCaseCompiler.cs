@@ -18,12 +18,10 @@ namespace ILCompiler.ReadyToRun.Tests.TestCasesRunner;
 /// </summary>
 internal sealed class R2RTestCaseCompiler
 {
-    private readonly string _outputDir;
     private readonly List<MetadataReference> _frameworkReferences;
 
-    public R2RTestCaseCompiler(string outputDir)
+    public R2RTestCaseCompiler()
     {
-        _outputDir = outputDir;
         _frameworkReferences = new List<MetadataReference>();
 
         // Add reference assemblies from the ref pack (needed for Roslyn compilation)
@@ -58,6 +56,7 @@ internal sealed class R2RTestCaseCompiler
     public string CompileAssembly(
         string assemblyName,
         IEnumerable<string> sources,
+        string outputPath,
         IEnumerable<string>? additionalReferences = null,
         OutputKind outputKind = OutputKind.DynamicallyLinkedLibrary,
         IEnumerable<string>? additionalDefines = null,
@@ -91,7 +90,6 @@ internal sealed class R2RTestCaseCompiler
                 .WithAllowUnsafe(true)
                 .WithNullableContextOptions(NullableContextOptions.Enable));
 
-        string outputPath = Path.Combine(_outputDir, assemblyName + ".dll");
         EmitResult result = compilation.Emit(outputPath);
 
         if (!result.Success)

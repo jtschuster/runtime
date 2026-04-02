@@ -5,224 +5,327 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Reflection.PortableExecutable;
+using System.Reflection;
 using ILCompiler.Reflection.ReadyToRun;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace ILCompiler.ReadyToRun.Tests.TestCasesRunner;
 
 /// <summary>
-/// Describes a test case: a main source file with its dependencies and compilation options.
-/// Validation is done via the <see cref="Validate"/> callback which receives the <see cref="ReadyToRunReader"/>.
-/// </summary>
-internal sealed class R2RTestCase
-{
-    public required string Name { get; init; }
-    public required string MainSourceResourceName { get; init; }
-    /// <summary>
-    /// Additional source files to compile with the main assembly (e.g. shared attribute files).
-    /// </summary>
-    public string[]? MainExtraSourceResourceNames { get; init; }
-    public required List<CompiledAssembly> Dependencies { get; init; }
-
-    // Compilation config
-    public bool CompositeMode { get; init; }
-    public List<Crossgen2Option> Crossgen2Options { get; init; } = new();
-    /// <summary>
-    /// Roslyn feature flags for the main assembly (e.g. runtime-async=on).
-    /// </summary>
-    public List<KeyValuePair<string, string>> Features { get; init; } = new();
-
-    /// <summary>
-    /// Callback that receives the <see cref="ReadyToRunReader"/> for the main R2R image.
-    /// Use <see cref="R2RAssert"/> helpers or raw xUnit assertions to validate the output.
-    /// </summary>
-    public required Action<ReadyToRunReader> Validate { get; init; }
-}
-
-/// <summary>
-/// Describes an assembly compiled as part of a test case.
-/// Dependencies are compiled in listed order — each assembly can reference all previously compiled assemblies.
+/// Describes an assembly compiled by Roslyn as part of a test case.
 /// </summary>
 internal sealed class CompiledAssembly
 {
     public required string AssemblyName { get; init; }
-    public required string[] SourceResourceNames { get; init; }
+
     /// <summary>
-    /// If true, this assembly is passed as an input to crossgen2.
-    /// If false, it is only used as a reference (--ref) during crossgen2 compilation.
+    /// The name of the string resources that contain the source code for this assembly.
     /// </summary>
-    public bool IsCrossgenInput { get; init; }
+    public required string[] SourceResourceNames { get; init; }
+
     /// <summary>
-    /// Roslyn feature flags for this dependency (e.g. runtime-async=on).
+    /// Roslyn feature flags for this assembly (e.g. runtime-async=on).
     /// </summary>
     public List<KeyValuePair<string, string>> Features { get; init; } = new();
+
+    /// <summary>
+    /// References to other assemblies that this assembly depends on.
+    /// </summary>
+    public List<CompiledAssembly> References { get; init; } = new();
+
+    private string? _outputDir = null;
+    public string FilePath => _outputDir != null ? Path.Combine(_outputDir, "IL", AssemblyName + ".dll")
+        : throw new InvalidOperationException("Output directory not set");
+
+    public void SetOutputDir(string outputDir)
+    {
+        _outputDir = outputDir;
+    }
 }
 
 /// <summary>
-/// Orchestrates the full R2R test pipeline: compile → crossgen2 → validate.
+/// References a <see cref="CompiledAssembly"/> within a <see cref="CrossgenCompilation"/>,
+/// specifying its role and per-assembly options.
+/// </summary>
+internal sealed class CrossgenAssembly(CompiledAssembly ilAssembly)
+{
+    public CompiledAssembly ILAssembly => ilAssembly;
+    /// <summary>
+    /// How this assembly is passed to crossgen2.
+    /// Defaults to <see cref="Crossgen2InputKind.InputAssembly"/>.
+    /// </summary>
+    public Crossgen2InputKind Kind { get; init; } = Crossgen2InputKind.InputAssembly;
+    /// <summary>
+    /// Per-assembly crossgen2 options (e.g. cross-module optimization targets).
+    /// </summary>
+    public List<Crossgen2AssemblyOption> Options { get; init; } = new();
+
+    public void SetOutputDir(string outputDir)
+    {
+        ILAssembly.SetOutputDir(outputDir);
+    }
+}
+
+/// <summary>
+/// A single crossgen2 compilation step.
+/// </summary>
+internal sealed class CrossgenCompilation(string name, List<CrossgenAssembly> assemblies)
+{
+    /// <summary>
+    /// Assemblies involved in this compilation. Each specifies its role
+    /// (<see cref="Crossgen2InputKind"/>) and per-assembly options.
+    /// All other Roslyn-compiled assemblies are automatically available as refs.
+    /// </summary>
+    public List<CrossgenAssembly> Assemblies => assemblies;
+
+    /// <summary>
+    /// Image-level crossgen2 options (e.g. Composite, InputBubble, Optimize).
+    /// </summary>
+    public List<Crossgen2Option> Options { get; init; } = new();
+
+    /// <summary>
+    /// Optional validator for this compilation's R2R output image.
+    /// </summary>
+    public Action<ReadyToRunReader>? Validate { get; init; }
+
+    public string Name => name;
+
+    public bool IsComposite => Options.Contains(Crossgen2Option.Composite);
+
+    private string? _outputDir = null;
+
+    /// <summary>
+    /// The output path for this compilation. In composite mode, uses a "-composite" suffix
+    /// to avoid colliding with component stubs that crossgen2 creates alongside the composite image.
+    /// </summary>
+    public string FilePath => _outputDir != null
+        ? Path.Combine(_outputDir, "CG2", Name + (IsComposite ? "-composite" : "") + ".dll")
+        : throw new InvalidOperationException("Output directory not set");
+
+    public void SetOutputDir(string outputDir)
+    {
+        _outputDir = outputDir;
+        foreach (var assembly in assemblies)
+        {
+            assembly.SetOutputDir(outputDir);
+        }
+    }
+}
+
+/// <summary>
+/// Describes a test case: assemblies compiled with Roslyn, then crossgen2'd in one or more
+/// compilation steps, each optionally validated.
+/// </summary>
+internal sealed class R2RTestCase(string name, List<CrossgenCompilation> compilations)
+{
+    public string Name => name;
+
+    /// <summary>
+    /// One or more crossgen2 compilation steps, executed after Roslyn compilation.
+    /// Each step can independently produce and validate an R2R image.
+    /// </summary>
+    public List<CrossgenCompilation> Compilations => compilations;
+
+    public IEnumerable<CompiledAssembly> GetAssemblies()
+    {
+        // Should be a small number of assemblies, so a simple list is fine as an insertion-ordered set
+        List<CompiledAssembly> seen = new();
+        foreach (var cg2Compilation in compilations)
+        {
+            foreach(var assembly in cg2Compilation.Assemblies)
+            {
+                GetDependencies(assembly.ILAssembly, seen);
+            }
+        }
+        return seen;
+
+        IEnumerable<CompiledAssembly> GetDependencies(CompiledAssembly assembly, List<CompiledAssembly> seen)
+        {
+            foreach(var reference in assembly.References)
+            {
+                GetDependencies(reference, seen);
+            }
+            if (!seen.Contains(assembly))
+            {
+                seen.Add(assembly);
+            }
+            return seen;
+        }
+    }
+
+    public void SetOutputDir(string outputDir)
+    {
+        Compilations.ForEach(c => c.SetOutputDir(outputDir));
+    }
+}
+
+/// <summary>
+/// Orchestrates the full R2R test pipeline: Roslyn compile → crossgen2 → validate.
 /// </summary>
 internal sealed class R2RTestRunner
 {
+    private readonly ITestOutputHelper _output;
+
+    public R2RTestRunner(ITestOutputHelper output)
+    {
+        _output = output;
+    }
+
     /// <summary>
     /// Runs a test case end-to-end.
     /// </summary>
     public void Run(R2RTestCase testCase)
     {
-        string tempDir = Path.Combine(Path.GetTempPath(), "R2RTests", testCase.Name, Guid.NewGuid().ToString("N")[..8]);
-        string ilDir = Path.Combine(tempDir, "il");
-        string r2rDir = Path.Combine(tempDir, "r2r");
+        var assembliesToCompile = testCase.GetAssemblies();
+        Assert.True(assembliesToCompile.Count() > 0, "Test case must have at least one assembly.");
+        Assert.True(testCase.Compilations.Count > 0, "Test case must have at least one compilation.");
+
+        string baseOutputDir = Path.Combine(AppContext.BaseDirectory, "R2RTestCases", testCase.Name, Guid.NewGuid().ToString("N")[..8]);
+        testCase.SetOutputDir(baseOutputDir);
+
+        _output.WriteLine($"Test '{testCase.Name}': baseOutputDir = {baseOutputDir}");
 
         try
         {
-            Directory.CreateDirectory(ilDir);
-            Directory.CreateDirectory(r2rDir);
+            // Step 1: Compile all assemblies with Roslyn in order
+            var assemblyPaths = CompileAllAssemblies(assembliesToCompile);
 
-            // Step 1: Compile all dependencies with Roslyn (in order, leaf to root)
-            var compiler = new R2RTestCaseCompiler(ilDir);
-            var compiledDeps = new List<(CompiledAssembly Dep, string IlPath)>();
+            // Step 2: Run each crossgen2 compilation and validate
+            var driver = new R2RDriver(_output);
+            var refPaths = BuildReferencePaths();
 
-            foreach (var dep in testCase.Dependencies)
+            foreach(var compilation in testCase.Compilations)
             {
-                var sources = dep.SourceResourceNames
-                    .Select(R2RTestCaseCompiler.ReadEmbeddedSource)
-                    .ToList();
+                string outputPath = RunCrossgenCompilation(
+                    testCase.Name, compilation, driver, compilation.FilePath, refPaths, assemblyPaths);
 
-                // Each dependency can reference all previously compiled assemblies
-                var refs = compiledDeps.Select(d => d.IlPath).ToList();
-
-                string ilPath = compiler.CompileAssembly(dep.AssemblyName, sources, refs,
-                    features: dep.Features.Count > 0 ? dep.Features : null);
-                compiledDeps.Add((dep, ilPath));
-            }
-
-            // Step 2: Compile main assembly with Roslyn
-            var mainSources = new List<string>
-            {
-                R2RTestCaseCompiler.ReadEmbeddedSource(testCase.MainSourceResourceName)
-            };
-            if (testCase.MainExtraSourceResourceNames is not null)
-            {
-                foreach (string extra in testCase.MainExtraSourceResourceNames)
-                    mainSources.Add(R2RTestCaseCompiler.ReadEmbeddedSource(extra));
-            }
-
-            var mainRefs = compiledDeps.Select(d => d.IlPath).ToList();
-            string mainIlPath = compiler.CompileAssembly(testCase.Name, mainSources, mainRefs,
-                outputKind: Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary,
-                features: testCase.Features.Count > 0 ? testCase.Features : null);
-
-            // Step 3: Crossgen2 dependencies
-            var driver = new R2RDriver();
-            var allRefPaths = BuildReferencePaths(ilDir);
-
-            foreach (var (dep, ilPath) in compiledDeps)
-            {
-                if (!dep.IsCrossgenInput)
-                    continue;
-
-                string r2rPath = Path.Combine(r2rDir, Path.GetFileName(ilPath));
-                var result = driver.Compile(new R2RCompilationOptions
+                if (compilation.Validate is not null)
                 {
-                    InputPath = ilPath,
-                    OutputPath = r2rPath,
-                    ReferencePaths = allRefPaths,
-                });
-
-                Assert.True(result.Success,
-                    $"crossgen2 failed for dependency '{dep.AssemblyName}':\n{result.StandardError}\n{result.StandardOutput}");
+                    Assert.True(File.Exists(outputPath), $"R2R image not found: {outputPath}");
+                    _output.WriteLine($"  Validating R2R image: {outputPath}");
+                    var reader = new ReadyToRunReader(new SimpleAssemblyResolver(), outputPath);
+                    compilation.Validate(reader);
+                }
             }
-
-            // Step 4: Crossgen2 main assembly
-            string mainR2RPath = Path.Combine(r2rDir, Path.GetFileName(mainIlPath));
-
-            if (testCase.CompositeMode)
-            {
-                RunCompositeCompilation(testCase, driver, mainIlPath, mainR2RPath, allRefPaths, compiledDeps);
-            }
-            else
-            {
-                RunSingleCompilation(testCase, driver, mainIlPath, mainR2RPath, allRefPaths);
-            }
-
-            // Step 5: Validate R2R output
-            Assert.True(File.Exists(mainR2RPath), $"R2R image not found: {mainR2RPath}");
-
-            var reader = new ReadyToRunReader(new SimpleAssemblyResolver(), mainR2RPath);
-            testCase.Validate(reader);
         }
         finally
         {
-            // Keep temp directory for debugging if KEEP_R2R_TESTS env var is set
             if (Environment.GetEnvironmentVariable("KEEP_R2R_TESTS") is null)
             {
-                try { Directory.Delete(tempDir, true); }
+                try { Directory.Delete(baseOutputDir, true); }
                 catch { /* best effort */ }
             }
         }
     }
 
-    private static void RunSingleCompilation(
-        R2RTestCase testCase,
-        R2RDriver driver,
-        string mainIlPath,
-        string mainR2RPath,
-        List<string> allRefPaths)
+    private Dictionary<string, string> CompileAllAssemblies(
+        IEnumerable<CompiledAssembly> assemblies)
     {
-        var options = new R2RCompilationOptions
-        {
-            InputPath = mainIlPath,
-            OutputPath = mainR2RPath,
-            ReferencePaths = allRefPaths,
-            ExtraArgs = testCase.Crossgen2Options.SelectMany(o => o.ToArgs()).ToList(),
-        };
+        var compiler = new R2RTestCaseCompiler();
+        var paths = new Dictionary<string, string>();
 
-        var result = driver.Compile(options);
-        Assert.True(result.Success,
-            $"crossgen2 failed for main assembly '{testCase.Name}':\n{result.StandardError}\n{result.StandardOutput}");
-    }
-
-    private static void RunCompositeCompilation(
-        R2RTestCase testCase,
-        R2RDriver driver,
-        string mainIlPath,
-        string mainR2RPath,
-        List<string> allRefPaths,
-        List<(CompiledAssembly Dep, string IlPath)> compiledDeps)
-    {
-        var compositeInputs = new List<string> { mainIlPath };
-        foreach (var (dep, ilPath) in compiledDeps)
+        foreach (var asm in assemblies)
         {
-            if (dep.IsCrossgenInput)
-                compositeInputs.Add(ilPath);
+            var sources = asm.SourceResourceNames
+                .Select(R2RTestCaseCompiler.ReadEmbeddedSource)
+                .ToList();
+
+            EnsureDirectoryExists(Path.GetDirectoryName(asm.FilePath));
+
+            string ilPath = compiler.CompileAssembly(
+                asm.AssemblyName,
+                sources,
+                asm.FilePath,
+                additionalReferences: asm.References.Select(r => r.FilePath).ToList(),
+                features: asm.Features.Count > 0 ? asm.Features : null);
+            paths[asm.AssemblyName] = ilPath;
+            _output.WriteLine($"  Roslyn compiled '{asm.AssemblyName}' -> {ilPath}");
         }
 
-        var options = new R2RCompilationOptions
-        {
-            InputPath = mainIlPath,
-            OutputPath = mainR2RPath,
-            ReferencePaths = allRefPaths,
-            Composite = true,
-            CompositeInputPaths = compositeInputs,
-            ExtraArgs = testCase.Crossgen2Options.SelectMany(o => o.ToArgs()).ToList(),
-        };
-
-        var result = driver.Compile(options);
-        Assert.True(result.Success,
-            $"crossgen2 composite compilation failed for '{testCase.Name}':\n{result.StandardError}\n{result.StandardOutput}");
+        return paths;
     }
 
-    private static List<string> BuildReferencePaths(string ilDir)
+    private static void EnsureDirectoryExists(string? v)
+    {
+        if (v is not null && !Directory.Exists(v))
+        {
+            Directory.CreateDirectory(v);
+        }
+    }
+
+    private static string RunCrossgenCompilation(
+        string testName,
+        CrossgenCompilation compilation,
+        R2RDriver driver,
+        string outputFile,
+        List<string> refPaths,
+        Dictionary<string, string> assemblyPaths)
+    {
+        var args = new List<string>();
+
+        var inputFiles = new List<string>();
+        // Per-assembly inputs and options
+        foreach (var asm in compilation.Assemblies)
+        {
+            var ilAssemblyName = asm.ILAssembly.AssemblyName;
+            Assert.True(assemblyPaths.ContainsKey(ilAssemblyName),
+                $"Assembly '{ilAssemblyName}' not found in compiled assemblies.");
+
+            string ilPath = asm.ILAssembly.FilePath;
+
+            if (asm.Kind == Crossgen2InputKind.InputAssembly)
+            {
+                inputFiles.Add(ilPath);
+            }
+            else
+            {
+                args.Add(asm.Kind.ToArg());
+                args.Add(ilPath);
+            }
+
+            foreach (var option in asm.Options)
+            {
+                args.Add(option.ToArg());
+                args.Add(ilAssemblyName);
+            }
+        }
+
+        // Image-level options
+        foreach (var option in compilation.Options)
+            args.Add(option.ToArg());
+
+        // Global refs (all compiled IL assemblies + runtime pack)
+        AddRefArgs(args, refPaths);
+
+        EnsureDirectoryExists(Path.GetDirectoryName(outputFile));
+
+        inputFiles.AddRange(args);
+        args = inputFiles;
+        args.Add($"--out");
+        args.Add($"{outputFile}");
+        var result = driver.Compile(args);
+        Assert.True(result.Success,
+            $"crossgen2 failed for '{testName}':\n{result.StandardError}\n{result.StandardOutput}");
+
+        return outputFile;
+    }
+
+    private static void AddRefArgs(List<string> args, List<string> refPaths)
+    {
+        foreach (string refPath in refPaths)
+        {
+            args.Add("-r");
+            args.Add(refPath);
+        }
+    }
+
+    private static List<string> BuildReferencePaths()
     {
         var paths = new List<string>();
 
-        // Add all compiled IL assemblies as references
-        paths.Add(Path.Combine(ilDir, "*.dll"));
-
-        // Add framework references (managed assemblies)
         paths.Add(Path.Combine(TestPaths.RuntimePackDir, "*.dll"));
 
-        // System.Private.CoreLib is in the native directory, not lib
         string runtimePackDir = TestPaths.RuntimePackDir;
         string nativeDir = Path.GetFullPath(Path.Combine(runtimePackDir, "..", "..", "native"));
         if (Directory.Exists(nativeDir))
