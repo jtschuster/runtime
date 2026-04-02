@@ -162,7 +162,7 @@ public class R2RTestSuites
                     new CrossgenAssembly(compositeBasic),
                 ])
                 {
-                    Options = [Crossgen2Option.Composite],
+                    Options = [Crossgen2Option.Composite, Crossgen2Option.Optimize],
                     Validate = Validate,
                 },
             ]));
@@ -395,7 +395,7 @@ public class R2RTestSuites
                     new CrossgenAssembly(compositeMain),
                 ])
                 {
-                    Options = [Crossgen2Option.Composite],
+                    Options = [Crossgen2Option.Composite, Crossgen2Option.Optimize],
                     Validate = Validate,
                 },
             ]));
@@ -403,6 +403,7 @@ public class R2RTestSuites
         static void Validate(ReadyToRunReader reader)
         {
             R2RAssert.HasManifestRef(reader, "InlineableLib");
+            R2RAssert.HasInlinedMethod(reader, "TestGetValue", "GetValue");
         }
     }
 
@@ -436,7 +437,7 @@ public class R2RTestSuites
                     new CrossgenAssembly(compositeAsyncMain),
                 ])
                 {
-                    Options = [Crossgen2Option.Composite],
+                    Options = [Crossgen2Option.Composite, Crossgen2Option.Optimize],
                     Validate = Validate,
                 },
             ]));
@@ -481,7 +482,7 @@ public class R2RTestSuites
                     new CrossgenAssembly(compositeAsyncMain),
                 ])
                 {
-                    Options = [Crossgen2Option.Composite],
+                    Options = [Crossgen2Option.Composite, Crossgen2Option.Optimize],
                     Validate = Validate,
                 },
             ]));
@@ -584,7 +585,7 @@ public class R2RTestSuites
                     new CrossgenAssembly(libB),
                 ])
                 {
-                    Options = [Crossgen2Option.Composite],
+                    Options = [Crossgen2Option.Composite, Crossgen2Option.Optimize],
                     Validate = reader =>
                     {
                         R2RAssert.HasManifestRef(reader, "MultiStepLibA");
@@ -647,7 +648,7 @@ public class R2RTestSuites
                     new CrossgenAssembly(compositeDevirtMain),
                 ])
                 {
-                    Options = [Crossgen2Option.Composite],
+                    Options = [Crossgen2Option.Composite, Crossgen2Option.Optimize],
                     Validate = Validate,
                 },
             ]));
@@ -694,7 +695,7 @@ public class R2RTestSuites
                     new CrossgenAssembly(compositeTransitiveMain),
                 ])
                 {
-                    Options = [Crossgen2Option.Composite],
+                    Options = [Crossgen2Option.Composite, Crossgen2Option.Optimize],
                     Validate = Validate,
                 },
             ]));
@@ -811,7 +812,7 @@ public class R2RTestSuites
                     new CrossgenAssembly(compositeAsyncTransitiveMain),
                 ])
                 {
-                    Options = [Crossgen2Option.Composite],
+                    Options = [Crossgen2Option.Composite, Crossgen2Option.Optimize],
                     Validate = Validate,
                 },
             ]));
@@ -865,7 +866,7 @@ public class R2RTestSuites
                     new CrossgenAssembly(compositeAsyncMain),
                 ])
                 {
-                    Options = [Crossgen2Option.Composite],
+                    Options = [Crossgen2Option.Composite, Crossgen2Option.Optimize],
                     Validate = reader =>
                     {
                         R2RAssert.HasManifestRef(reader, "AsyncCompositeLib");
