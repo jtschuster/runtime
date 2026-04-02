@@ -9,6 +9,7 @@ using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using ILCompiler.Reflection.ReadyToRun;
 using Internal.ReadyToRunConstants;
+using Internal.Runtime;
 using Xunit;
 
 namespace ILCompiler.ReadyToRun.Tests.TestCasesRunner;
@@ -41,11 +42,14 @@ internal static class R2RAssert
         var allRefs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         var globalMetadata = reader.GetGlobalMetadata();
-        var mdReader = globalMetadata.MetadataReader;
-        foreach (var handle in mdReader.AssemblyReferences)
+        if (globalMetadata is not null)
         {
-            var assemblyRef = mdReader.GetAssemblyReference(handle);
-            allRefs.Add(mdReader.GetString(assemblyRef.Name));
+            var mdReader = globalMetadata.MetadataReader;
+            foreach (var handle in mdReader.AssemblyReferences)
+            {
+                var assemblyRef = mdReader.GetAssemblyReference(handle);
+                allRefs.Add(mdReader.GetString(assemblyRef.Name));
+            }
         }
 
         foreach (var kvp in reader.ManifestReferenceAssemblies)
@@ -57,28 +61,137 @@ internal static class R2RAssert
     }
 
     /// <summary>
-    /// Asserts the R2R image contains a CHECK_IL_BODY fixup whose signature contains the given method name.
+    /// Asserts that the CrossModuleInlineInfo section records that <paramref name="inlinerMethodName"/>
+    /// inlined <paramref name="inlineeMethodName"/>, and that the inlinee is encoded as a cross-module
+    /// reference (ILBody import index, not a local MethodDef RID).
     /// </summary>
-    public static void HasInlinedMethod(ReadyToRunReader reader, string methodName)
+    public static void HasCrossModuleInlinedMethod(ReadyToRunReader reader, string inlinerMethodName, string inlineeMethodName)
     {
-        var formattingOptions = new SignatureFormattingOptions();
-        var checkIlBodySigs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var inliningInfo = GetCrossModuleInliningInfoSection(reader);
 
-        foreach (var method in GetAllMethods(reader))
+        var allPairs = new List<string>();
+        foreach (var (inlinerName, inlineeName, inlineeKind) in inliningInfo.GetInliningPairs())
         {
-            if (method.Fixups is null)
-                continue;
-            foreach (var cell in method.Fixups)
+            allPairs.Add($"{inlinerName} → {inlineeName} ({inlineeKind})");
+
+            if (inlinerName.Contains(inlinerMethodName, StringComparison.OrdinalIgnoreCase) &&
+                inlineeName.Contains(inlineeMethodName, StringComparison.OrdinalIgnoreCase))
             {
-                if (cell.Signature?.FixupKind is ReadyToRunFixupKind.Check_IL_Body or ReadyToRunFixupKind.Verify_IL_Body)
-                    checkIlBodySigs.Add(cell.Signature.ToString(formattingOptions));
+                Assert.True(inlineeKind == CrossModuleInliningInfoSection.InlineeReferenceKind.CrossModule,
+                    $"Found inlining pair '{inlinerName} → {inlineeName}' but the inlinee is not encoded " +
+                    $"as a cross-module reference ({inlineeKind}). Expected ILBody import encoding.");
+                return;
             }
         }
 
+        Assert.Fail(
+            $"Expected cross-module inlining '{inlineeMethodName}' into '{inlinerMethodName}', but it was not found.\n" +
+            $"Recorded inlining pairs:\n  {string.Join("\n  ", allPairs)}");
+    }
+
+    /// <summary>
+    /// Asserts that any inlining info section (CrossModuleInlineInfo or InliningInfo2) records that
+    /// <paramref name="inlinerMethodName"/> inlined <paramref name="inlineeMethodName"/>.
+    /// Does not check whether the encoding is cross-module or local.
+    /// </summary>
+    public static void HasInlinedMethod(ReadyToRunReader reader, string inlinerMethodName, string inlineeMethodName)
+    {
+        var foundPairs = new List<string>();
+
+        if (reader.ReadyToRunHeader.Sections.ContainsKey(ReadyToRunSectionType.CrossModuleInlineInfo))
+        {
+            var inliningInfo = GetCrossModuleInliningInfoSection(reader);
+            foreach (var (inlinerName, inlineeName, _) in inliningInfo.GetInliningPairs())
+            {
+                if (inlinerName.Contains(inlinerMethodName, StringComparison.OrdinalIgnoreCase) &&
+                    inlineeName.Contains(inlineeMethodName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+                foundPairs.Add($"[CXMI] {inlinerName} -> {inlineeName}");
+            }
+        }
+
+        foreach (var info2 in GetAllInliningInfo2Sections(reader))
+        {
+            foreach (var (inlinerName, inlineeName) in info2.GetInliningPairs())
+            {
+                if (inlinerName.Contains(inlinerMethodName, StringComparison.OrdinalIgnoreCase) &&
+                    inlineeName.Contains(inlineeMethodName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+                foundPairs.Add($"[II2] {inlinerName} -> {inlineeName}");
+            }
+        }
+
+        string pairList = foundPairs.Count > 0
+            ? string.Join("\n  ", foundPairs)
+            : "(none)";
+
+        Assert.Fail(
+            $"Expected inlining '{inlineeMethodName}' into '{inlinerMethodName}', but it was not found.\n" +
+            $"Found inlining pairs:\n  {pairList}");
+    }
+
+    private static CrossModuleInliningInfoSection GetCrossModuleInliningInfoSection(ReadyToRunReader reader)
+    {
         Assert.True(
-            checkIlBodySigs.Any(s => s.Contains(methodName, StringComparison.OrdinalIgnoreCase)),
-            $"Expected CHECK_IL_BODY fixup for '{methodName}' not found. " +
-            $"CHECK_IL_BODY fixups: [{string.Join(", ", checkIlBodySigs)}]");
+            reader.ReadyToRunHeader.Sections.TryGetValue(
+                ReadyToRunSectionType.CrossModuleInlineInfo, out ReadyToRunSection section),
+            "Expected CrossModuleInlineInfo section not found in R2R image.");
+
+        int offset = reader.GetOffset(section.RelativeVirtualAddress);
+        int endOffset = offset + section.Size;
+
+        return new CrossModuleInliningInfoSection(reader, offset, endOffset);
+    }
+
+    private static IEnumerable<InliningInfoSection2> GetAllInliningInfo2Sections(ReadyToRunReader reader)
+    {
+        // InliningInfo2 can appear in the global header
+        if (reader.ReadyToRunHeader.Sections.TryGetValue(
+                ReadyToRunSectionType.InliningInfo2, out ReadyToRunSection globalSection))
+        {
+            int offset = reader.GetOffset(globalSection.RelativeVirtualAddress);
+            int endOffset = offset + globalSection.Size;
+            yield return new InliningInfoSection2(reader, offset, endOffset);
+        }
+
+        // In composite images, InliningInfo2 is per-assembly
+        if (reader.ReadyToRunAssemblyHeaders is not null)
+        {
+            foreach (var asmHeader in reader.ReadyToRunAssemblyHeaders)
+            {
+                if (asmHeader.Sections.TryGetValue(
+                        ReadyToRunSectionType.InliningInfo2, out ReadyToRunSection asmSection))
+                {
+                    int offset = reader.GetOffset(asmSection.RelativeVirtualAddress);
+                    int endOffset = offset + asmSection.Size;
+                    yield return new InliningInfoSection2(reader, offset, endOffset);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Asserts the R2R image contains a CrossModuleInlineInfo section with at least one entry.
+    /// </summary>
+    public static void HasCrossModuleInliningInfo(ReadyToRunReader reader)
+    {
+        Assert.True(
+            reader.ReadyToRunHeader.Sections.TryGetValue(
+                ReadyToRunSectionType.CrossModuleInlineInfo, out ReadyToRunSection section),
+            "Expected CrossModuleInlineInfo section not found in R2R image.");
+
+        int offset = reader.GetOffset(section.RelativeVirtualAddress);
+        int endOffset = offset + section.Size;
+        var inliningInfo = new CrossModuleInliningInfoSection(reader, offset, endOffset);
+        string dump = inliningInfo.ToString();
+
+        Assert.True(
+            dump.Length > 0,
+            "CrossModuleInlineInfo section is present but contains no entries.");
     }
 
     /// <summary>
@@ -122,11 +235,29 @@ internal static class R2RAssert
     }
 
     /// <summary>
+    /// Asserts a method whose signature contains <paramref name="methodName"/>
+    /// has at least one ContinuationLayout fixup.
+    /// </summary>
+    public static void HasContinuationLayout(ReadyToRunReader reader, string methodName)
+    {
+        HasFixupKindOnMethod(reader, ReadyToRunFixupKind.ContinuationLayout, methodName);
+    }
+
+    /// <summary>
     /// Asserts the R2R image contains at least one ResumptionStubEntryPoint fixup.
     /// </summary>
     public static void HasResumptionStubFixup(ReadyToRunReader reader)
     {
         HasFixupKind(reader, ReadyToRunFixupKind.ResumptionStubEntryPoint);
+    }
+
+    /// <summary>
+    /// Asserts a method whose signature contains <paramref name="methodName"/>
+    /// has at least one ResumptionStubEntryPoint fixup.
+    /// </summary>
+    public static void HasResumptionStubFixup(ReadyToRunReader reader, string methodName)
+    {
+        HasFixupKindOnMethod(reader, ReadyToRunFixupKind.ResumptionStubEntryPoint, methodName);
     }
 
     /// <summary>
@@ -149,6 +280,41 @@ internal static class R2RAssert
         Assert.True(presentKinds.Contains(kind),
             $"Expected fixup kind '{kind}' not found. " +
             $"Present kinds: [{string.Join(", ", presentKinds)}]");
+    }
+
+    /// <summary>
+    /// Asserts a method whose signature contains <paramref name="methodName"/>
+    /// has at least one fixup of the given kind.
+    /// </summary>
+    public static void HasFixupKindOnMethod(ReadyToRunReader reader, ReadyToRunFixupKind kind, string methodName)
+    {
+        var methodsWithFixup = new List<string>();
+        foreach (var method in GetAllMethods(reader))
+        {
+            if (method.Fixups is null)
+                continue;
+
+            bool hasKind = false;
+            foreach (var cell in method.Fixups)
+            {
+                if (cell.Signature is not null && cell.Signature.FixupKind == kind)
+                {
+                    hasKind = true;
+                    break;
+                }
+            }
+
+            if (hasKind)
+            {
+                methodsWithFixup.Add(method.SignatureString);
+                if (method.SignatureString.Contains(methodName, StringComparison.OrdinalIgnoreCase))
+                    return;
+            }
+        }
+
+        Assert.Fail(
+            $"Expected fixup kind '{kind}' on method matching '{methodName}', but not found.\n" +
+            $"Methods with '{kind}' fixups: [{string.Join(", ", methodsWithFixup)}]");
     }
 }
 
