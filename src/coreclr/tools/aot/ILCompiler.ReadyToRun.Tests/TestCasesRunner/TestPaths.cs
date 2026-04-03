@@ -22,8 +22,8 @@ internal static class TestPaths
     }
 
     /// <summary>
-    /// Path to the crossgen2 output directory (contains crossgen2.dll and clrjit).
-    /// e.g. artifacts/bin/coreclr/linux.x64.Checked/crossgen2/
+    /// Path to the crossgen2 output directory (contains the self-contained crossgen2 executable and clrjit).
+    /// e.g. artifacts/bin/coreclr/linux.x64.Checked/x64/crossgen2/
     /// Falls back to Checked or Release if Debug path doesn't exist.
     /// </summary>
     public static string Crossgen2Dir
@@ -31,14 +31,14 @@ internal static class TestPaths
         get
         {
             string dir = GetRequiredConfig("R2RTest.Crossgen2Dir");
-            if (!File.Exists(Path.Combine(dir, "crossgen2.dll")))
+            if (!File.Exists(Path.Combine(dir, Crossgen2ExeName)))
             {
                 // Try Checked and Release fallbacks since crossgen2 may be built in a different config
                 foreach (string fallbackConfig in new[] { "Checked", "Release", "Debug" })
                 {
                     string fallback = Regex.Replace(
                         dir, @"\.(Debug|Release|Checked)[/\\]", $".{fallbackConfig}/");
-                    if (File.Exists(Path.Combine(fallback, "crossgen2.dll")))
+                    if (File.Exists(Path.Combine(fallback, Crossgen2ExeName)))
                         return fallback;
                 }
             }
@@ -47,17 +47,13 @@ internal static class TestPaths
         }
     }
 
+    private static string Crossgen2ExeName =>
+        RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "crossgen2.exe" : "crossgen2";
+
     /// <summary>
-    /// Path to the native crossgen2 executable (apphost).
+    /// Path to the self-contained crossgen2 executable (from crossgen2_inbuild).
     /// </summary>
-    public static string Crossgen2Exe
-    {
-        get
-        {
-            string exe = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "crossgen2.exe" : "crossgen2";
-            return Path.Combine(Crossgen2Dir, exe);
-        }
-    }
+    public static string Crossgen2Exe => Path.Combine(Crossgen2Dir, Crossgen2ExeName);
 
     /// <summary>
     /// Path to the runtime pack managed assemblies directory.
