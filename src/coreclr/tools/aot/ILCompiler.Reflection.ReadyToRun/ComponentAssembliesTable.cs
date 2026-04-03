@@ -1,0 +1,69 @@
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+
+using System.Collections.Generic;
+
+namespace ILCompiler.Reflection.ReadyToRun
+{
+    /// <summary>
+    /// Structural projection of the ComponentAssemblies section.
+    /// Each entry contains RVAs to the per-assembly COR header and R2R header.
+    /// </summary>
+    public sealed class ComponentAssembliesTable
+    {
+        public IReadOnlyList<ComponentAssemblyEntry> Entries { get; }
+
+        private ComponentAssembliesTable(List<ComponentAssemblyEntry> entries)
+        {
+            Entries = entries;
+        }
+
+        public static ComponentAssembliesTable Parse(RawReadyToRunReader reader, ReadyToRunSection section)
+        {
+            int offset = reader.GetOffset(section.RelativeVirtualAddress);
+            int count = section.Size / ComponentAssembly.Size;
+            var entries = new List<ComponentAssemblyEntry>(count);
+
+            for (int i = 0; i < count; i++)
+            {
+                int corHeaderRva = reader.ImageReader.ReadInt32(ref offset);
+                int corHeaderSize = reader.ImageReader.ReadInt32(ref offset);
+                int assemblyHeaderRva = reader.ImageReader.ReadInt32(ref offset);
+                int assemblyHeaderSize = reader.ImageReader.ReadInt32(ref offset);
+                entries.Add(new ComponentAssemblyEntry(i, corHeaderRva, corHeaderSize, assemblyHeaderRva, assemblyHeaderSize));
+            }
+
+            return new ComponentAssembliesTable(entries);
+        }
+    }
+
+    /// <summary>
+    /// A single entry in the ComponentAssemblies table.
+    /// </summary>
+    public sealed class ComponentAssemblyEntry
+    {
+        /// <summary>Index of this component assembly.</summary>
+        public int Index { get; }
+
+        /// <summary>RVA of the COR header for this assembly.</summary>
+        public int CorHeaderRva { get; }
+
+        /// <summary>Size of the COR header.</summary>
+        public int CorHeaderSize { get; }
+
+        /// <summary>RVA of the per-assembly R2R header.</summary>
+        public int AssemblyHeaderRva { get; }
+
+        /// <summary>Size of the per-assembly R2R header.</summary>
+        public int AssemblyHeaderSize { get; }
+
+        public ComponentAssemblyEntry(int index, int corHeaderRva, int corHeaderSize, int assemblyHeaderRva, int assemblyHeaderSize)
+        {
+            Index = index;
+            CorHeaderRva = corHeaderRva;
+            CorHeaderSize = corHeaderSize;
+            AssemblyHeaderRva = assemblyHeaderRva;
+            AssemblyHeaderSize = assemblyHeaderSize;
+        }
+    }
+}
