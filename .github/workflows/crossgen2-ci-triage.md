@@ -105,9 +105,21 @@ Analyze failures from these Azure DevOps pipelines (org: `dnceng-public`, projec
 3. `runtime-coreclr crossgen2 outerloop`
 4. `runtime-coreclr crossgen2-composite gcstress`
 
+### Cross-Reference Pipeline
+
+In addition to the target pipelines above, also query the following pipeline for cross-referencing failures:
+
+- `runtime`
+
+This pipeline is **not** a triage target — do not create issues for failures found only in `runtime`. Instead, use it to identify failures that also occur in the `runtime` pipeline (see Step 2b below).
+
+### Branch Restriction
+
+**All pipeline queries — both target pipelines and the cross-reference pipeline — MUST be filtered to the `main` branch only** (`branchName=refs/heads/main`). Do not analyze builds from pull request branches or any other branches. PR builds may have failures that will be fixed before merging to `main`.
+
 ## Step 1: Discover Failed Builds
 
-Query Azure DevOps for builds completed in the last 48 hours (to cover weekends on Monday) that have failures.
+Query Azure DevOps for builds completed in the last 48 hours (to cover weekends on Monday) that have failures. **Only query builds on the `main` branch — never analyze PR builds.**
 
 For each target pipeline:
 
@@ -121,11 +133,13 @@ For each target pipeline:
    ```
    curl -s "https://dev.azure.com/dnceng-public/public/_apis/build/builds?definitions=<DEF_ID>&minTime=<ISO_DATETIME_48H_AGO>&resultFilter=failed&statusFilter=completed&branchName=refs/heads/main&api-version=7.0"
    ```
-   Use the current UTC time minus 48 hours for `minTime` in ISO 8601 format.
+   Use the current UTC time minus 48 hours for `minTime` in ISO 8601 format. The `branchName=refs/heads/main` filter is **required** — do not omit it.
 
 3. **Collect build IDs** for all failed builds across all four pipelines.
 
-If no failed builds are found across any pipeline, call the `noop` safe output with a message explaining that no crossgen2 pipeline failures were found in the last 48 hours.
+Also query the **cross-reference pipeline** (`runtime`) using the same steps above (same time window, same `branchName=refs/heads/main` filter). Collect these build IDs separately — they will be used in Step 2b for cross-referencing.
+
+If no failed builds are found across any target pipeline, call the `noop` safe output with a message explaining that no crossgen2 pipeline failures were found in the last 48 hours.
 
 ## Step 2: Analyze Each Failed Build
 
@@ -153,6 +167,24 @@ Skip failures that are already matched to known issues by Build Analysis. Focus 
 
 Read from `cache-memory` a file named `triaged-builds.json` (if it exists). This contains build IDs and failure signatures that have already been triaged. Skip any failures that match entries in this file.
 
+## Step 2b: Cross-Reference Failures Against the `runtime` Pipeline
+
+For each failed `runtime` pipeline build collected in Step 1, run the same CI Analysis script:
+
+```bash
+pwsh .github/skills/ci-analysis/scripts/Get-CIStatus.ps1 -BuildId <BUILD_ID> -ShowLogs -SearchMihuBot -ContinueOnError
+```
+
+Extract the failing test names from the `runtime` pipeline builds. Build a set of **runtime pipeline failure signatures** (fully qualified test names and error categories).
+
+Then compare the crossgen2 pipeline failures (from Step 2) against the runtime pipeline failures:
+
+- If a test failure from a crossgen2 pipeline **also appears in the `runtime` pipeline** (matching by fully qualified test name), mark that failure as a **runtime-shared failure**.
+- **Do NOT create issues for runtime-shared failures.** These failures are not specific to crossgen2 and do not warrant new crossgen2 issues.
+- Instead, collect all runtime-shared failures to be reported in the `noop` safe output (see Step 4).
+
+Only failures that are **unique to the crossgen2 pipelines** (i.e., not found in the `runtime` pipeline) should proceed to Step 3 and potentially have issues created.
+
 ## Step 3: Search for Existing Issues
 
 For each unknown failure, search GitHub for existing issues that might already track it:
@@ -169,7 +201,7 @@ If an existing open issue already tracks the failure, skip creating a new one. N
 
 ## Step 4: Create Issues for New Failures
 
-For each genuinely new, untracked failure, create a GitHub issue using the `create-issue` safe output.
+For each genuinely new, untracked failure that is **unique to the crossgen2 pipelines** (not a runtime-shared failure from Step 2b), create a GitHub issue using the `create-issue` safe output.
 
 ### Assess Fix Complexity
 
@@ -265,7 +297,7 @@ For Option B (disabling tests), provide specific guidance:
 ## Step 5: Update Cache Memory
 
 After processing all builds, write the updated `triaged-builds.json` to `cache-memory` with:
-- Build IDs that were analyzed
+- Build IDs that were analyzed (both crossgen2 and runtime pipeline builds)
 - Failure signatures (test name + error category) that were triaged
 - Timestamp of this triage run
 
@@ -273,6 +305,8 @@ Use filesystem-safe timestamp format `YYYY-MM-DD-HH-MM-SS` (no colons).
 
 ## Important Guidelines
 
+- **Only analyze `main` branch builds.** Never analyze builds from pull request branches or feature branches. PR builds may contain failures that will be fixed before merging.
+- **Do not create issues for failures that also occur in the `runtime` pipeline.** These are not crossgen2-specific. Instead, note them in the `noop` safe output.
 - **Do not create duplicate issues.** Always search thoroughly before creating.
 - **Do not create issues for known/tracked failures.** If Build Analysis has already matched a failure to a known issue, skip it.
 - **Be conservative with "simple fix" assessments.** When in doubt, instruct Copilot to disable the test rather than attempt a fix.
@@ -282,4 +316,7 @@ Use filesystem-safe timestamp format `YYYY-MM-DD-HH-MM-SS` (no colons).
   - Do NOT say "Helix console logs are not accessible without authentication" as a substitute for error details. The CI analysis script already extracts error information — use it.
 - **Include enough context in issues** for Copilot Coding Agent to act without further investigation.
 - **Group related failures.** If the same test fails across multiple pipelines or configurations, create a single issue covering all occurrences.
-- If there are no new unknown failures to report, call the `noop` safe output explaining what you analyzed and that all failures are either known or already tracked.
+- When calling the `noop` safe output, include:
+  - A summary of what was analyzed (which pipelines, how many builds)
+  - Any failures that were skipped because they also appear in the `runtime` pipeline (list the test names and note they are shared with `runtime`)
+  - Any failures that were skipped because they match known issues or cached entries
