@@ -107,11 +107,11 @@ Analyze failures from these Azure DevOps pipelines (org: `dnceng-public`, projec
 
 ### Cross-Reference Pipeline
 
-In addition to the target pipelines above, also query the following pipeline for cross-referencing failures:
+The following pipeline is used for cross-referencing failures (see Step 3):
 
 - `runtime`
 
-This pipeline is **not** a triage target — do not create issues for its failures. Instead, use it to identify crossgen2 pipeline failures that also occur in the `runtime` pipeline, which indicates they are not crossgen2-specific (see Step 2b below).
+This pipeline is **not** a triage target — do not create issues for its failures. It is only queried when crossgen2 pipeline failures are found, to determine whether those failures also occur in the `runtime` pipeline (which indicates they are not crossgen2-specific).
 
 ### Branch Restriction
 
@@ -136,8 +136,6 @@ For each target pipeline:
    Use the current UTC time minus 48 hours for `minTime` in ISO 8601 format. The `branchName=refs/heads/main` filter is **required** — do not omit it.
 
 3. **Collect build IDs** for all failed builds across all four pipelines.
-
-Also query the **cross-reference pipeline** (`runtime`) using the same steps above (same time window, same `branchName=refs/heads/main` filter). Collect these build IDs separately — they will be used in Step 2b for cross-referencing.
 
 If no failed builds are found across any target pipeline, call the `noop` safe output with a message explaining that no crossgen2 pipeline failures were found in the last 48 hours.
 
@@ -167,9 +165,17 @@ Skip failures that are already matched to known issues by Build Analysis. Focus 
 
 Read from `cache-memory` a file named `triaged-builds.json` (if it exists). This contains build IDs and failure signatures that have already been triaged. Skip any failures that match entries in this file.
 
-## Step 2b: Cross-Reference Failures Against the `runtime` Pipeline
+## Step 3: Cross-Reference Failures Against the `runtime` Pipeline
 
-For each failed `runtime` pipeline build collected in Step 1, run the same CI Analysis script:
+If Step 2 identified unknown, untracked crossgen2 failures, query the `runtime` pipeline to check whether those failures also occur there. **Skip this step entirely if there are no unknown crossgen2 failures to cross-reference.**
+
+First, discover failed `runtime` pipeline builds using the same approach as Step 1 (same time window, same `branchName=refs/heads/main` filter):
+
+1. Look up the pipeline definition ID for `runtime`.
+2. Query failed builds on `main` in the last 48 hours.
+3. Collect the `runtime` build IDs.
+
+Then, for each failed `runtime` pipeline build, run the CI Analysis script:
 
 ```bash
 pwsh .github/skills/ci-analysis/scripts/Get-CIStatus.ps1 -BuildId <BUILD_ID> -ShowLogs -SearchMihuBot -ContinueOnError
@@ -181,11 +187,11 @@ Then compare the crossgen2 pipeline failures (from Step 2) against the runtime p
 
 - If a test failure from a crossgen2 pipeline **also appears in the `runtime` pipeline** (matching by fully qualified test name, regardless of error category or platform), mark that failure as a **runtime-shared failure**.
 - **Do NOT create issues for runtime-shared failures.** These failures are not specific to crossgen2 and do not warrant new crossgen2 issues.
-- Instead, collect all runtime-shared failures to be reported in the `noop` safe output (see Step 4).
+- Instead, collect all runtime-shared failures to be reported in the `noop` safe output (see Step 5).
 
-Only failures that are **unique to the crossgen2 pipelines** (i.e., not found in the `runtime` pipeline) should proceed to Step 3 and potentially have issues created.
+Only failures that are **unique to the crossgen2 pipelines** (i.e., not found in the `runtime` pipeline) should proceed to Step 4 and potentially have issues created.
 
-## Step 3: Search for Existing Issues
+## Step 4: Search for Existing Issues
 
 For each unknown failure, search GitHub for existing issues that might already track it:
 
@@ -199,9 +205,9 @@ For each unknown failure, search GitHub for existing issues that might already t
 
 If an existing open issue already tracks the failure, skip creating a new one. Note the existing issue number in your analysis.
 
-## Step 4: Create Issues for New Failures
+## Step 5: Create Issues for New Failures
 
-For each genuinely new, untracked failure that is **unique to the crossgen2 pipelines** (not a runtime-shared failure from Step 2b), create a GitHub issue using the `create-issue` safe output.
+For each genuinely new, untracked failure that is **unique to the crossgen2 pipelines** (not a runtime-shared failure from Step 3), create a GitHub issue using the `create-issue` safe output.
 
 ### Assess Fix Complexity
 
@@ -294,7 +300,7 @@ For Option B (disabling tests), provide specific guidance:
 - Suggest the correct `[ActiveIssue]` attribute syntax
 - Note which configurations to disable for (e.g., only crossgen2, only specific OS)
 
-## Step 5: Update Cache Memory
+## Step 6: Update Cache Memory
 
 After processing all builds, write the updated `triaged-builds.json` to `cache-memory` with:
 - Build IDs that were analyzed from the crossgen2 target pipelines
