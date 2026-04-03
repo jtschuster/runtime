@@ -5,6 +5,8 @@ using System;
 using System.Collections.Generic;
 using System.Reflection.PortableExecutable;
 
+using Internal.ReadyToRunConstants;
+
 namespace ILCompiler.Reflection.ReadyToRun.Format;
 
 /// <summary>
@@ -31,6 +33,7 @@ public sealed class RawReadyToRunParser
     private bool[] _isEntryPoint;
     private Dictionary<int, int> _hotColdMap; // coldRtFuncIdx → hotRtFuncIdx
     private Dictionary<int, int> _rvaToEhInfoRva; // methodStartRva → ehInfoRva
+    private Dictionary<int, int> _ehClauseCounts; // methodStartRva → clauseCount
 
     /// <summary>
     /// Creates a new parser that cross-references sections from the given format reader.
@@ -58,6 +61,7 @@ public sealed class RawReadyToRunParser
         EnsureEntryPointMap();
         EnsureHotColdMap();
         EnsureEhInfoMap();
+        EnsureDebugInfoOffsets();
 
         var methods = new List<ParsedMethod>();
 
@@ -124,16 +128,13 @@ public sealed class RawReadyToRunParser
         }
 
         // Mark entry points from InstanceMethodEntryPoints
-        // (requires parsing the entry points, which we'll do by reading the raw offset data)
-        var instanceMethods = _formatReader.InstanceMethodEntryPoints;
-        if (instanceMethods != null)
+        // Use the legacy reader which correctly parses the method signature to find
+        // the entry point index (the index is after the variable-length signature blob).
+        foreach (var instanceMethod in _legacyReader.InstanceMethods)
         {
-            foreach (var entry in instanceMethods.Entries)
-            {
-                int rtFuncIdx = GetRuntimeFunctionIndexFromOffset(entry.SignatureBlobOffset);
-                if (rtFuncIdx >= 0 && rtFuncIdx < _isEntryPoint.Length)
-                    _isEntryPoint[rtFuncIdx] = true;
-            }
+            int rtFuncIdx = instanceMethod.Method.EntryPointRuntimeFunctionId;
+            if (rtFuncIdx >= 0 && rtFuncIdx < _isEntryPoint.Length)
+                _isEntryPoint[rtFuncIdx] = true;
         }
     }
 
@@ -160,7 +161,8 @@ public sealed class RawReadyToRunParser
     }
 
     /// <summary>
-    /// Builds a map from method start RVA to EH info RVA.
+    /// Builds maps from method start RVA to EH info RVA and clause counts.
+    /// Clause count is derived from the difference between consecutive EH info RVAs.
     /// </summary>
     private void EnsureEhInfoMap()
     {
@@ -168,14 +170,26 @@ public sealed class RawReadyToRunParser
             return;
 
         _rvaToEhInfoRva = new Dictionary<int, int>();
+        _ehClauseCounts = new Dictionary<int, int>();
         var ehInfo = _formatReader.ExceptionInfo;
-        if (ehInfo != null)
+        if (ehInfo == null || ehInfo.Entries.Count == 0)
+            return;
+
+        var entries = ehInfo.Entries;
+        for (int i = 0; i < entries.Count; i++)
         {
-            foreach (var entry in ehInfo.Entries)
-            {
-                _rvaToEhInfoRva[entry.MethodRva] = entry.EhInfoRva;
-            }
+            _rvaToEhInfoRva[entries[i].MethodRva] = entries[i].EhInfoRva;
         }
+
+        // Clause count = (nextEhInfoRva - thisEhInfoRva) / EHClause.Length
+        for (int i = 0; i < entries.Count - 1; i++)
+        {
+            int clauseCount = (entries[i + 1].EhInfoRva - entries[i].EhInfoRva) / EHClause.Length;
+            _ehClauseCounts[entries[i].MethodRva] = clauseCount;
+        }
+        // Last entry: we can't determine clause count from the next entry,
+        // so we leave it without a count (it won't be parsed).
+        // A more complete solution would use the section end offset.
     }
 
     /// <summary>
@@ -212,30 +226,31 @@ public sealed class RawReadyToRunParser
     }
 
     /// <summary>
-    /// Parse the InstanceMethodEntryPoints and create ParsedMethod objects.
+    /// Parse the InstanceMethodEntryPoints using the legacy reader (which correctly
+    /// decodes the variable-length method signature blob before reading the entry point).
     /// </summary>
     private void ParseInstanceMethodEntryPoints(List<ParsedMethod> methods)
     {
-        var instanceMethods = _formatReader.InstanceMethodEntryPoints;
-        if (instanceMethods == null)
-            return;
-
-        foreach (var entry in instanceMethods.Entries)
+        foreach (var instanceMethod in _legacyReader.InstanceMethods)
         {
-            int rtFuncIdx = GetRuntimeFunctionIndexFromOffset(entry.SignatureBlobOffset);
+            var legacyMethod = instanceMethod.Method;
+            int rtFuncIdx = legacyMethod.EntryPointRuntimeFunctionId;
             if (rtFuncIdx < 0)
                 continue;
 
-            // TODO: Parse the signature blob into an R2RMethodRef using the structural provider
-            // For now, create a placeholder
             var runtimeFunctions = CollectRuntimeFunctions(rtFuncIdx);
             var coldFunctions = CollectColdRuntimeFunctions(rtFuncIdx);
-            var fixups = ParseFixupCellsFromOffset(entry.SignatureBlobOffset);
             var gcInfo = ParseGcInfo(rtFuncIdx);
 
+            // Use MethodDef RID from the legacy method
+            uint rid = legacyMethod.Rid;
+
+            // Get fixup cells for this method from the legacy reader's fixup data
+            var fixups = CollectFixupsFromLegacyMethod(legacyMethod);
+
             methods.Add(new ParsedMethod(
-                rid: 0,
-                methodRef: null, // TODO: structural parse
+                rid: rid,
+                methodRef: null, // TODO: structural parse from signature blob
                 entryPointRuntimeFunctionIndex: rtFuncIdx,
                 runtimeFunctions: runtimeFunctions,
                 coldRuntimeFunctions: coldFunctions,
@@ -244,6 +259,40 @@ public sealed class RawReadyToRunParser
                 isInstanceMethod: true,
                 componentIndex: 0));
         }
+    }
+
+    /// <summary>
+    /// Collect fixup cells from a legacy ReadyToRunMethod's fixup data.
+    /// </summary>
+    private List<ParsedFixupCell> CollectFixupsFromLegacyMethod(ReadyToRunMethod legacyMethod)
+    {
+        var result = new List<ParsedFixupCell>();
+        try
+        {
+            var importSections = GetImportSections();
+            foreach (var fixupCell in legacyMethod.Fixups)
+            {
+                R2RFixupSignature signature = null;
+                int tableIdx = (int)fixupCell.TableIndex;
+                int cellIdx = (int)fixupCell.CellOffset;
+
+                if (tableIdx < importSections.Count)
+                {
+                    var section = importSections[tableIdx];
+                    if (cellIdx < section.Entries.Count)
+                    {
+                        signature = section.Entries[cellIdx].Signature;
+                    }
+                }
+
+                result.Add(new ParsedFixupCell(fixupCell.TableIndex, fixupCell.CellOffset, signature));
+            }
+        }
+        catch
+        {
+            // Fixup parsing can fail for some methods
+        }
+        return result;
     }
 
     /// <summary>
@@ -364,31 +413,130 @@ public sealed class RawReadyToRunParser
 
     private BaseUnwindInfo ParseUnwindInfo(RuntimeFunctionEntry entry)
     {
-        // TODO: Parse unwind info from the image at entry.UnwindRva
-        // This requires the image bytes and architecture-specific parsing
-        return null;
+        try
+        {
+            int unwindOffset = _formatReader.GetOffset(entry.UnwindRva);
+            NativeReader imageReader = _formatReader.ImageReader;
+
+            return _formatReader.Machine switch
+            {
+                Machine.I386 => new x86.UnwindInfo(imageReader, unwindOffset),
+                Machine.Amd64 => new Amd64.UnwindInfo(imageReader, unwindOffset),
+                Machine.ArmThumb2 => new Arm.UnwindInfo(imageReader, unwindOffset),
+                Machine.Arm64 => new Arm64.UnwindInfo(imageReader, unwindOffset),
+                _ => null,
+            };
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private Dictionary<uint, int> _debugInfoOffsets; // rtFuncIndex → file offset
+
+    private void EnsureDebugInfoOffsets()
+    {
+        if (_debugInfoOffsets != null)
+            return;
+
+        _debugInfoOffsets = new Dictionary<uint, int>();
+        var debugInfo = _formatReader.DebugInfo;
+        if (debugInfo != null)
+        {
+            foreach (var entry in debugInfo.Entries)
+            {
+                _debugInfoOffsets[entry.RuntimeFunctionIndex] = entry.DebugInfoOffset;
+            }
+        }
     }
 
     private DebugInfo ParseDebugInfo(int runtimeFunctionIndex)
     {
-        // TODO: Look up debug info from the sparse array
+        // DebugInfo requires a RuntimeFunction (old type) which we don't have.
+        // Store the offset for now; the metadata resolver can parse it later.
+        // TODO: Extract core debug info parsing into a static method that takes only image bytes.
         return null;
+    }
+
+    /// <summary>
+    /// Gets the debug info file offset for a given runtime function index, or -1 if none.
+    /// This can be used by consumers who need to parse debug info with additional context.
+    /// </summary>
+    public int GetDebugInfoOffset(int runtimeFunctionIndex)
+    {
+        EnsureDebugInfoOffsets();
+        if (_debugInfoOffsets.TryGetValue((uint)runtimeFunctionIndex, out int offset))
+            return offset;
+        return -1;
     }
 
     private EHInfo ParseEhInfo(int startRva)
     {
-        if (_rvaToEhInfoRva.TryGetValue(startRva, out int ehInfoRva))
+        if (!_rvaToEhInfoRva.TryGetValue(startRva, out int ehInfoRva))
+            return null;
+
+        if (!_ehClauseCounts.TryGetValue(startRva, out int clauseCount) || clauseCount <= 0)
+            return null;
+
+        try
         {
-            // TODO: Parse EH clauses from the image at ehInfoRva
+            int offset = _formatReader.GetOffset(ehInfoRva);
+            return new EHInfo(_legacyReader, ehInfoRva, startRva, offset, clauseCount);
+        }
+        catch
+        {
             return null;
         }
-        return null;
     }
 
     private BaseGcInfo ParseGcInfo(int entryPointRtFuncIndex)
     {
-        // TODO: GC info is at UnwindRVA + UnwindInfo.Size of the first runtime function
-        return null;
+        // GC info sits right after the unwind info of the first runtime function:
+        // - On I386: GcInfoRva = UnwindRva (same offset)
+        // - On other archs: GcInfoRva = UnwindRva + UnwindInfo.Size
+        var rtFuncs = _formatReader.RuntimeFunctions;
+        if (rtFuncs == null || entryPointRtFuncIndex >= rtFuncs.Entries.Count)
+            return null;
+
+        var entry = rtFuncs.Entries[entryPointRtFuncIndex];
+        NativeReader imageReader = _formatReader.ImageReader;
+
+        try
+        {
+            int gcInfoRva;
+            if (_formatReader.Machine == Machine.I386)
+            {
+                gcInfoRva = entry.UnwindRva;
+            }
+            else
+            {
+                var unwindInfo = ParseUnwindInfo(entry);
+                if (unwindInfo == null)
+                    return null;
+                gcInfoRva = entry.UnwindRva + unwindInfo.Size;
+            }
+
+            int gcInfoOffset = _formatReader.GetOffset(gcInfoRva);
+
+            if (_formatReader.Machine == Machine.I386)
+            {
+                return new x86.GcInfo(imageReader, gcInfoOffset);
+            }
+            else
+            {
+                return new Amd64.GcInfo(
+                    imageReader,
+                    gcInfoOffset,
+                    _formatReader.Machine,
+                    _formatReader.ReadyToRunHeader.MajorVersion,
+                    _formatReader.ReadyToRunHeader.MinorVersion);
+            }
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     // ── Fixup parsing ────────────────────────────────────────────────
@@ -399,19 +547,28 @@ public sealed class RawReadyToRunParser
         if (cellRefs == null)
             return result;
 
+        // Ensure import sections are parsed so we can look up signature RVAs
+        var importSections = GetImportSections();
+
         foreach (var cell in cellRefs)
         {
-            // TODO: Decode signature through import section
-            result.Add(new ParsedFixupCell(cell.TableIndex, cell.CellIndex, signature: null));
+            R2RFixupSignature signature = null;
+            int tableIdx = (int)cell.TableIndex;
+            int cellIdx = (int)cell.CellIndex;
+
+            if (tableIdx < importSections.Count)
+            {
+                var section = importSections[tableIdx];
+                if (cellIdx < section.Entries.Count)
+                {
+                    signature = section.Entries[cellIdx].Signature;
+                }
+            }
+
+            result.Add(new ParsedFixupCell(cell.TableIndex, cell.CellIndex, signature));
         }
 
         return result;
-    }
-
-    private List<ParsedFixupCell> ParseFixupCellsFromOffset(int entryPointOffset)
-    {
-        // TODO: Parse fixup cells from the instance method entry point offset
-        return new List<ParsedFixupCell>();
     }
 
     // ── Import section parsing ───────────────────────────────────────
@@ -423,14 +580,94 @@ public sealed class RawReadyToRunParser
         if (importSections == null)
             return result;
 
-        foreach (var entry in importSections.Entries)
+        foreach (var section in importSections.Entries)
         {
-            var entries = new List<ParsedImportEntry>();
-            // TODO: Parse per-entry signatures
-            result.Add(new ParsedImportSection(entry.Index, entry, entries));
+            var entries = ParseImportSectionEntries(section);
+            result.Add(new ParsedImportSection(section.Index, section, entries));
         }
 
         return result;
+    }
+
+    private List<ParsedImportEntry> ParseImportSectionEntries(ImportSectionEntry section)
+    {
+        var entries = new List<ParsedImportEntry>();
+        if (section.SignatureRva == 0 || section.EntryCount == 0)
+            return entries;
+
+        try
+        {
+            int signatureOffset = _formatReader.GetOffset(section.SignatureRva);
+            int sectionOffset = _formatReader.GetOffset(section.SectionRva);
+
+            for (int i = 0; i < section.EntryCount; i++)
+            {
+                int entryRva = section.SectionRva + section.EntrySize * i;
+                R2RFixupSignature signature = null;
+
+                // Each entry in the signature table is a 4-byte RVA pointing to a signature blob
+                int sigTableOffset = signatureOffset + i * sizeof(int);
+                uint sigRva = _formatReader.ImageReader.ReadUInt32(ref sigTableOffset);
+
+                if (sigRva != 0)
+                {
+                    try
+                    {
+                        int sigOffset = _formatReader.GetOffset((int)sigRva);
+                        signature = ParseFixupSignatureAtOffset(sigOffset);
+                    }
+                    catch
+                    {
+                        // Signature parsing can fail for unsupported fixup kinds
+                    }
+                }
+
+                entries.Add(new ParsedImportEntry(i, entryRva, signature));
+            }
+        }
+        catch
+        {
+            // Section parsing can fail for malformed images
+        }
+
+        return entries;
+    }
+
+    /// <summary>
+    /// Parse a fixup signature blob at the given image offset into an <see cref="R2RFixupSignature"/> AST.
+    /// Uses the legacy reader's signature decoder infrastructure.
+    /// </summary>
+    private R2RFixupSignature ParseFixupSignatureAtOffset(int offset)
+    {
+        // Use the existing MetadataNameFormatter.FormatSignature which creates a SignatureDecoder
+        // and calls ReadR2RSignature. We get back a ReadyToRunSignature which contains the decoded text.
+        // For the structural version, we parse the raw bytes ourselves.
+        try
+        {
+            NativeReader imageReader = _formatReader.ImageReader;
+            int readOffset = offset;
+            byte fixupByte = imageReader.ReadByte(ref readOffset);
+
+            bool moduleOverride = (fixupByte & (byte)ReadyToRunFixupKind.ModuleOverride) != 0;
+            var fixupKind = (ReadyToRunFixupKind)(fixupByte & ~(byte)ReadyToRunFixupKind.ModuleOverride);
+
+            int moduleIndex = -1;
+            if (moduleOverride)
+            {
+                uint modIdx = 0;
+                imageReader.DecodeUnsigned((uint)readOffset, ref modIdx);
+                moduleIndex = (int)modIdx;
+            }
+
+            // For the structural representation, we store the fixup kind, module index,
+            // and a null payload (full payload parsing requires the structural signature decoder).
+            // This provides the fixup kind categorization which is the most useful cross-reference.
+            return new R2RFixupSignature(fixupKind, moduleIndex, null);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     // ── Available types parsing ──────────────────────────────────────
@@ -448,27 +685,5 @@ public sealed class RawReadyToRunParser
         }
 
         return result;
-    }
-
-    // ── Helpers ──────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Decodes a runtime function index from an entry point offset using the same
-    /// encoding as MethodDefEntryPoints (compressed uint with fixup bit flags).
-    /// </summary>
-    private int GetRuntimeFunctionIndexFromOffset(int offset)
-    {
-        uint id = 0;
-        _formatReader.ImageReader.DecodeUnsigned((uint)offset, ref id);
-
-        if ((id & 1) != 0)
-        {
-            // Has fixups — runtime function index is in upper bits
-            return (int)(id >> 2);
-        }
-        else
-        {
-            return (int)(id >> 1);
-        }
     }
 }

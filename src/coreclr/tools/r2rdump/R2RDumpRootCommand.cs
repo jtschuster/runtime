@@ -80,6 +80,8 @@ namespace R2RDump
             new("--validateDebugInfo", "--val") { Description = "Validate functions reported debug info." };
         public Option<bool> RawSections { get; } =
             new("--raw-sections", "--rs") { Description = "Dump all R2R sections structurally without metadata resolution" };
+        public Option<bool> Parsed { get; } =
+            new("--parsed") { Description = "Dump cross-referenced parsed R2R data (methods with runtime functions, fixups, GC info)" };
 
         public ParseResult Result;
 
@@ -124,6 +126,7 @@ namespace R2RDump
             Options.Add(InlineSignatureBinary);
             Options.Add(ValidateDebugInfo);
             Options.Add(RawSections);
+            Options.Add(Parsed);
 
             SetAction(parseResult =>
             {

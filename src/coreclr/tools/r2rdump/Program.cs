@@ -473,6 +473,23 @@ namespace R2RDump
                     return 0;
                 }
 
+                bool parsed = Get(_command.Parsed);
+                if (parsed)
+                {
+                    foreach (string filename in inputs)
+                    {
+                        _writer.WriteLine($"File: {filename}");
+                        _writer.WriteLine();
+                        var formatReader = RawSectionsDumper.CreateFormatReader(filename);
+                        var legacyReader = new ReadyToRunReader(model, filename);
+                        var parser = new ILCompiler.Reflection.ReadyToRun.Format.RawReadyToRunParser(formatReader, legacyReader);
+                        var parsedDumper = new ParsedDumper(parser, _writer);
+                        parsedDumper.Dump();
+                        _writer.WriteLine();
+                    }
+                    return 0;
+                }
+
                 Dumper previousDumper = null;
 
                 foreach (string filename in inputs)
