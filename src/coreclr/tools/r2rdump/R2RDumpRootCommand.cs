@@ -78,6 +78,8 @@ namespace R2RDump
             new("--inlineSignatureBinary", "--isb") { Description = "Embed binary signature into its textual representation" };
         public Option<bool> ValidateDebugInfo { get; } =
             new("--validateDebugInfo", "--val") { Description = "Validate functions reported debug info." };
+        public Option<bool> RawSections { get; } =
+            new("--raw-sections", "--rs") { Description = "Dump all R2R sections structurally without metadata resolution" };
 
         public ParseResult Result;
 
@@ -121,6 +123,7 @@ namespace R2RDump
             Options.Add(SignatureBinary);
             Options.Add(InlineSignatureBinary);
             Options.Add(ValidateDebugInfo);
+            Options.Add(RawSections);
 
             SetAction(parseResult =>
             {

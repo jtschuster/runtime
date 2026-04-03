@@ -364,7 +364,7 @@ namespace R2RDump
                 case ReadyToRunSectionType.MethodDefEntryPoints:
                     if (!_model.Naked)
                     {
-                        NativeArray methodEntryPoints = new NativeArray(_r2r.ImageReader, (uint)_r2r.GetOffset(section.RelativeVirtualAddress));
+                        NativeSparseArray methodEntryPoints = new NativeSparseArray(_r2r.ImageReader, (uint)_r2r.GetOffset(section.RelativeVirtualAddress));
                         _writer.Write(methodEntryPoints.ToString());
                     }
 

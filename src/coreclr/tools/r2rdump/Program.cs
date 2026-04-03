@@ -447,6 +447,7 @@ namespace R2RDump
             try
             {
                 bool diff = Get(_command.Diff);
+                bool rawSections = Get(_command.RawSections);
                 if (inputs.Count == 0)
                     throw new ArgumentException("Input filename must be specified (--in <file>)");
 
@@ -456,6 +457,20 @@ namespace R2RDump
                 if (naked && raw)
                 {
                     throw new ArgumentException("The option '--naked' is incompatible with '--raw'");
+                }
+
+                if (rawSections)
+                {
+                    foreach (string filename in inputs)
+                    {
+                        _writer.WriteLine($"File: {filename}");
+                        _writer.WriteLine();
+                        var formatReader = RawSectionsDumper.CreateFormatReader(filename);
+                        var rawDumper = new RawSectionsDumper(formatReader, _writer);
+                        rawDumper.Dump();
+                        _writer.WriteLine();
+                    }
+                    return 0;
                 }
 
                 Dumper previousDumper = null;
