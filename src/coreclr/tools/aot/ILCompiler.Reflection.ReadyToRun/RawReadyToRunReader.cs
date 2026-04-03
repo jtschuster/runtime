@@ -31,9 +31,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
         // Section table caches (lazy)
         private string _compilerIdentifier;
-        private bool _compilerIdentifierParsed;
         private string _ownerCompositeExecutable;
-        private bool _ownerCompositeExecutableParsed;
         private RuntimeFunctionsTable _runtimeFunctions;
         private RawImportSectionsTable _importSections;
         private MethodDefEntryPointsTable _methodDefEntryPoints;
@@ -51,9 +49,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         private TypeGenericInfoMapTable _typeGenericInfoMap;
         private ComponentAssembliesTable _componentAssemblies;
         private IReadOnlyList<Guid> _manifestAssemblyMvids;
-        private bool _manifestAssemblyMvidsParsed;
         private RawManifestMetadataSection _manifestMetadata;
-        private bool _manifestMetadataParsed;
         private Dictionary<ReadyToRunSectionType, RawSectionData> _opaqueSections;
 
         public RawReadyToRunReader(IBinaryImageReader compositeReader, NativeReader imageReader)
@@ -124,32 +120,12 @@ namespace ILCompiler.Reflection.ReadyToRun
         // ── Section properties ──────────────────────────────────────────
 
         /// <summary>CompilerIdentifier (100): UTF-8 string identifying the compiler.</summary>
-        public string CompilerIdentifier
-        {
-            get
-            {
-                if (!_compilerIdentifierParsed)
-                {
-                    _compilerIdentifier = ParseCompilerIdentifier();
-                    _compilerIdentifierParsed = true;
-                }
-                return _compilerIdentifier;
-            }
-        }
+        public string CompilerIdentifier =>
+            _compilerIdentifier ??= ParseCompilerIdentifier();
 
         /// <summary>OwnerCompositeExecutable (116): filename of the owning composite image.</summary>
-        public string OwnerCompositeExecutable
-        {
-            get
-            {
-                if (!_ownerCompositeExecutableParsed)
-                {
-                    _ownerCompositeExecutable = ParseOwnerCompositeExecutable();
-                    _ownerCompositeExecutableParsed = true;
-                }
-                return _ownerCompositeExecutable;
-            }
-        }
+        public string OwnerCompositeExecutable =>
+            _ownerCompositeExecutable ??= ParseOwnerCompositeExecutable();
 
         /// <summary>RuntimeFunctions (102): sorted array of runtime function entries.</summary>
         public RuntimeFunctionsTable RuntimeFunctions =>
@@ -227,33 +203,13 @@ namespace ILCompiler.Reflection.ReadyToRun
                 (s) => ComponentAssembliesTable.Parse(this, s));
 
         /// <summary>ManifestAssemblyMvids (118): array of assembly MVIDs.</summary>
-        public IReadOnlyList<Guid> ManifestAssemblyMvids
-        {
-            get
-            {
-                if (!_manifestAssemblyMvidsParsed)
-                {
-                    _manifestAssemblyMvids = ParseManifestAssemblyMvids();
-                    _manifestAssemblyMvidsParsed = true;
-                }
-                return _manifestAssemblyMvids;
-            }
-        }
+        public IReadOnlyList<Guid> ManifestAssemblyMvids =>
+            _manifestAssemblyMvids ??= ParseManifestAssemblyMvids();
 
         /// <summary>ManifestMetadata (112): raw ECMA-335 metadata blob location.</summary>
-        public RawManifestMetadataSection ManifestMetadata
-        {
-            get
-            {
-                if (!_manifestMetadataParsed)
-                {
-                    _manifestMetadata = ParseSection(ReadyToRunSectionType.ManifestMetadata,
-                        (s) => new RawManifestMetadataSection(GetOffset(s.RelativeVirtualAddress), s.Size));
-                    _manifestMetadataParsed = true;
-                }
-                return _manifestMetadata;
-            }
-        }
+        public RawManifestMetadataSection ManifestMetadata =>
+            _manifestMetadata ??= ParseSection(ReadyToRunSectionType.ManifestMetadata,
+                (s) => new RawManifestMetadataSection(GetOffset(s.RelativeVirtualAddress), s.Size));
 
         /// <summary>
         /// Gets the raw section data for an opaque/undocumented section type.
