@@ -120,6 +120,9 @@ internal sealed class R2RDriver
             psi.Environment[envVar] = null;
         }
 
+        string commandLine = $"{TestPaths.Crossgen2Exe} {string.Join(" ", crossgen2Args)}";
+        _output.WriteLine($"  crossgen2 command: {commandLine}");
+
         using var process = Process.Start(psi)!;
 
         // Read stdout and stderr concurrently to avoid pipe buffer deadlock.
