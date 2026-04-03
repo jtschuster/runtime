@@ -111,7 +111,7 @@ In addition to the target pipelines above, also query the following pipeline for
 
 - `runtime`
 
-This pipeline is **not** a triage target — do not create issues for failures found only in `runtime`. Instead, use it to identify failures that also occur in the `runtime` pipeline (see Step 2b below).
+This pipeline is **not** a triage target — do not create issues for its failures. Instead, use it to identify crossgen2 pipeline failures that also occur in the `runtime` pipeline, which indicates they are not crossgen2-specific (see Step 2b below).
 
 ### Branch Restriction
 
@@ -175,11 +175,11 @@ For each failed `runtime` pipeline build collected in Step 1, run the same CI An
 pwsh .github/skills/ci-analysis/scripts/Get-CIStatus.ps1 -BuildId <BUILD_ID> -ShowLogs -SearchMihuBot -ContinueOnError
 ```
 
-Extract the failing test names from the `runtime` pipeline builds. Build a set of **runtime pipeline failure signatures** (fully qualified test names and error categories).
+Extract the failing test names from the `runtime` pipeline builds. Build a set of **runtime pipeline failure signatures** (fully qualified test names).
 
 Then compare the crossgen2 pipeline failures (from Step 2) against the runtime pipeline failures:
 
-- If a test failure from a crossgen2 pipeline **also appears in the `runtime` pipeline** (matching by fully qualified test name), mark that failure as a **runtime-shared failure**.
+- If a test failure from a crossgen2 pipeline **also appears in the `runtime` pipeline** (matching by fully qualified test name, regardless of error category or platform), mark that failure as a **runtime-shared failure**.
 - **Do NOT create issues for runtime-shared failures.** These failures are not specific to crossgen2 and do not warrant new crossgen2 issues.
 - Instead, collect all runtime-shared failures to be reported in the `noop` safe output (see Step 4).
 
@@ -297,7 +297,8 @@ For Option B (disabling tests), provide specific guidance:
 ## Step 5: Update Cache Memory
 
 After processing all builds, write the updated `triaged-builds.json` to `cache-memory` with:
-- Build IDs that were analyzed (both crossgen2 and runtime pipeline builds)
+- Build IDs that were analyzed from the crossgen2 target pipelines
+- Build IDs from the `runtime` cross-reference pipeline that were checked (to avoid re-analyzing them)
 - Failure signatures (test name + error category) that were triaged
 - Timestamp of this triage run
 
