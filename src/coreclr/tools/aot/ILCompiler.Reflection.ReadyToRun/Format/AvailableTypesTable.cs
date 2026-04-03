@@ -3,34 +3,34 @@
 
 using System.Collections.Generic;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Format
 {
     /// <summary>
     /// Structural projection of the AvailableTypes section.
     /// A NativeHashtable of (rid, isExported) entries per available type.
     /// No type name resolution is performed.
     /// </summary>
-    public sealed class RawAvailableTypesTable
+    public sealed class AvailableTypesTable
     {
-        public IReadOnlyList<RawAvailableTypeEntry> Entries { get; }
+        public IReadOnlyList<AvailableTypeEntry> Entries { get; }
 
-        private RawAvailableTypesTable(List<RawAvailableTypeEntry> entries)
+        private AvailableTypesTable(List<AvailableTypeEntry> entries)
         {
             Entries = entries;
         }
 
-        internal static RawAvailableTypesTable FromEntries(List<RawAvailableTypeEntry> entries)
+        internal static AvailableTypesTable FromEntries(List<AvailableTypeEntry> entries)
         {
-            return new RawAvailableTypesTable(entries);
+            return new AvailableTypesTable(entries);
         }
 
-        public static RawAvailableTypesTable Parse(RawReadyToRunReader reader, ReadyToRunSection section)
+        public static AvailableTypesTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
         {
             int sectionOffset = reader.GetOffset(section.RelativeVirtualAddress);
             NativeParser parser = new NativeParser(reader.ImageReader, (uint)sectionOffset);
             NativeHashtable hashtable = new NativeHashtable(reader.ImageReader, parser, (uint)(sectionOffset + section.Size));
             NativeHashtable.AllEntriesEnumerator enumerator = hashtable.EnumerateAllEntries();
-            var entries = new List<RawAvailableTypeEntry>();
+            var entries = new List<AvailableTypeEntry>();
 
             NativeParser curParser = enumerator.GetNext();
             while (!curParser.IsNull())
@@ -38,18 +38,18 @@ namespace ILCompiler.Reflection.ReadyToRun
                 uint rid = curParser.GetUnsigned();
                 bool isExportedType = (rid & 1) != 0;
                 rid >>= 1;
-                entries.Add(new RawAvailableTypeEntry(rid, isExportedType));
+                entries.Add(new AvailableTypeEntry(rid, isExportedType));
                 curParser = enumerator.GetNext();
             }
 
-            return new RawAvailableTypesTable(entries);
+            return new AvailableTypesTable(entries);
         }
     }
 
     /// <summary>
     /// A single entry in the AvailableTypes table.
     /// </summary>
-    public sealed class RawAvailableTypeEntry
+    public sealed class AvailableTypeEntry
     {
         /// <summary>
         /// The row ID of the type. This is a TypeDef RID if <see cref="IsExportedType"/>
@@ -60,7 +60,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         /// <summary>Whether this entry refers to an ExportedType (true) or TypeDef (false).</summary>
         public bool IsExportedType { get; }
 
-        public RawAvailableTypeEntry(uint rid, bool isExportedType)
+        public AvailableTypeEntry(uint rid, bool isExportedType)
         {
             Rid = rid;
             IsExportedType = isExportedType;

@@ -1,7 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Format
 {
     /// <summary>
     /// Structural projection of the MethodIsGenericMap section.
@@ -35,7 +35,7 @@ namespace ILCompiler.Reflection.ReadyToRun
             return (_data[byteIndex] & (1 << bitIndex)) != 0;
         }
 
-        public static MethodIsGenericMapTable Parse(RawReadyToRunReader reader, ReadyToRunSection section)
+        public static MethodIsGenericMapTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
         {
             int offset = reader.GetOffset(section.RelativeVirtualAddress);
             int count = reader.ImageReader.ReadInt32(ref offset);

@@ -3,7 +3,7 @@
 
 using System.Collections.Generic;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Format
 {
     /// <summary>
     /// Structural projection of the InliningInfo2 section (section 114, v4.1+).
@@ -11,22 +11,22 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// (identified by RID and optional module index) to a list of inliners.
     /// No method name resolution is performed.
     /// </summary>
-    public sealed class RawInliningInfo2Table
+    public sealed class InliningInfo2Table
     {
-        public IReadOnlyList<RawInliningInfo2Entry> Entries { get; }
+        public IReadOnlyList<InliningInfo2Entry> Entries { get; }
 
-        private RawInliningInfo2Table(List<RawInliningInfo2Entry> entries)
+        private InliningInfo2Table(List<InliningInfo2Entry> entries)
         {
             Entries = entries;
         }
 
-        public static RawInliningInfo2Table Parse(RawReadyToRunReader reader, ReadyToRunSection section)
+        public static InliningInfo2Table Parse(ReadyToRunReader reader, ReadyToRunSection section)
         {
             int sectionOffset = reader.GetOffset(section.RelativeVirtualAddress);
             NativeParser parser = new NativeParser(reader.ImageReader, (uint)sectionOffset);
             NativeHashtable hashtable = new NativeHashtable(reader.ImageReader, parser, (uint)(sectionOffset + section.Size));
             var enumerator = hashtable.EnumerateAllEntries();
-            var entries = new List<RawInliningInfo2Entry>();
+            var entries = new List<InliningInfo2Entry>();
 
             NativeParser curParser = enumerator.GetNext();
             while (!curParser.IsNull())
@@ -45,7 +45,7 @@ namespace ILCompiler.Reflection.ReadyToRun
                     count--;
                 }
 
-                var inliners = new List<RawInlinerRef>();
+                var inliners = new List<InlinerRef>();
                 int currentRid = 0;
 
                 while (count > 0)
@@ -64,21 +64,21 @@ namespace ILCompiler.Reflection.ReadyToRun
                         count--;
                     }
 
-                    inliners.Add(new RawInlinerRef(currentRid, inlinerHasModule, inlinerModuleIndex));
+                    inliners.Add(new InlinerRef(currentRid, inlinerHasModule, inlinerModuleIndex));
                 }
 
-                entries.Add(new RawInliningInfo2Entry(inlineeRid, inlineeHasModule, inlineeModuleIndex, inliners));
+                entries.Add(new InliningInfo2Entry(inlineeRid, inlineeHasModule, inlineeModuleIndex, inliners));
                 curParser = enumerator.GetNext();
             }
 
-            return new RawInliningInfo2Table(entries);
+            return new InliningInfo2Table(entries);
         }
     }
 
     /// <summary>
     /// A single entry in the InliningInfo2 table.
     /// </summary>
-    public sealed class RawInliningInfo2Entry
+    public sealed class InliningInfo2Entry
     {
         /// <summary>MethodDef RID of the inlinee.</summary>
         public int InlineeRid { get; }
@@ -90,9 +90,9 @@ namespace ILCompiler.Reflection.ReadyToRun
         public uint InlineeModuleIndex { get; }
 
         /// <summary>List of inliner method references.</summary>
-        public IReadOnlyList<RawInlinerRef> Inliners { get; }
+        public IReadOnlyList<InlinerRef> Inliners { get; }
 
-        public RawInliningInfo2Entry(int inlineeRid, bool inlineeHasModule, uint inlineeModuleIndex, List<RawInlinerRef> inliners)
+        public InliningInfo2Entry(int inlineeRid, bool inlineeHasModule, uint inlineeModuleIndex, List<InlinerRef> inliners)
         {
             InlineeRid = inlineeRid;
             InlineeHasModule = inlineeHasModule;
@@ -104,7 +104,7 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// <summary>
     /// A reference to an inliner method in the InliningInfo2 format.
     /// </summary>
-    public sealed class RawInlinerRef
+    public sealed class InlinerRef
     {
         /// <summary>MethodDef RID of the inliner.</summary>
         public int Rid { get; }
@@ -115,7 +115,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         /// <summary>Module index of the inliner (0 = owner module).</summary>
         public uint ModuleIndex { get; }
 
-        public RawInlinerRef(int rid, bool hasModule, uint moduleIndex)
+        public InlinerRef(int rid, bool hasModule, uint moduleIndex)
         {
             Rid = rid;
             HasModule = hasModule;

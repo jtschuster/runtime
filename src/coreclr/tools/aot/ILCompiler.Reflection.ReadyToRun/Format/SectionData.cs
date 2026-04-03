@@ -3,13 +3,13 @@
 
 using Internal.Runtime;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Format
 {
     /// <summary>
     /// Represents the raw location and size of an R2R section whose internal
     /// format is either opaque, undocumented, or not yet parsed.
     /// </summary>
-    public sealed class RawSectionData
+    public sealed class SectionData
     {
         /// <summary>The section type.</summary>
         public ReadyToRunSectionType Type { get; }
@@ -23,7 +23,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         /// <summary>File offset of the section within the image.</summary>
         public int FileOffset { get; }
 
-        public RawSectionData(ReadyToRunSectionType type, int rva, int size, int fileOffset)
+        public SectionData(ReadyToRunSectionType type, int rva, int size, int fileOffset)
         {
             Type = type;
             RelativeVirtualAddress = rva;

@@ -3,7 +3,7 @@
 
 using System.Collections.Generic;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Format
 {
     /// <summary>
     /// Structural projection of the ComponentAssemblies section.
@@ -18,7 +18,7 @@ namespace ILCompiler.Reflection.ReadyToRun
             Entries = entries;
         }
 
-        public static ComponentAssembliesTable Parse(RawReadyToRunReader reader, ReadyToRunSection section)
+        public static ComponentAssembliesTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
         {
             int offset = reader.GetOffset(section.RelativeVirtualAddress);
             int count = section.Size / ComponentAssembly.Size;

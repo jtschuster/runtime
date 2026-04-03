@@ -3,7 +3,7 @@
 
 using System.Collections.Generic;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Format
 {
     /// <summary>
     /// Structural projection of the InstanceMethodEntryPoints section.
@@ -11,22 +11,22 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// runtime function index, and optional fixup cells.
     /// No signature decoding is performed.
     /// </summary>
-    public sealed class RawInstanceMethodEntryPointsTable
+    public sealed class InstanceMethodEntryPointsTable
     {
-        public IReadOnlyList<RawInstanceMethodEntry> Entries { get; }
+        public IReadOnlyList<InstanceMethodEntry> Entries { get; }
 
-        private RawInstanceMethodEntryPointsTable(List<RawInstanceMethodEntry> entries)
+        private InstanceMethodEntryPointsTable(List<InstanceMethodEntry> entries)
         {
             Entries = entries;
         }
 
-        public static RawInstanceMethodEntryPointsTable Parse(RawReadyToRunReader reader, ReadyToRunSection section)
+        public static InstanceMethodEntryPointsTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
         {
             int sectionOffset = reader.GetOffset(section.RelativeVirtualAddress);
             NativeParser parser = new NativeParser(reader.ImageReader, (uint)sectionOffset);
             NativeHashtable hashtable = new NativeHashtable(reader.ImageReader, parser, (uint)(sectionOffset + section.Size));
             NativeHashtable.AllEntriesEnumerator enumerator = hashtable.EnumerateAllEntries();
-            var entries = new List<RawInstanceMethodEntry>();
+            var entries = new List<InstanceMethodEntry>();
 
             NativeParser curParser = enumerator.GetNext();
             while (!curParser.IsNull())
@@ -38,11 +38,11 @@ namespace ILCompiler.Reflection.ReadyToRun
                 // The signature is a variable-length blob; we can't skip it without
                 // partially decoding it. Instead, we store the blob offset and let
                 // higher-level code decode it.
-                entries.Add(new RawInstanceMethodEntry(signatureBlobOffset, lowHashcode));
+                entries.Add(new InstanceMethodEntry(signatureBlobOffset, lowHashcode));
                 curParser = enumerator.GetNext();
             }
 
-            return new RawInstanceMethodEntryPointsTable(entries);
+            return new InstanceMethodEntryPointsTable(entries);
         }
     }
 
@@ -52,7 +52,7 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// The signature must be decoded by a higher-level reader to extract the
     /// runtime function index and fixup cells.
     /// </summary>
-    public sealed class RawInstanceMethodEntry
+    public sealed class InstanceMethodEntry
     {
         /// <summary>File offset of the method signature blob.</summary>
         public int SignatureBlobOffset { get; }
@@ -60,7 +60,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         /// <summary>Low byte of the hash code used for hashtable bucketing.</summary>
         public byte LowHashcode { get; }
 
-        public RawInstanceMethodEntry(int signatureBlobOffset, byte lowHashcode)
+        public InstanceMethodEntry(int signatureBlobOffset, byte lowHashcode)
         {
             SignatureBlobOffset = signatureBlobOffset;
             LowHashcode = lowHashcode;

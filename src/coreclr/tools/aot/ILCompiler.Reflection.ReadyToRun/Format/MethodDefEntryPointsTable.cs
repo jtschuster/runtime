@@ -3,7 +3,7 @@
 
 using System.Collections.Generic;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Format
 {
     /// <summary>
     /// Structural projection of the MethodDefEntryPoints NativeArray section.
@@ -29,17 +29,18 @@ namespace ILCompiler.Reflection.ReadyToRun
         }
 
         /// <summary>
-        /// Parse a MethodDefEntryPoints section from the R2R image using a <see cref="RawReadyToRunReader"/>.
+        /// Parse a MethodDefEntryPoints section from the R2R image using a <see cref="ReadyToRunReader"/>.
         /// </summary>
-        public static MethodDefEntryPointsTable Parse(RawReadyToRunReader reader, ReadyToRunSection section)
+        public static MethodDefEntryPointsTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
         {
             return ParseCore(reader.ImageReader, reader.GetOffset(section.RelativeVirtualAddress));
         }
 
         /// <summary>
-        /// Parse a MethodDefEntryPoints section from the R2R image using a <see cref="ReadyToRunReader"/>.
+        /// Parse a MethodDefEntryPoints section from the R2R image using an
+        /// <see cref="ILCompiler.Reflection.ReadyToRun.ReadyToRunReader"/>.
         /// </summary>
-        public static MethodDefEntryPointsTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
+        public static MethodDefEntryPointsTable Parse(ILCompiler.Reflection.ReadyToRun.ReadyToRunReader reader, ReadyToRunSection section)
         {
             return ParseCore(reader.ImageReader, reader.GetOffset(section.RelativeVirtualAddress));
         }

@@ -5,23 +5,23 @@ using System.Collections.Generic;
 
 using Internal.ReadyToRunConstants;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Format
 {
     /// <summary>
     /// Structural projection of the CrossModuleInlineInfo section (section 119, v6.3+).
     /// A NativeHashtable of inlining entries with cross-module support.
     /// No method name resolution is performed.
     /// </summary>
-    public sealed class RawCrossModuleInlineInfoTable
+    public sealed class CrossModuleInlineInfoTable
     {
-        public IReadOnlyList<RawCrossModuleInlineEntry> Entries { get; }
+        public IReadOnlyList<CrossModuleInlineEntry> Entries { get; }
 
-        private RawCrossModuleInlineInfoTable(List<RawCrossModuleInlineEntry> entries)
+        private CrossModuleInlineInfoTable(List<CrossModuleInlineEntry> entries)
         {
             Entries = entries;
         }
 
-        public static RawCrossModuleInlineInfoTable Parse(RawReadyToRunReader reader, ReadyToRunSection section)
+        public static CrossModuleInlineInfoTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
         {
             bool multiModuleFormat = (reader.ReadyToRunHeader.Flags & (uint)ReadyToRunFlags.READYTORUN_FLAG_MultiModuleVersionBubble) != 0;
 
@@ -29,7 +29,7 @@ namespace ILCompiler.Reflection.ReadyToRun
             NativeParser parser = new NativeParser(reader.ImageReader, (uint)sectionOffset);
             NativeHashtable hashtable = new NativeHashtable(reader.ImageReader, parser, (uint)(sectionOffset + section.Size));
             var enumerator = hashtable.EnumerateAllEntries();
-            var entries = new List<RawCrossModuleInlineEntry>();
+            var entries = new List<CrossModuleInlineEntry>();
 
             NativeParser curParser = enumerator.GetNext();
             while (!curParser.IsNull())
@@ -49,7 +49,7 @@ namespace ILCompiler.Reflection.ReadyToRun
                     streamSize--;
                 }
 
-                var inliners = new List<RawCrossModuleInlinerRef>();
+                var inliners = new List<CrossModuleInlinerRef>();
 
                 if (hasCrossModuleInliners && streamSize > 0)
                 {
@@ -60,7 +60,7 @@ namespace ILCompiler.Reflection.ReadyToRun
                     {
                         uint inlinerIndex = curParser.GetUnsigned();
                         streamSize--;
-                        inliners.Add(new RawCrossModuleInlinerRef(isCrossModule: true, index: inlinerIndex, moduleIndex: 0));
+                        inliners.Add(new CrossModuleInlinerRef(isCrossModule: true, index: inlinerIndex, moduleIndex: 0));
                     }
                 }
 
@@ -84,22 +84,22 @@ namespace ILCompiler.Reflection.ReadyToRun
                     {
                         currentRid += inlinerDeltaAndFlag;
                     }
-                    inliners.Add(new RawCrossModuleInlinerRef(isCrossModule: false, index: currentRid, moduleIndex: moduleIndex));
+                    inliners.Add(new CrossModuleInlinerRef(isCrossModule: false, index: currentRid, moduleIndex: moduleIndex));
                 }
 
-                entries.Add(new RawCrossModuleInlineEntry(
+                entries.Add(new CrossModuleInlineEntry(
                     crossModuleInlinee, inlineeIndex, inlineeModuleIndex, inliners));
                 curParser = enumerator.GetNext();
             }
 
-            return new RawCrossModuleInlineInfoTable(entries);
+            return new CrossModuleInlineInfoTable(entries);
         }
     }
 
     /// <summary>
     /// A single entry in the CrossModuleInlineInfo table.
     /// </summary>
-    public sealed class RawCrossModuleInlineEntry
+    public sealed class CrossModuleInlineEntry
     {
         /// <summary>Whether the inlinee is a cross-module reference (ILBody import index).</summary>
         public bool IsCrossModuleInlinee { get; }
@@ -114,9 +114,9 @@ namespace ILCompiler.Reflection.ReadyToRun
         public uint InlineeModuleIndex { get; }
 
         /// <summary>List of inliner references.</summary>
-        public IReadOnlyList<RawCrossModuleInlinerRef> Inliners { get; }
+        public IReadOnlyList<CrossModuleInlinerRef> Inliners { get; }
 
-        public RawCrossModuleInlineEntry(bool isCrossModuleInlinee, uint inlineeIndex, uint inlineeModuleIndex, List<RawCrossModuleInlinerRef> inliners)
+        public CrossModuleInlineEntry(bool isCrossModuleInlinee, uint inlineeIndex, uint inlineeModuleIndex, List<CrossModuleInlinerRef> inliners)
         {
             IsCrossModuleInlinee = isCrossModuleInlinee;
             InlineeIndex = inlineeIndex;
@@ -128,7 +128,7 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// <summary>
     /// A reference to an inliner method in the CrossModuleInlineInfo format.
     /// </summary>
-    public sealed class RawCrossModuleInlinerRef
+    public sealed class CrossModuleInlinerRef
     {
         /// <summary>Whether this is a cross-module reference (ILBody import index).</summary>
         public bool IsCrossModule { get; }
@@ -142,7 +142,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         /// <summary>Module index for local inliners.</summary>
         public uint ModuleIndex { get; }
 
-        public RawCrossModuleInlinerRef(bool isCrossModule, uint index, uint moduleIndex)
+        public CrossModuleInlinerRef(bool isCrossModule, uint index, uint moduleIndex)
         {
             IsCrossModule = isCrossModule;
             Index = index;

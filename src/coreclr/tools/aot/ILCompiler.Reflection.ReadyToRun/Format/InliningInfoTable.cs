@@ -3,29 +3,29 @@
 
 using System.Collections.Generic;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Format
 {
     /// <summary>
     /// Structural projection of the InliningInfo section (v1, section 110, deprecated in 4.1).
     /// Contains an index of inlinee RIDs to nibble-encoded lists of inliner RIDs.
     /// No method name resolution is performed.
     /// </summary>
-    public sealed class RawInliningInfoTable
+    public sealed class InliningInfoTable
     {
-        public IReadOnlyList<RawInliningInfoEntry> Entries { get; }
+        public IReadOnlyList<InliningInfoEntry> Entries { get; }
 
-        private RawInliningInfoTable(List<RawInliningInfoEntry> entries)
+        private InliningInfoTable(List<InliningInfoEntry> entries)
         {
             Entries = entries;
         }
 
-        public static RawInliningInfoTable Parse(RawReadyToRunReader reader, ReadyToRunSection section)
+        public static InliningInfoTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
         {
             int startOffset = reader.GetOffset(section.RelativeVirtualAddress);
             int offset = startOffset;
             int sizeOfInlineIndex = reader.ImageReader.ReadInt32(ref offset);
             int inlineIndexEndOffset = offset + sizeOfInlineIndex;
-            var entries = new List<RawInliningInfoEntry>();
+            var entries = new List<InliningInfoEntry>();
 
             while (offset < inlineIndexEndOffset)
             {
@@ -44,17 +44,17 @@ namespace ILCompiler.Reflection.ReadyToRun
                     baseRid = currentRid;
                 }
 
-                entries.Add(new RawInliningInfoEntry(inlineeRid, inlinerRids));
+                entries.Add(new InliningInfoEntry(inlineeRid, inlinerRids));
             }
 
-            return new RawInliningInfoTable(entries);
+            return new InliningInfoTable(entries);
         }
     }
 
     /// <summary>
     /// A single entry in the v1 InliningInfo table.
     /// </summary>
-    public sealed class RawInliningInfoEntry
+    public sealed class InliningInfoEntry
     {
         /// <summary>MethodDef RID of the inlinee.</summary>
         public int InlineeRid { get; }
@@ -62,7 +62,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         /// <summary>MethodDef RIDs of the methods that inline the inlinee.</summary>
         public IReadOnlyList<int> InlinerRids { get; }
 
-        public RawInliningInfoEntry(int inlineeRid, List<int> inlinerRids)
+        public InliningInfoEntry(int inlineeRid, List<int> inlinerRids)
         {
             InlineeRid = inlineeRid;
             InlinerRids = inlinerRids;

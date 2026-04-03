@@ -3,7 +3,7 @@
 
 using Internal.ReadyToRunConstants;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Format
 {
     /// <summary>
     /// Structural projection of the TypeGenericInfoMap section.
@@ -45,7 +45,7 @@ namespace ILCompiler.Reflection.ReadyToRun
             return (ReadyToRunTypeGenericInfo)nibble;
         }
 
-        public static TypeGenericInfoMapTable Parse(RawReadyToRunReader reader, ReadyToRunSection section)
+        public static TypeGenericInfoMapTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
         {
             int offset = reader.GetOffset(section.RelativeVirtualAddress);
             int count = reader.ImageReader.ReadInt32(ref offset);

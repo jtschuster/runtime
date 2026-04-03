@@ -3,7 +3,7 @@
 
 using System.Collections.Generic;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Format
 {
     /// <summary>
     /// Structural projection of the HotColdMap section.
@@ -19,7 +19,7 @@ namespace ILCompiler.Reflection.ReadyToRun
             Entries = entries;
         }
 
-        public static HotColdMapTable Parse(RawReadyToRunReader reader, ReadyToRunSection section)
+        public static HotColdMapTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
         {
             int offset = reader.GetOffset(section.RelativeVirtualAddress);
             int count = section.Size / (2 * sizeof(int));

@@ -4,7 +4,7 @@
 using System.Collections.Generic;
 using System.Reflection.PortableExecutable;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Format
 {
     /// <summary>
     /// Structural projection of the RuntimeFunctions section.
@@ -19,7 +19,7 @@ namespace ILCompiler.Reflection.ReadyToRun
             Entries = entries;
         }
 
-        public static RuntimeFunctionsTable Parse(RawReadyToRunReader reader, ReadyToRunSection section)
+        public static RuntimeFunctionsTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
         {
             int offset = reader.GetOffset(section.RelativeVirtualAddress);
             int entrySize = reader.CalculateRuntimeFunctionSize();

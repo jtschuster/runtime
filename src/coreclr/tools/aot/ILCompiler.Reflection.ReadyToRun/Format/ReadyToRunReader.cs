@@ -8,14 +8,14 @@ using System.Reflection.PortableExecutable;
 using Internal.ReadyToRunConstants;
 using Internal.Runtime;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Format
 {
     /// <summary>
     /// A low-level, structural reader for Ready-to-Run images. Parses headers and sections
     /// without cross-referencing metadata — each section table exposes only the raw indices,
     /// RIDs, offsets, and flags encoded in that section.
     /// </summary>
-    public sealed class RawReadyToRunReader
+    public sealed class ReadyToRunReader
     {
         private readonly IBinaryImageReader _compositeReader;
         private readonly NativeReader _imageReader;
@@ -33,26 +33,26 @@ namespace ILCompiler.Reflection.ReadyToRun
         private string _compilerIdentifier;
         private string _ownerCompositeExecutable;
         private RuntimeFunctionsTable _runtimeFunctions;
-        private RawImportSectionsTable _importSections;
+        private ImportSectionsTable _importSections;
         private MethodDefEntryPointsTable _methodDefEntryPoints;
-        private RawExceptionInfoTable _exceptionInfo;
-        private RawDebugInfoTable _debugInfo;
-        private RawAvailableTypesTable _availableTypes;
-        private RawInstanceMethodEntryPointsTable _instanceMethodEntryPoints;
-        private RawInliningInfoTable _inliningInfo;
-        private RawInliningInfo2Table _inliningInfo2;
-        private RawPgoInstrumentationDataTable _pgoInstrumentationData;
-        private RawCrossModuleInlineInfoTable _crossModuleInlineInfo;
+        private ExceptionInfoTable _exceptionInfo;
+        private DebugInfoTable _debugInfo;
+        private AvailableTypesTable _availableTypes;
+        private InstanceMethodEntryPointsTable _instanceMethodEntryPoints;
+        private InliningInfoTable _inliningInfo;
+        private InliningInfo2Table _inliningInfo2;
+        private PgoInstrumentationDataTable _pgoInstrumentationData;
+        private CrossModuleInlineInfoTable _crossModuleInlineInfo;
         private HotColdMapTable _hotColdMap;
         private MethodIsGenericMapTable _methodIsGenericMap;
         private EnclosingTypeMapTable _enclosingTypeMap;
         private TypeGenericInfoMapTable _typeGenericInfoMap;
         private ComponentAssembliesTable _componentAssemblies;
         private IReadOnlyList<Guid> _manifestAssemblyMvids;
-        private RawManifestMetadataSection _manifestMetadata;
-        private Dictionary<ReadyToRunSectionType, RawSectionData> _opaqueSections;
+        private ManifestMetadataSection _manifestMetadata;
+        private Dictionary<ReadyToRunSectionType, SectionData> _opaqueSections;
 
-        public RawReadyToRunReader(IBinaryImageReader compositeReader, NativeReader imageReader)
+        public ReadyToRunReader(IBinaryImageReader compositeReader, NativeReader imageReader)
         {
             _compositeReader = compositeReader;
             _imageReader = imageReader;
@@ -133,52 +133,52 @@ namespace ILCompiler.Reflection.ReadyToRun
                 (s) => RuntimeFunctionsTable.Parse(this, s));
 
         /// <summary>ImportSections (101): array of import section descriptors.</summary>
-        public RawImportSectionsTable ImportSections =>
+        public ImportSectionsTable ImportSections =>
             _importSections ??= ParseSection(ReadyToRunSectionType.ImportSections,
-                (s) => RawImportSectionsTable.Parse(this, s));
+                (s) => ImportSectionsTable.Parse(this, s));
 
         /// <summary>MethodDefEntryPoints (103): sparse array mapping MethodDef RID → entry point.</summary>
         public MethodDefEntryPointsTable MethodDefEntryPoints =>
             _methodDefEntryPoints ??= ParseMethodDefEntryPointsFromHeaders();
 
         /// <summary>ExceptionInfo (104): array of (methodRva, ehInfoRva) pairs.</summary>
-        public RawExceptionInfoTable ExceptionInfo =>
+        public ExceptionInfoTable ExceptionInfo =>
             _exceptionInfo ??= ParseSection(ReadyToRunSectionType.ExceptionInfo,
-                (s) => RawExceptionInfoTable.Parse(this, s));
+                (s) => ExceptionInfoTable.Parse(this, s));
 
         /// <summary>DebugInfo (105): sparse array mapping runtime function ID → debug data offset.</summary>
-        public RawDebugInfoTable DebugInfo =>
+        public DebugInfoTable DebugInfo =>
             _debugInfo ??= ParseSection(ReadyToRunSectionType.DebugInfo,
-                (s) => RawDebugInfoTable.Parse(this, s));
+                (s) => DebugInfoTable.Parse(this, s));
 
         /// <summary>AvailableTypes (108): hashtable of (rid, isExported) per available type.</summary>
-        public RawAvailableTypesTable AvailableTypes =>
+        public AvailableTypesTable AvailableTypes =>
             _availableTypes ??= ParseAvailableTypesFromHeaders();
 
         /// <summary>InstanceMethodEntryPoints (109): hashtable of generic method entry points.</summary>
-        public RawInstanceMethodEntryPointsTable InstanceMethodEntryPoints =>
+        public InstanceMethodEntryPointsTable InstanceMethodEntryPoints =>
             _instanceMethodEntryPoints ??= ParseSection(ReadyToRunSectionType.InstanceMethodEntryPoints,
-                (s) => RawInstanceMethodEntryPointsTable.Parse(this, s));
+                (s) => InstanceMethodEntryPointsTable.Parse(this, s));
 
         /// <summary>InliningInfo (110): v1 inlining info (deprecated).</summary>
-        public RawInliningInfoTable InliningInfo =>
+        public InliningInfoTable InliningInfo =>
             _inliningInfo ??= ParseSection(ReadyToRunSectionType.InliningInfo,
-                (s) => RawInliningInfoTable.Parse(this, s));
+                (s) => InliningInfoTable.Parse(this, s));
 
         /// <summary>InliningInfo2 (114): v2 inlining info.</summary>
-        public RawInliningInfo2Table InliningInfo2 =>
+        public InliningInfo2Table InliningInfo2 =>
             _inliningInfo2 ??= ParseSection(ReadyToRunSectionType.InliningInfo2,
-                (s) => RawInliningInfo2Table.Parse(this, s));
+                (s) => InliningInfo2Table.Parse(this, s));
 
         /// <summary>PgoInstrumentationData (117): hashtable of PGO data entries.</summary>
-        public RawPgoInstrumentationDataTable PgoInstrumentationData =>
+        public PgoInstrumentationDataTable PgoInstrumentationData =>
             _pgoInstrumentationData ??= ParseSection(ReadyToRunSectionType.PgoInstrumentationData,
-                (s) => RawPgoInstrumentationDataTable.Parse(this, s));
+                (s) => PgoInstrumentationDataTable.Parse(this, s));
 
         /// <summary>CrossModuleInlineInfo (119): cross-module inlining data.</summary>
-        public RawCrossModuleInlineInfoTable CrossModuleInlineInfo =>
+        public CrossModuleInlineInfoTable CrossModuleInlineInfo =>
             _crossModuleInlineInfo ??= ParseSection(ReadyToRunSectionType.CrossModuleInlineInfo,
-                (s) => RawCrossModuleInlineInfoTable.Parse(this, s));
+                (s) => CrossModuleInlineInfoTable.Parse(this, s));
 
         /// <summary>HotColdMap (120): pairs of hot/cold runtime function indices.</summary>
         public HotColdMapTable HotColdMap =>
@@ -207,25 +207,25 @@ namespace ILCompiler.Reflection.ReadyToRun
             _manifestAssemblyMvids ??= ParseManifestAssemblyMvids();
 
         /// <summary>ManifestMetadata (112): raw ECMA-335 metadata blob location.</summary>
-        public RawManifestMetadataSection ManifestMetadata =>
+        public ManifestMetadataSection ManifestMetadata =>
             _manifestMetadata ??= ParseSection(ReadyToRunSectionType.ManifestMetadata,
-                (s) => new RawManifestMetadataSection(GetOffset(s.RelativeVirtualAddress), s.Size));
+                (s) => new ManifestMetadataSection(GetOffset(s.RelativeVirtualAddress), s.Size));
 
         /// <summary>
         /// Gets the raw section data for an opaque/undocumented section type.
         /// Returns null if the section is not present.
         /// </summary>
-        public RawSectionData GetOpaqueSection(ReadyToRunSectionType sectionType)
+        public SectionData GetOpaqueSection(ReadyToRunSectionType sectionType)
         {
             EnsureHeader();
-            _opaqueSections ??= new Dictionary<ReadyToRunSectionType, RawSectionData>();
+            _opaqueSections ??= new Dictionary<ReadyToRunSectionType, SectionData>();
 
             if (_opaqueSections.TryGetValue(sectionType, out var cached))
                 return cached;
 
             if (_header.Sections.TryGetValue(sectionType, out var section))
             {
-                var data = new RawSectionData(sectionType, section.RelativeVirtualAddress, section.Size, GetOffset(section.RelativeVirtualAddress));
+                var data = new SectionData(sectionType, section.RelativeVirtualAddress, section.Size, GetOffset(section.RelativeVirtualAddress));
                 _opaqueSections[sectionType] = data;
                 return data;
             }
@@ -234,15 +234,15 @@ namespace ILCompiler.Reflection.ReadyToRun
         }
 
         /// <summary>
-        /// Enumerates all sections present in the image as <see cref="RawSectionData"/>.
+        /// Enumerates all sections present in the image as <see cref="SectionData"/>.
         /// This provides a way to account for every section's RVA and size.
         /// </summary>
-        public IEnumerable<RawSectionData> EnumerateAllSections()
+        public IEnumerable<SectionData> EnumerateAllSections()
         {
             EnsureHeader();
             foreach (var kvp in _header.Sections)
             {
-                yield return new RawSectionData(kvp.Key, kvp.Value.RelativeVirtualAddress, kvp.Value.Size, GetOffset(kvp.Value.RelativeVirtualAddress));
+                yield return new SectionData(kvp.Key, kvp.Value.RelativeVirtualAddress, kvp.Value.Size, GetOffset(kvp.Value.RelativeVirtualAddress));
             }
         }
 
@@ -343,25 +343,25 @@ namespace ILCompiler.Reflection.ReadyToRun
             return null;
         }
 
-        private RawAvailableTypesTable ParseAvailableTypesFromHeaders()
+        private AvailableTypesTable ParseAvailableTypesFromHeaders()
         {
             EnsureHeader();
             if (_header.Sections.TryGetValue(ReadyToRunSectionType.AvailableTypes, out var section))
-                return RawAvailableTypesTable.Parse(this, section);
+                return AvailableTypesTable.Parse(this, section);
 
             if (_assemblyHeaders is not null)
             {
-                var allEntries = new List<RawAvailableTypeEntry>();
+                var allEntries = new List<AvailableTypeEntry>();
                 for (int i = 0; i < _assemblyHeaders.Count; i++)
                 {
                     if (_assemblyHeaders[i].Sections.TryGetValue(ReadyToRunSectionType.AvailableTypes, out section))
                     {
-                        var table = RawAvailableTypesTable.Parse(this, section);
+                        var table = AvailableTypesTable.Parse(this, section);
                         allEntries.AddRange(table.Entries);
                     }
                 }
                 if (allEntries.Count > 0)
-                    return RawAvailableTypesTable.FromEntries(allEntries);
+                    return AvailableTypesTable.FromEntries(allEntries);
             }
             return null;
         }

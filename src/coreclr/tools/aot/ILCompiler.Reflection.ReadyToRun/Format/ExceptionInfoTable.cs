@@ -3,26 +3,26 @@
 
 using System.Collections.Generic;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Format
 {
     /// <summary>
     /// Structural projection of the ExceptionInfo section.
     /// Each entry maps a method RVA to its EH info RVA.
     /// </summary>
-    public sealed class RawExceptionInfoTable
+    public sealed class ExceptionInfoTable
     {
-        public IReadOnlyList<RawExceptionInfoEntry> Entries { get; }
+        public IReadOnlyList<ExceptionInfoEntry> Entries { get; }
 
-        private RawExceptionInfoTable(List<RawExceptionInfoEntry> entries)
+        private ExceptionInfoTable(List<ExceptionInfoEntry> entries)
         {
             Entries = entries;
         }
 
-        public static RawExceptionInfoTable Parse(RawReadyToRunReader reader, ReadyToRunSection section)
+        public static ExceptionInfoTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
         {
             int offset = reader.GetOffset(section.RelativeVirtualAddress);
             int length = section.Size;
-            var entries = new List<RawExceptionInfoEntry>();
+            var entries = new List<ExceptionInfoEntry>();
 
             // Each record is 2 ints: (methodRva, ehInfoRva).
             // We read pairs until we exhaust the section.
@@ -30,11 +30,11 @@ namespace ILCompiler.Reflection.ReadyToRun
             {
                 int methodRva = reader.ImageReader.ReadInt32(ref offset);
                 int ehInfoRva = reader.ImageReader.ReadInt32(ref offset);
-                entries.Add(new RawExceptionInfoEntry(methodRva, ehInfoRva));
+                entries.Add(new ExceptionInfoEntry(methodRva, ehInfoRva));
                 length -= 2 * sizeof(int);
             }
 
-            return new RawExceptionInfoTable(entries);
+            return new ExceptionInfoTable(entries);
         }
     }
 
@@ -42,7 +42,7 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// A single entry in the ExceptionInfo table: maps a method code RVA
     /// to the RVA of its exception handling information.
     /// </summary>
-    public sealed class RawExceptionInfoEntry
+    public sealed class ExceptionInfoEntry
     {
         /// <summary>RVA of the method code.</summary>
         public int MethodRva { get; }
@@ -50,7 +50,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         /// <summary>RVA of the exception handling info.</summary>
         public int EhInfoRva { get; }
 
-        public RawExceptionInfoEntry(int methodRva, int ehInfoRva)
+        public ExceptionInfoEntry(int methodRva, int ehInfoRva)
         {
             MethodRva = methodRva;
             EhInfoRva = ehInfoRva;

@@ -1,7 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Format
 {
     /// <summary>
     /// Structural projection of the EnclosingTypeMap section.
@@ -32,7 +32,7 @@ namespace ILCompiler.Reflection.ReadyToRun
             return _enclosingTypeRids[typeDefRid - 1];
         }
 
-        public static EnclosingTypeMapTable Parse(RawReadyToRunReader reader, ReadyToRunSection section)
+        public static EnclosingTypeMapTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
         {
             int offset = reader.GetOffset(section.RelativeVirtualAddress);
             ushort count = reader.ImageReader.ReadUInt16(ref offset);

@@ -6,26 +6,26 @@ using System.Reflection.PortableExecutable;
 
 using Internal.ReadyToRunConstants;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Format
 {
     /// <summary>
     /// Structural projection of the ImportSections section.
     /// Each entry is a raw import section descriptor without decoded signatures.
     /// </summary>
-    public sealed class RawImportSectionsTable
+    public sealed class ImportSectionsTable
     {
-        public IReadOnlyList<RawImportSectionEntry> Entries { get; }
+        public IReadOnlyList<ImportSectionEntry> Entries { get; }
 
-        private RawImportSectionsTable(List<RawImportSectionEntry> entries)
+        private ImportSectionsTable(List<ImportSectionEntry> entries)
         {
             Entries = entries;
         }
 
-        public static RawImportSectionsTable Parse(RawReadyToRunReader reader, ReadyToRunSection section)
+        public static ImportSectionsTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
         {
             int offset = reader.GetOffset(section.RelativeVirtualAddress);
             int endOffset = offset + section.Size;
-            var entries = new List<RawImportSectionEntry>();
+            var entries = new List<ImportSectionEntry>();
             int index = 0;
 
             while (offset < endOffset)
@@ -51,7 +51,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
                 int entryCount = entrySize != 0 ? sectionSize / entrySize : 0;
 
-                entries.Add(new RawImportSectionEntry(
+                entries.Add(new ImportSectionEntry(
                     index++,
                     sectionRva,
                     sectionSize,
@@ -63,14 +63,14 @@ namespace ILCompiler.Reflection.ReadyToRun
                     auxiliaryDataRva));
             }
 
-            return new RawImportSectionsTable(entries);
+            return new ImportSectionsTable(entries);
         }
     }
 
     /// <summary>
     /// A single raw import section descriptor.
     /// </summary>
-    public sealed class RawImportSectionEntry
+    public sealed class ImportSectionEntry
     {
         /// <summary>Index of this import section.</summary>
         public int Index { get; }
@@ -99,7 +99,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         /// <summary>RVA of optional auxiliary data (typically GC info).</summary>
         public int AuxiliaryDataRva { get; }
 
-        public RawImportSectionEntry(
+        public ImportSectionEntry(
             int index,
             int sectionRva,
             int sectionSize,
