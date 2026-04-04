@@ -231,10 +231,23 @@ public sealed class RawReadyToRunParser
     /// </summary>
     private void ParseInstanceMethodEntryPoints(List<ParsedMethod> methods)
     {
+        // Parse all instance method signature blobs eagerly.
+        // The Format-level entries and legacy reader enumerate the same NativeHashtable
+        // in the same order, so we can match them by index.
+        var instanceMethodRefs = ParseInstanceMethodRefs();
+        int refIndex = 0;
+
         foreach (var instanceMethod in _legacyReader.InstanceMethods)
         {
             var legacyMethod = instanceMethod.Method;
             int rtFuncIdx = legacyMethod.EntryPointRuntimeFunctionId;
+
+            // Match the corresponding structural method reference by enumeration order
+            R2RMethodRef methodRef = null;
+            if (refIndex < instanceMethodRefs.Count)
+                methodRef = instanceMethodRefs[refIndex];
+            refIndex++;
+
             if (rtFuncIdx < 0)
                 continue;
 
@@ -242,15 +255,12 @@ public sealed class RawReadyToRunParser
             var coldFunctions = CollectColdRuntimeFunctions(rtFuncIdx);
             var gcInfo = ParseGcInfo(rtFuncIdx);
 
-            // Use MethodDef RID from the legacy method
             uint rid = legacyMethod.Rid;
-
-            // Get fixup cells for this method from the legacy reader's fixup data
             var fixups = CollectFixupsFromLegacyMethod(legacyMethod);
 
             methods.Add(new ParsedMethod(
                 rid: rid,
-                methodRef: null, // TODO: structural parse from signature blob
+                methodRef: methodRef,
                 entryPointRuntimeFunctionIndex: rtFuncIdx,
                 runtimeFunctions: runtimeFunctions,
                 coldRuntimeFunctions: coldFunctions,
@@ -259,6 +269,35 @@ public sealed class RawReadyToRunParser
                 isInstanceMethod: true,
                 componentIndex: 0));
         }
+    }
+
+    /// <summary>
+    /// Parse all instance method signature blobs into structural <see cref="R2RMethodRef"/> nodes.
+    /// Returns a list in the same order as <see cref="ReadyToRunReader.InstanceMethods"/>.
+    /// </summary>
+    private List<R2RMethodRef> ParseInstanceMethodRefs()
+    {
+        var result = new List<R2RMethodRef>();
+        var entries = _formatReader.InstanceMethodEntryPoints?.Entries;
+        if (entries is null)
+            return result;
+
+        foreach (var entry in entries)
+        {
+            int offset = entry.SignatureBlobOffset;
+            try
+            {
+                var decoder = CreateStructuralDecoder(offset);
+                var methodRef = decoder.ParseMethod();
+                result.Add(methodRef); // may be null on error
+            }
+            catch
+            {
+                result.Add(null);
+            }
+        }
+
+        return result;
     }
 
     /// <summary>

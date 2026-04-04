@@ -14,11 +14,13 @@ namespace R2RDump;
 internal sealed class ParsedDumper
 {
     private readonly RawReadyToRunParser _parser;
+    private readonly ReadyToRunMetadataResolver _resolver;
     private readonly TextWriter _writer;
 
-    public ParsedDumper(RawReadyToRunParser parser, TextWriter writer)
+    public ParsedDumper(RawReadyToRunParser parser, ReadyToRunMetadataResolver resolver, TextWriter writer)
     {
         _parser = parser;
+        _resolver = resolver;
         _writer = writer;
     }
 
@@ -41,11 +43,11 @@ internal sealed class ParsedDumper
             {
                 _writer.Write($"  Instance Method");
                 if (method.MethodRef != null)
-                    _writer.Write($" {method.MethodRef}");
+                    _writer.Write($" {_resolver.ResolveMethod(method.MethodRef)}");
             }
             else
             {
-                _writer.Write($"  MethodDef RID={method.Rid}");
+                _writer.Write($"  MethodDef RID={method.Rid} {_resolver.ResolveMethodDef(method.Rid)}");
             }
 
             _writer.WriteLine($"  EntryPoint=rtf#{method.EntryPointRuntimeFunctionIndex}  Component={method.ComponentIndex}");
@@ -84,7 +86,7 @@ internal sealed class ParsedDumper
                     _writer.Write($"      [{fixup.TableIndex}:{fixup.CellIndex}]");
                     if (fixup.Signature != null)
                     {
-                        _writer.Write($" {fixup.Signature}");
+                        _writer.Write($" {_resolver.ResolveFixupSignature(fixup.Signature)}");
                     }
                     _writer.WriteLine();
                 }
@@ -134,7 +136,7 @@ internal sealed class ParsedDumper
                     _writer.Write($"    [{entry.Index}] RVA=0x{entry.Rva:X4}");
                     if (entry.Signature != null)
                     {
-                        _writer.Write($" {entry.Signature}");
+                        _writer.Write($" {_resolver.ResolveFixupSignature(entry.Signature)}");
                     }
                     _writer.WriteLine();
                 }
@@ -156,7 +158,10 @@ internal sealed class ParsedDumper
         for (int i = 0; i < displayCount; i++)
         {
             var t = types[i];
-            _writer.WriteLine($"  RID={t.Rid} {(t.IsExported ? "Exported" : "TypeDef")} Component={t.ComponentIndex}");
+            string name = t.IsExported
+                ? _resolver.ResolveExportedType(t.Rid, moduleIndex: -1)
+                : _resolver.ResolveTypeDef(t.Rid, moduleIndex: -1);
+            _writer.WriteLine($"  RID={t.Rid} {(t.IsExported ? "Exported" : "TypeDef")} {name}");
         }
         if (types.Count > 50)
             _writer.WriteLine($"  ... and {types.Count - 50} more types");
