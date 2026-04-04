@@ -84,9 +84,7 @@ internal sealed class ParsedDumper
                     _writer.Write($"      [{fixup.TableIndex}:{fixup.CellIndex}]");
                     if (fixup.Signature != null)
                     {
-                        _writer.Write($" {fixup.Signature.Kind}");
-                        if (fixup.Signature.ModuleIndex >= 0)
-                            _writer.Write($" module={fixup.Signature.ModuleIndex}");
+                        _writer.Write($" {fixup.Signature}");
                     }
                     _writer.WriteLine();
                 }
@@ -136,9 +134,7 @@ internal sealed class ParsedDumper
                     _writer.Write($"    [{entry.Index}] RVA=0x{entry.Rva:X4}");
                     if (entry.Signature != null)
                     {
-                        _writer.Write($" {entry.Signature.Kind}");
-                        if (entry.Signature.ModuleIndex >= 0)
-                            _writer.Write($" module={entry.Signature.ModuleIndex}");
+                        _writer.Write($" {entry.Signature}");
                     }
                     _writer.WriteLine();
                 }

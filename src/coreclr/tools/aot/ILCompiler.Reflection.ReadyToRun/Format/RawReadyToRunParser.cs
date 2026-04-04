@@ -635,39 +635,38 @@ public sealed class RawReadyToRunParser
 
     /// <summary>
     /// Parse a fixup signature blob at the given image offset into an <see cref="R2RFixupSignature"/> AST.
-    /// Uses the legacy reader's signature decoder infrastructure.
+    /// Uses <see cref="StructuralSignatureDecoder"/> which produces structural AST nodes
+    /// (<see cref="R2RTypeNode"/>, <see cref="R2RMethodRef"/>, <see cref="R2RFieldRef"/>)
+    /// for the payload.
     /// </summary>
     private R2RFixupSignature ParseFixupSignatureAtOffset(int offset)
     {
-        // Use the existing MetadataNameFormatter.FormatSignature which creates a SignatureDecoder
-        // and calls ReadR2RSignature. We get back a ReadyToRunSignature which contains the decoded text.
-        // For the structural version, we parse the raw bytes ourselves.
         try
         {
-            NativeReader imageReader = _formatReader.ImageReader;
-            int readOffset = offset;
-            byte fixupByte = imageReader.ReadByte(ref readOffset);
-
-            bool moduleOverride = (fixupByte & (byte)ReadyToRunFixupKind.ModuleOverride) != 0;
-            var fixupKind = (ReadyToRunFixupKind)(fixupByte & ~(byte)ReadyToRunFixupKind.ModuleOverride);
-
-            int moduleIndex = -1;
-            if (moduleOverride)
-            {
-                uint modIdx = 0;
-                imageReader.DecodeUnsigned((uint)readOffset, ref modIdx);
-                moduleIndex = (int)modIdx;
-            }
-
-            // For the structural representation, we store the fixup kind, module index,
-            // and a null payload (full payload parsing requires the structural signature decoder).
-            // This provides the fixup kind categorization which is the most useful cross-reference.
-            return new R2RFixupSignature(fixupKind, moduleIndex, null);
+            var decoder = CreateStructuralDecoder(offset);
+            return decoder.ParseFixupSignature();
         }
         catch
         {
             return null;
         }
+    }
+
+    private R2RStructuralContext _structuralContext;
+
+    private StructuralSignatureDecoder CreateStructuralDecoder(int offset)
+    {
+        if (_structuralContext is null)
+        {
+            _structuralContext = new R2RStructuralContext(readerToModuleIndex: null);
+        }
+
+        var globalMetadata = _legacyReader.GetGlobalMetadata();
+        return new StructuralSignatureDecoder(
+            _structuralContext,
+            globalMetadata?.MetadataReader,
+            _legacyReader,
+            offset);
     }
 
     // ── Available types parsing ──────────────────────────────────────
