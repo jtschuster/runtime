@@ -5,7 +5,7 @@ using System.Reflection.Metadata;
 using System.Text;
 using Internal.ReadyToRunConstants;
 
-namespace ILCompiler.Reflection.ReadyToRun.Format;
+namespace ILCompiler.Reflection.ReadyToRun.Format.Parsed;
 
 /// <summary>
 /// Structural representation of a field reference in an R2R signature.

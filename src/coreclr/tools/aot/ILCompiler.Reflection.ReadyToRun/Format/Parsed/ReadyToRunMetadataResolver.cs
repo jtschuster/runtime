@@ -8,7 +8,7 @@ using System.Reflection.Metadata.Ecma335;
 using System.Text;
 using Internal.ReadyToRunConstants;
 
-namespace ILCompiler.Reflection.ReadyToRun.Format;
+namespace ILCompiler.Reflection.ReadyToRun.Format.Parsed;
 
 /// <summary>
 /// Resolves structural AST tokens (<see cref="R2RTypeNode"/>, <see cref="R2RMethodRef"/>,

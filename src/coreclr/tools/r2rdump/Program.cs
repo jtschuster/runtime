@@ -482,8 +482,8 @@ namespace R2RDump
                         _writer.WriteLine();
                         var formatReader = RawSectionsDumper.CreateFormatReader(filename);
                         var legacyReader = new ReadyToRunReader(model, filename);
-                        var parser = new ILCompiler.Reflection.ReadyToRun.Format.RawReadyToRunParser(formatReader, legacyReader);
-                        var resolver = new ILCompiler.Reflection.ReadyToRun.Format.ReadyToRunMetadataResolver(legacyReader);
+                        var parser = new ILCompiler.Reflection.ReadyToRun.Format.Parsed.RawReadyToRunParser(formatReader, legacyReader);
+                        var resolver = new ILCompiler.Reflection.ReadyToRun.Format.Parsed.ReadyToRunMetadataResolver(legacyReader);
                         var parsedDumper = new ParsedDumper(parser, resolver, _writer);
                         parsedDumper.Dump();
                         _writer.WriteLine();

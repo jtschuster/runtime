@@ -4,6 +4,7 @@
 using System.IO;
 using ILCompiler.Reflection.ReadyToRun;
 using ILCompiler.Reflection.ReadyToRun.Format;
+using ILCompiler.Reflection.ReadyToRun.Format.Parsed;
 
 namespace R2RDump;
 

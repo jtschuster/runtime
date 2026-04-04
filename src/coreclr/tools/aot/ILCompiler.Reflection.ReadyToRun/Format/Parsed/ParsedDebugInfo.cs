@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection.PortableExecutable;
 
-namespace ILCompiler.Reflection.ReadyToRun.Format;
+namespace ILCompiler.Reflection.ReadyToRun.Format.Parsed;
 
 /// <summary>
 /// Debug information for a single runtime function, parsed without depending on the

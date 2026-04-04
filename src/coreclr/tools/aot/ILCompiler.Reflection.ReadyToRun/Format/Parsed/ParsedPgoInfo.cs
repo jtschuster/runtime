@@ -7,7 +7,7 @@ using System.Linq;
 using System.Text;
 using Internal.Pgo;
 
-namespace ILCompiler.Reflection.ReadyToRun.Format;
+namespace ILCompiler.Reflection.ReadyToRun.Format.Parsed;
 
 /// <summary>
 /// PGO (Profile-Guided Optimization) instrumentation data for a single method,

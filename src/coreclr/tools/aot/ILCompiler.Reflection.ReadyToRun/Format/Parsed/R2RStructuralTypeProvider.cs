@@ -8,7 +8,7 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using Internal.ReadyToRunConstants;
 
-namespace ILCompiler.Reflection.ReadyToRun.Format;
+namespace ILCompiler.Reflection.ReadyToRun.Format.Parsed;
 
 /// <summary>
 /// Context for the structural signature decoder. Tracks the mapping from

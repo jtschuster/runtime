@@ -7,7 +7,7 @@ using System.Reflection.PortableExecutable;
 
 using Internal.ReadyToRunConstants;
 
-namespace ILCompiler.Reflection.ReadyToRun.Format;
+namespace ILCompiler.Reflection.ReadyToRun.Format.Parsed;
 
 /// <summary>
 /// Cross-references R2R section data from a <see cref="ReadyToRunReader"/> (Format) to produce

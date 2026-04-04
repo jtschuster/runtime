@@ -3,7 +3,7 @@
 
 using System.Collections.Generic;
 
-namespace ILCompiler.Reflection.ReadyToRun.Format;
+namespace ILCompiler.Reflection.ReadyToRun.Format.Parsed;
 
 /// <summary>
 /// A fully cross-referenced method from an R2R image. Contains all structural data
