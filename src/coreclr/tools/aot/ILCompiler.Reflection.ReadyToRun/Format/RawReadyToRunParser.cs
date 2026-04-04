@@ -490,12 +490,17 @@ public sealed class RawReadyToRunParser
         }
     }
 
-    private DebugInfo ParseDebugInfo(int runtimeFunctionIndex)
+    private ParsedDebugInfo ParseDebugInfo(int runtimeFunctionIndex)
     {
-        // DebugInfo requires a RuntimeFunction (old type) which we don't have.
-        // Store the offset for now; the metadata resolver can parse it later.
-        // TODO: Extract core debug info parsing into a static method that takes only image bytes.
-        return null;
+        int offset = GetDebugInfoOffset(runtimeFunctionIndex);
+        if (offset < 0)
+            return null;
+
+        return ParsedDebugInfo.Parse(
+            _legacyReader.ImageReader,
+            _legacyReader.Machine,
+            _legacyReader.ReadyToRunHeader.MajorVersion,
+            offset);
     }
 
     /// <summary>

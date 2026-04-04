@@ -109,9 +109,8 @@ internal sealed class ParsedDumper
         if (rtf.EHInfo != null)
             _writer.Write($" EHClauses={rtf.EHInfo.EHClauses.Count}");
 
-        int debugOffset = _parser.GetDebugInfoOffset(rtf.Index);
-        if (debugOffset >= 0)
-            _writer.Write($" DebugOffset=0x{debugOffset:X}");
+        if (rtf.DebugInfo != null)
+            _writer.Write($" Bounds={rtf.DebugInfo.Bounds.Count} Vars={rtf.DebugInfo.Variables.Count}");
 
         _writer.WriteLine();
     }
