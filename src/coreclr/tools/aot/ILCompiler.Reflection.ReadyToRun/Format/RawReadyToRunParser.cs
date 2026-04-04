@@ -28,6 +28,7 @@ public sealed class RawReadyToRunParser
     private IReadOnlyList<ParsedMethod> _methods;
     private IReadOnlyList<ParsedImportSection> _importSections;
     private IReadOnlyList<ParsedAvailableType> _availableTypes;
+    private IReadOnlyList<ParsedPgoInfo> _pgoInfos;
 
     // Internal data built during method resolution
     private bool[] _isEntryPoint;
@@ -94,6 +95,19 @@ public sealed class RawReadyToRunParser
 
         _availableTypes = ParseAvailableTypes();
         return _availableTypes;
+    }
+
+    /// <summary>
+    /// Gets all PGO instrumentation data entries.
+    /// Each entry contains a method reference and its PGO schema elements.
+    /// </summary>
+    public IReadOnlyList<ParsedPgoInfo> GetPgoInfos()
+    {
+        if (_pgoInfos != null)
+            return _pgoInfos;
+
+        _pgoInfos = ParsedPgoInfo.ParseAll(_formatReader, _legacyReader, CreateStructuralDecoder);
+        return _pgoInfos;
     }
 
     // ── Internal parsing methods ─────────────────────────────────────

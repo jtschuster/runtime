@@ -29,6 +29,7 @@ internal sealed class ParsedDumper
         DumpMethods();
         DumpImportSections();
         DumpAvailableTypes();
+        DumpPgoInfos();
     }
 
     private void DumpMethods()
@@ -164,6 +165,55 @@ internal sealed class ParsedDumper
         }
         if (types.Count > 50)
             _writer.WriteLine($"  ... and {types.Count - 50} more types");
+        _writer.WriteLine();
+    }
+
+    private void DumpPgoInfos()
+    {
+        var pgoInfos = _parser.GetPgoInfos();
+        if (pgoInfos.Count == 0)
+            return;
+
+        _writer.WriteLine($"=== PGO Instrumentation Data ({pgoInfos.Count} methods) ===");
+        _writer.WriteLine();
+
+        int displayCount = pgoInfos.Count > 20 ? 20 : pgoInfos.Count;
+        for (int i = 0; i < displayCount; i++)
+        {
+            var pgo = pgoInfos[i];
+            string methodName = pgo.MethodRef is not null
+                ? _resolver.ResolveMethod(pgo.MethodRef)
+                : "???";
+            _writer.WriteLine($"  {methodName}  (version={pgo.FormatVersion}, size={pgo.Size}, elements={pgo.SchemaElements.Count})");
+
+            foreach (var elem in pgo.SchemaElements)
+            {
+                _writer.Write($"    IL_{elem.ILOffset:X4} {elem.InstrumentationKind}");
+                if (elem.Count > 0)
+                    _writer.Write($" Count={elem.Count}");
+                if (elem.Other != 0)
+                    _writer.Write($" Other={elem.Other}");
+                if (elem.DataHeldInDataLong)
+                    _writer.Write($" Data={elem.DataLong}");
+                _writer.WriteLine();
+
+                if (!elem.DataHeldInDataLong && elem.DataObject is not null)
+                {
+                    int dataLimit = elem.DataObject.Length > 5 ? 5 : elem.DataObject.Length;
+                    for (int d = 0; d < dataLimit; d++)
+                    {
+                        _writer.WriteLine($"      {elem.DataObject.GetValue(d)}");
+                    }
+                    if (elem.DataObject.Length > 5)
+                        _writer.WriteLine($"      ... and {elem.DataObject.Length - 5} more");
+                }
+            }
+
+            _writer.WriteLine();
+        }
+
+        if (pgoInfos.Count > 20)
+            _writer.WriteLine($"  ... and {pgoInfos.Count - 20} more PGO entries");
         _writer.WriteLine();
     }
 }
