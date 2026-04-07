@@ -412,6 +412,9 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             if (!_header.Sections.TryGetValue(ReadyToRunSectionType.CompilerIdentifier, out var section))
                 return null;
 
+            if (section.Size <= 1)
+                return string.Empty;
+
             int offset = GetOffset(section.RelativeVirtualAddress);
             byte[] bytes = new byte[section.Size - 1]; // exclude null terminator
             for (int i = 0; i < bytes.Length; i++)
@@ -425,6 +428,9 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             EnsureHeader();
             if (!_header.Sections.TryGetValue(ReadyToRunSectionType.OwnerCompositeExecutable, out var section))
                 return null;
+
+            if (section.Size <= 1)
+                return string.Empty;
 
             int offset = GetOffset(section.RelativeVirtualAddress);
             byte[] bytes = new byte[section.Size - 1]; // exclude null terminator

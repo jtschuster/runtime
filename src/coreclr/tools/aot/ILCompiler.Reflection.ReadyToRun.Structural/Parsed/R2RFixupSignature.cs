@@ -289,8 +289,11 @@ public sealed class R2RVirtualOverrideFixupPayload : R2RFixupPayload
         Declaration.AppendTo(sb);
         sb.Append(" implType:");
         ImplementationType.AppendTo(sb);
-        sb.Append(" impl:");
-        ImplementationMethod.AppendTo(sb);
+        if (ImplementationMethod is not null)
+        {
+            sb.Append(" impl:");
+            ImplementationMethod.AppendTo(sb);
+        }
     }
 }
 
