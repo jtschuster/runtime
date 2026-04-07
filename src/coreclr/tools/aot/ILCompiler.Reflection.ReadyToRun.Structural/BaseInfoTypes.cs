@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Reflection.PortableExecutable;
 using System.Text;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Structural
 {
     public abstract class BaseUnwindInfo
     {

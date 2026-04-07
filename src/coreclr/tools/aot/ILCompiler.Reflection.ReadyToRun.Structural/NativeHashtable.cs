@@ -4,7 +4,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Structural
 {
     /// <summary>
     /// based on <a href="https://github.com/dotnet/runtime/blob/main/src/coreclr/vm/nativeformatreader.h">NativeFormat::NativeParser</a>

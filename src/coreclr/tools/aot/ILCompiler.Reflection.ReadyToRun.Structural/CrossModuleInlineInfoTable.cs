@@ -5,7 +5,6 @@ using System.Collections.Generic;
 
 using Internal.ReadyToRunConstants;
 
-using ILCompiler.Reflection.ReadyToRun;
 
 namespace ILCompiler.Reflection.ReadyToRun.Structural
 {

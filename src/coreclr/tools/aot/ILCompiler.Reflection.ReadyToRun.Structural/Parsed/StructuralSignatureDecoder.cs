@@ -6,7 +6,6 @@ using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using Internal.ReadyToRunConstants;
 
-using ILCompiler.Reflection.ReadyToRun;
 
 namespace ILCompiler.Reflection.ReadyToRun.Structural.Parsed;
 

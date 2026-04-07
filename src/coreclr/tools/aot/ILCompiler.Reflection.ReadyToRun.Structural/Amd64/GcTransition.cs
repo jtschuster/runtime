@@ -7,7 +7,7 @@ using System.Diagnostics;
 using System.Reflection.PortableExecutable;
 using System.Text;
 
-namespace ILCompiler.Reflection.ReadyToRun.Amd64
+namespace ILCompiler.Reflection.ReadyToRun.Structural.Amd64
 {
     public struct InterruptibleRange
     {

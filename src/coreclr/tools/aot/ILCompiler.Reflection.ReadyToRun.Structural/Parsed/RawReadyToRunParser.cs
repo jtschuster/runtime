@@ -7,7 +7,6 @@ using System.Reflection.PortableExecutable;
 
 using Internal.ReadyToRunConstants;
 
-using ILCompiler.Reflection.ReadyToRun;
 
 namespace ILCompiler.Reflection.ReadyToRun.Structural.Parsed;
 

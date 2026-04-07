@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Reflection.PortableExecutable;
 using System.Text;
 
-namespace ILCompiler.Reflection.ReadyToRun.x86
+namespace ILCompiler.Reflection.ReadyToRun.Structural.x86
 {
     public class NoGcRegionTable
     {

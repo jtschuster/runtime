@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection.PortableExecutable;
 
-using ILCompiler.Reflection.ReadyToRun;
 
 namespace ILCompiler.Reflection.ReadyToRun.Structural.Parsed;
 

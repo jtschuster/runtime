@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace ILCompiler.Reflection.ReadyToRun.Amd64
+namespace ILCompiler.Reflection.ReadyToRun.Structural.Amd64
 {
     /// <summary>
     /// based on <a href="https://github.com/dotnet/runtime/blob/main/src/coreclr/inc/win64unwind.h">src\inc\win64unwind.h</a> _UNWIND_OP_CODES

@@ -6,7 +6,7 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Reflection.PortableExecutable;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Structural
 {
     /// <summary>
     /// Interface for abstracting binary image reading across different formats (PE, MachO)

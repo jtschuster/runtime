@@ -8,7 +8,7 @@ using System.Text;
 using Internal.ReadyToRunConstants;
 using Internal.Runtime;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Structural
 {
     /// <summary>
     /// Structure representing an element of the assembly table in composite R2R images.

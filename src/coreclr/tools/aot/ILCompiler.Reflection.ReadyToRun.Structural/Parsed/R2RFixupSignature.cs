@@ -5,7 +5,6 @@ using System.Collections.Immutable;
 using System.Text;
 using Internal.ReadyToRunConstants;
 
-using ILCompiler.Reflection.ReadyToRun;
 
 namespace ILCompiler.Reflection.ReadyToRun.Structural.Parsed;
 

@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace ILCompiler.Reflection.ReadyToRun.x86
+namespace ILCompiler.Reflection.ReadyToRun.Structural.x86
 {
     /// <summary>
     /// based on <a href="https://github.com/dotnet/runtime/blob/main/src/coreclr/inc/gcinfotypes.h">src\inc\gcinfotypes.h</a> InfoHdrSmall

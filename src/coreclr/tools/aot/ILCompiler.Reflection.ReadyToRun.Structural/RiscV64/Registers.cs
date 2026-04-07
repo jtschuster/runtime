@@ -1,7 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-namespace ILCompiler.Reflection.ReadyToRun.RiscV64
+namespace ILCompiler.Reflection.ReadyToRun.Structural.RiscV64
 {
     public enum Registers
     {

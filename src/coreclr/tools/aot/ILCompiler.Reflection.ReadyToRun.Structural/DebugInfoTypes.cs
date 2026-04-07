@@ -4,7 +4,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Structural
 {
     public struct DebugInfoBoundsEntry
     {

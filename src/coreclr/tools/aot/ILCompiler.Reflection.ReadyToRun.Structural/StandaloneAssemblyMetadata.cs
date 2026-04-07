@@ -4,7 +4,7 @@
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Structural
 {
     /// <summary>
     /// Metadata access interface for standalone assemblies represented by MSIL PE files.

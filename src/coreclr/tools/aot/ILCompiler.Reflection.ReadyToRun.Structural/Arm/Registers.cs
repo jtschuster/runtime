@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace ILCompiler.Reflection.ReadyToRun.Arm
+namespace ILCompiler.Reflection.ReadyToRun.Structural.Arm
 {
     /// <summary>
     /// based on <a href="https://github.com/dotnet/runtime/blob/main/src/coreclr/jit/unwindarm.cpp">src/jit/unwindarm.cpp</a> mapRegNumToDwarfReg

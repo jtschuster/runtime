@@ -3,7 +3,7 @@
 
 using System.Text;
 
-namespace ILCompiler.Reflection.ReadyToRun.RiscV64
+namespace ILCompiler.Reflection.ReadyToRun.Structural.RiscV64
 {
     public class Epilog
     {

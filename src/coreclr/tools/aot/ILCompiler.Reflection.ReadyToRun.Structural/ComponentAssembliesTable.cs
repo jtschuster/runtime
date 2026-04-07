@@ -3,7 +3,6 @@
 
 using System.Collections.Generic;
 
-using ILCompiler.Reflection.ReadyToRun;
 
 namespace ILCompiler.Reflection.ReadyToRun.Structural
 {

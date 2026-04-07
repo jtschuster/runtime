@@ -5,7 +5,7 @@ using System;
 using System.Reflection.PortableExecutable;
 using System.Text;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Structural
 {
     /// <summary>
     /// based on <a href="https://github.com/dotnet/runtime/blob/main/src/coreclr/inc/gcinfotypes.h">src\inc\gcinfotypes.h</a> infoHdrAdjustConstants

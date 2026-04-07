@@ -8,7 +8,6 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 
-using ILCompiler.Reflection.ReadyToRun;
 using ILCompiler.Reflection.ReadyToRun.Structural;
 using Internal.CorConstants;
 using Internal.ReadyToRunConstants;

@@ -12,7 +12,7 @@ using System.Text;
 using Internal.Runtime;
 using Internal.ReadyToRunConstants;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Structural
 {
     public class PEExportTable
     {

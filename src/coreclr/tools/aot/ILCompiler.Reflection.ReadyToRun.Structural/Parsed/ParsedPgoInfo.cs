@@ -7,7 +7,6 @@ using System.Linq;
 using System.Text;
 using Internal.Pgo;
 
-using ILCompiler.Reflection.ReadyToRun;
 
 namespace ILCompiler.Reflection.ReadyToRun.Structural.Parsed;
 

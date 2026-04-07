@@ -5,7 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace ILCompiler.Reflection.ReadyToRun.Arm64
+namespace ILCompiler.Reflection.ReadyToRun.Structural.Arm64
 {
     public enum Registers
     {

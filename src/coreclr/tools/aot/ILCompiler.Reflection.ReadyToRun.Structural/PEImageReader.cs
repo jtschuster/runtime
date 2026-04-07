@@ -7,7 +7,7 @@ using System.Collections.Immutable;
 using System.IO;
 using System.Reflection.PortableExecutable;
 
-namespace ILCompiler.Reflection.ReadyToRun
+namespace ILCompiler.Reflection.ReadyToRun.Structural
 {
     /// <summary>
     /// Wrapper around PEReader that implements IBinaryImageReader
