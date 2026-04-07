@@ -22,10 +22,6 @@
     <BuildType Solution="Checked|*" Project="Release" />
     <Platform Solution="*|x64" Project="x64" />
   </Project>
-  <Project Path="../aot/ILCompiler.Reflection.ReadyToRun.Structural/ILCompiler.Reflection.ReadyToRun.Structural.csproj">
-    <BuildType Solution="Checked|*" Project="Release" />
-    <Platform Solution="*|x64" Project="x64" />
-  </Project>
   <Project Path="../aot/ILCompiler.TypeSystem/ILCompiler.TypeSystem.csproj">
     <Platform Solution="*|Any CPU" Project="x64" />
     <Platform Solution="*|x64" Project="x64" />
