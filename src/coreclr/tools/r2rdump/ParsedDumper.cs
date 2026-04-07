@@ -97,7 +97,7 @@ internal sealed class ParsedDumper
             _writer.WriteLine();
         }
     }
-
+#if false
     private void DumpRuntimeFunction(ParsedRuntimeFunction rtf, string indent)
     {
         _writer.Write($"{indent}rtf#{rtf.Index}: RVA=[0x{rtf.StartRva:X4}");
@@ -116,6 +116,7 @@ internal sealed class ParsedDumper
 
         _writer.WriteLine();
     }
+#endif
 
     private void DumpImportSections()
     {

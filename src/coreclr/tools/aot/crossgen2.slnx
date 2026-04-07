@@ -43,6 +43,12 @@
     <BuildType Solution="Checked|*" Project="Debug" />
     <Platform Solution="*|x64" Project="x64" />
   </Project>
+  <Project Path="ILCompiler.Reflection.ReadyToRun.Structural/ILCompiler.Reflection.ReadyToRun.Structural.csproj">
+    <BuildType Solution="Checked|*" Project="Debug" />
+  </Project>
+  <Project Path="myR2RDump/myR2RDump.csproj">
+    <BuildType Solution="Checked|*" Project="Debug" />
+  </Project>
   <Project Path="ILCompiler.TypeSystem.Tests/ILCompiler.TypeSystem.Tests.csproj">
     <Platform Solution="*|x64" Project="x64" />
   </Project>
