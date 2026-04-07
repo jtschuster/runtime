@@ -373,3 +373,5 @@ test:.cs
 *.tempLog.xml
 *.testResults.xml
 *.testStats.csv
+*.lscache
+out.txt
