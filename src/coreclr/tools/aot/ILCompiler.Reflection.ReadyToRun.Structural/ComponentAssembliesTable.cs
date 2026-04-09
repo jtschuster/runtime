@@ -14,23 +14,26 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public IReadOnlyList<ComponentAssemblyEntry> Entries { get; }
 
-        private ComponentAssembliesTable(List<ComponentAssemblyEntry> entries)
+        internal ComponentAssembliesTable(List<ComponentAssemblyEntry> entries)
         {
             Entries = entries;
         }
+    }
 
-        public static ComponentAssembliesTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
+    public partial class ReadyToRunReader
+    {
+        public ComponentAssembliesTable GetComponentAssembliesTable(ReadyToRunSectionHandle section)
         {
-            int offset = reader.GetOffset(section.RelativeVirtualAddress);
+            int offset = GetOffset(section.RelativeVirtualAddress);
             int count = section.Size / ComponentAssembly.Size;
             var entries = new List<ComponentAssemblyEntry>(count);
 
             for (int i = 0; i < count; i++)
             {
-                int corHeaderRva = reader.ImageReader.ReadInt32(ref offset);
-                int corHeaderSize = reader.ImageReader.ReadInt32(ref offset);
-                int assemblyHeaderRva = reader.ImageReader.ReadInt32(ref offset);
-                int assemblyHeaderSize = reader.ImageReader.ReadInt32(ref offset);
+                int corHeaderRva = _imageReader.ReadInt32(ref offset);
+                int corHeaderSize = _imageReader.ReadInt32(ref offset);
+                int assemblyHeaderRva = _imageReader.ReadInt32(ref offset);
+                int assemblyHeaderSize = _imageReader.ReadInt32(ref offset);
                 entries.Add(new ComponentAssemblyEntry(i, corHeaderRva, corHeaderSize, assemblyHeaderRva, assemblyHeaderSize));
             }
 

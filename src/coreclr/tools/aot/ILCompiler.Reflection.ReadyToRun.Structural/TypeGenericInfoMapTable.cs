@@ -18,7 +18,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
 
         private readonly byte[] _data;
 
-        private TypeGenericInfoMapTable(int count, byte[] data)
+        internal TypeGenericInfoMapTable(int count, byte[] data)
         {
             Count = count;
             _data = data;
@@ -38,23 +38,25 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
 
             int index = typeDefRid - 1;
             int byteIndex = index / 2;
-            // The entry for the lower RID is in the high nibble of each byte
             byte nibble = (index % 2 == 0)
                 ? (byte)((_data[byteIndex] >> 4) & 0x0F)
                 : (byte)(_data[byteIndex] & 0x0F);
 
             return (ReadyToRunTypeGenericInfo)nibble;
         }
+    }
 
-        public static TypeGenericInfoMapTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
+    public partial class ReadyToRunReader
+    {
+        public TypeGenericInfoMapTable GetTypeGenericInfoMapTable(ReadyToRunSectionHandle section)
         {
-            int offset = reader.GetOffset(section.RelativeVirtualAddress);
-            int count = reader.ImageReader.ReadInt32(ref offset);
+            int offset = GetOffset(section.RelativeVirtualAddress);
+            int count = _imageReader.ReadInt32(ref offset);
             int byteCount = (count + 1) / 2;
             byte[] data = new byte[byteCount];
 
             for (int i = 0; i < byteCount; i++)
-                data[i] = reader.ImageReader.ReadByte(ref offset);
+                data[i] = _imageReader.ReadByte(ref offset);
 
             return new TypeGenericInfoMapTable(count, data);
         }

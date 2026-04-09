@@ -15,7 +15,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
 
         private readonly ushort[] _enclosingTypeRids;
 
-        private EnclosingTypeMapTable(int count, ushort[] enclosingTypeRids)
+        internal EnclosingTypeMapTable(int count, ushort[] enclosingTypeRids)
         {
             Count = count;
             _enclosingTypeRids = enclosingTypeRids;
@@ -32,15 +32,18 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
 
             return _enclosingTypeRids[typeDefRid - 1];
         }
+    }
 
-        public static EnclosingTypeMapTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
+    public partial class ReadyToRunReader
+    {
+        public EnclosingTypeMapTable GetEnclosingTypeMapTable(ReadyToRunSectionHandle section)
         {
-            int offset = reader.GetOffset(section.RelativeVirtualAddress);
-            ushort count = reader.ImageReader.ReadUInt16(ref offset);
+            int offset = GetOffset(section.RelativeVirtualAddress);
+            ushort count = _imageReader.ReadUInt16(ref offset);
             ushort[] rids = new ushort[count];
 
             for (int i = 0; i < count; i++)
-                rids[i] = reader.ImageReader.ReadUInt16(ref offset);
+                rids[i] = _imageReader.ReadUInt16(ref offset);
 
             return new EnclosingTypeMapTable(count, rids);
         }

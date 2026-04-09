@@ -11,31 +11,46 @@ using Internal.Runtime;
 namespace ILCompiler.Reflection.ReadyToRun.Structural
 {
     /// <summary>
-    /// Structure representing an element of the assembly table in composite R2R images.
+    /// Fields common to the global R2R header and per-assembly headers in composite R2R images.
     /// </summary>
-    public class ComponentAssembly
+    public class ReadyToRunCoreHeader
     {
-        public const int Size = 4 * sizeof(int);
+        /// <summary>Flags in the header.</summary>
+        public uint Flags { get; }
 
-        public readonly int CorHeaderRVA;
-        public readonly int CorHeaderSize;
-        public readonly int AssemblyHeaderRVA;
-        public readonly int AssemblyHeaderSize;
+        /// <summary>The ReadyToRun section handles.</summary>
+        public IReadOnlyList<ReadyToRunSectionHandle> Sections { get; }
 
-        public ComponentAssembly(NativeReader imageReader, ref int curOffset)
+        public ReadyToRunCoreHeader(uint flags, IReadOnlyList<ReadyToRunSectionHandle> sections)
         {
-            CorHeaderRVA = imageReader.ReadInt32(ref curOffset);
-            CorHeaderSize = imageReader.ReadInt32(ref curOffset);
-            AssemblyHeaderRVA = imageReader.ReadInt32(ref curOffset);
-            AssemblyHeaderSize = imageReader.ReadInt32(ref curOffset);
+            Flags = flags;
+            Sections = sections;
         }
     }
 
     /// <summary>
-    /// Fields common to the global R2R header and per assembly headers in composite R2R images.
+    /// Structure representing the ReadyToRun header in a PE image.
+    /// based on <a href="https://github.com/dotnet/runtime/blob/main/src/coreclr/inc/readytorun.h">src/inc/readytorun.h</a> READYTORUN_HEADER
     /// </summary>
-    public class ReadyToRunCoreHeader
+    public class ReadyToRunHeader
     {
+        // READYTORUN_HEADER fields
+
+        /// <summary>
+        /// The expected signature of a ReadyToRun header
+        /// </summary>
+        public const uint READYTORUN_SIGNATURE = 0x00525452; // 'RTR'
+
+        public uint Signature { get; }
+
+        /// <summary>
+        /// The ReadyToRun version
+        /// </summary>
+        public ushort MajorVersion { get; set; }
+        public ushort MinorVersion { get; set; }
+
+        // READYTORUN_CORE_HEADER fields
+
         /// <summary>
         /// Flags in the header
         /// eg. PLATFORM_NEUTRAL_SOURCE, SKIP_TYPE_VALIDATION
@@ -45,116 +60,26 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         /// <summary>
         /// The ReadyToRun section RVAs and sizes
         /// </summary>
-        public IDictionary<ReadyToRunSectionType, ReadyToRunSection> Sections { get; private set; }
+        public IReadOnlyList<ReadyToRunSectionHandle> Sections { get; private set; }
 
-        public ReadyToRunCoreHeader()
+
+        public ReadyToRunHeader(uint signature, ushort majorVersion, ushort minorVersion, uint flags, IReadOnlyList<ReadyToRunSectionHandle> sections)
         {
+            Signature = signature;
+            MajorVersion = majorVersion;
+            MinorVersion = minorVersion;
+            Flags = flags;
+            Sections = sections;
         }
 
-        public ReadyToRunCoreHeader(NativeReader imageReader, ref int curOffset)
-        {
-            ParseCoreHeader(imageReader, ref curOffset);
-        }
-
-        /// <summary>
-        /// Parse core header fields common to global R2R file header and per assembly headers in composite R2R images.
-        /// </summary>
-        /// <param name="imageReader">PE Image reader</param>
-        /// <param name="curOffset">Index in the image byte array to the start of the ReadyToRun core header</param>
-        public void ParseCoreHeader(NativeReader imageReader, ref int curOffset)
-        {
-            Flags = imageReader.ReadUInt32(ref curOffset);
-            int nSections = imageReader.ReadInt32(ref curOffset);
-            Sections = new Dictionary<ReadyToRunSectionType, ReadyToRunSection>();
-
-            for (int i = 0; i < nSections; i++)
-            {
-                int type = imageReader.ReadInt32(ref curOffset);
-                var sectionType = (ReadyToRunSectionType)type;
-                if (!Enum.IsDefined(typeof(ReadyToRunSectionType), type))
-                {
-                    throw new BadImageFormatException("Warning: Invalid ReadyToRun section type");
-                }
-                int sectionStartRva = imageReader.ReadInt32(ref curOffset);
-                int sectionLength = imageReader.ReadInt32(ref curOffset);
-                Sections[sectionType] = new ReadyToRunSection(sectionType, (SectionRva)sectionStartRva, sectionLength);
-            }
-        }
-    }
-
-
-    /// <summary>
-    /// based on <a href="https://github.com/dotnet/runtime/blob/main/src/coreclr/inc/readytorun.h">src/inc/readytorun.h</a> READYTORUN_HEADER
-    /// </summary>
-    public class ReadyToRunHeader : ReadyToRunCoreHeader
-    {
-        /// <summary>
-        /// The expected signature of a ReadyToRun header
-        /// </summary>
-        public const uint READYTORUN_SIGNATURE = 0x00525452; // 'RTR'
-
-        /// <summary>
-        /// RVA to the beginning of the ReadyToRun header
-        /// </summary>
-        public int RelativeVirtualAddress { get; set; }
-
-        /// <summary>
-        /// Size of the ReadyToRun header
-        /// </summary>
-        public int Size { get; set; }
-
-        /// <summary>
-        /// Signature of the header in string and hex formats
-        /// </summary>
-        public string SignatureString { get; set; }
-        public uint Signature { get; set; }
-
-        /// <summary>
-        /// The ReadyToRun version
-        /// </summary>
-        public ushort MajorVersion { get; set; }
-        public ushort MinorVersion { get; set; }
-
-        public ReadyToRunHeader() { }
-
-        /// <summary>
-        /// Initializes the fields of the R2RHeader
-        /// </summary>
-        /// <param name="imageReader">PE Image reader</param>
-        /// <param name="rva">Relative virtual address of the ReadyToRun header</param>
-        /// <param name="curOffset">Index in the image byte array to the start of the ReadyToRun header</param>
-        /// <exception cref="BadImageFormatException">The signature must be 0x00525452</exception>
-        public ReadyToRunHeader(NativeReader imageReader, int rva, int curOffset)
-        {
-            RelativeVirtualAddress = rva;
-            int startOffset = curOffset;
-
-            byte[] signature = new byte[sizeof(uint) - 1]; // -1 removes the null character at the end of the cstring
-            imageReader.ReadSpanAt(ref curOffset, signature);
-            curOffset = startOffset;
-            SignatureString = Encoding.UTF8.GetString(signature);
-            Signature = imageReader.ReadUInt32(ref curOffset);
-            if (Signature != READYTORUN_SIGNATURE)
-            {
-                throw new System.BadImageFormatException("Incorrect R2R header signature: " + SignatureString);
-            }
-
-            MajorVersion = imageReader.ReadUInt16(ref curOffset);
-            MinorVersion = imageReader.ReadUInt16(ref curOffset);
-
-            ParseCoreHeader(imageReader, ref curOffset);
-
-            Size = curOffset - startOffset;
-        }
 
         public override string ToString()
         {
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine($"Signature: 0x{Signature:X8} ({SignatureString})");
-            sb.AppendLine($"RelativeVirtualAddress: 0x{RelativeVirtualAddress:X8}");
+            sb.AppendLine($"Signature: 0x{Signature:X8} ('R2R')");
+            // sb.AppendLine($"RelativeVirtualAddress: 0x{RelativeVirtualAddress:X8}");
             if (Signature == READYTORUN_SIGNATURE)
             {
-                sb.AppendLine($"Size: {Size} bytes");
                 sb.AppendLine($"MajorVersion: 0x{MajorVersion:X4}");
                 sb.AppendLine($"MinorVersion: 0x{MinorVersion:X4}");
                 sb.AppendLine($"Flags: 0x{Flags:X8}");
@@ -167,6 +92,58 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
                 }
             }
             return sb.ToString();
+        }
+    }
+
+    public partial class ReadyToRunReader
+    {
+        /// <summary>
+        /// Initializes the fields of the R2RHeader
+        /// </summary>
+        /// <param name="imageReader">PE Image reader</param>
+        /// <param name="rva">Relative virtual address of the ReadyToRun header</param>
+        /// <param name="curOffset">Index in the image byte array to the start of the ReadyToRun header</param>
+        /// <exception cref="BadImageFormatException">The signature must be 0x00525452</exception>
+        public static ReadyToRunHeader ReadReadyToRunHeader(NativeReader imageReader, int rva, int curOffset)
+        {
+            var Signature = imageReader.ReadUInt32(ref curOffset);
+            if (Signature != ReadyToRunHeader.READYTORUN_SIGNATURE)
+            {
+                byte[] signature = new byte[sizeof(uint) - 1];
+                imageReader.ReadSpanAt(ref curOffset, signature);
+                throw new BadImageFormatException("Incorrect R2R header signature: " + Encoding.UTF8.GetString(signature));
+            }
+
+            var MajorVersion = imageReader.ReadUInt16(ref curOffset);
+            var MinorVersion = imageReader.ReadUInt16(ref curOffset);
+
+            var coreHeader = ReadReadyToRunCoreHeader(imageReader, ref curOffset);
+            return new ReadyToRunHeader(Signature, MajorVersion, MinorVersion, coreHeader.Flags, coreHeader.Sections);
+        }
+
+        /// <summary>
+        /// Reads the core header fields (flags + sections) shared by both the global header
+        /// and per-assembly headers in composite R2R images.
+        /// </summary>
+        public static ReadyToRunCoreHeader ReadReadyToRunCoreHeader(NativeReader imageReader, ref int curOffset)
+        {
+            uint flags = imageReader.ReadUInt32(ref curOffset);
+            int nSections = imageReader.ReadInt32(ref curOffset);
+            var sections = new List<ReadyToRunSectionHandle>(nSections);
+
+            for (int i = 0; i < nSections; i++)
+            {
+                int type = imageReader.ReadInt32(ref curOffset);
+                var sectionType = (ReadyToRunSectionType)type;
+                if (!Enum.IsDefined(typeof(ReadyToRunSectionType), type))
+                {
+                    throw new BadImageFormatException("Warning: Invalid ReadyToRun section type");
+                }
+                int sectionStartRva = imageReader.ReadInt32(ref curOffset);
+                int sectionLength = imageReader.ReadInt32(ref curOffset);
+                sections.Add(new ReadyToRunSectionHandle(sectionType, (SectionRva)sectionStartRva, sectionLength));
+            }
+            return new ReadyToRunCoreHeader(flags, sections);
         }
     }
 }

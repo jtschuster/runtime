@@ -10,61 +10,16 @@ using Internal.ReadyToRunConstants;
 namespace ILCompiler.Reflection.ReadyToRun.Structural
 {
     /// <summary>
-    /// Structural projection of the ImportSections section.
+    /// Structural projection of the ImportsTable section.
     /// Each entry is a raw import section descriptor without decoded signatures.
     /// </summary>
-    public sealed class ImportSectionsTable
+    public sealed class ImportSectionsTableSection
     {
         public IReadOnlyList<ImportSectionEntry> Entries { get; }
 
-        private ImportSectionsTable(List<ImportSectionEntry> entries)
+        internal ImportSectionsTableSection(List<ImportSectionEntry> entries)
         {
             Entries = entries;
-        }
-
-        public static ImportSectionsTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
-        {
-            int offset = reader.GetOffset(section.RelativeVirtualAddress);
-            int endOffset = offset + section.Size;
-            var entries = new List<ImportSectionEntry>();
-            int index = 0;
-
-            while (offset < endOffset)
-            {
-                int sectionRva = reader.ImageReader.ReadInt32(ref offset);
-                int sectionSize = reader.ImageReader.ReadInt32(ref offset);
-                var flags = (ReadyToRunImportSectionFlags)reader.ImageReader.ReadUInt16(ref offset);
-                var type = (ReadyToRunImportSectionType)reader.ImageReader.ReadByte(ref offset);
-                byte entrySize = reader.ImageReader.ReadByte(ref offset);
-
-                if (entrySize == 0)
-                {
-                    entrySize = reader.Machine switch
-                    {
-                        Machine.I386 or Machine.ArmThumb2 => 4,
-                        Machine.Amd64 or Machine.Arm64 or Machine.LoongArch64 or Machine.RiscV64 => 8,
-                        _ => throw new System.NotImplementedException(reader.Machine.ToString()),
-                    };
-                }
-
-                int signatureRva = reader.ImageReader.ReadInt32(ref offset);
-                int auxiliaryDataRva = reader.ImageReader.ReadInt32(ref offset);
-
-                int entryCount = entrySize != 0 ? sectionSize / entrySize : 0;
-
-                entries.Add(new ImportSectionEntry(
-                    index++,
-                    (ImportSlotTableHandle)sectionRva,
-                    sectionSize,
-                    flags,
-                    type,
-                    entrySize,
-                    entryCount,
-                    (SignatureTableHandle)signatureRva,
-                    (AuxiliaryDataTableHandle)auxiliaryDataRva));
-            }
-
-            return new ImportSectionsTable(entries);
         }
     }
 
@@ -122,6 +77,55 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             AuxiliaryDataRva = auxiliaryDataRva;
         }
     }
+
+    public partial class ReadyToRunReader
+    {
+        public ImportSectionsTableSection GetImportSectionsTableSection(ReadyToRunSectionHandle section)
+        {
+            int offset = this.GetOffset(section.RelativeVirtualAddress);
+            int endOffset = offset + section.Size;
+            var entries = new List<ImportSectionEntry>();
+            int index = 0;
+
+            while (offset < endOffset)
+            {
+                int sectionRva = this.ImageReader.ReadInt32(ref offset);
+                int sectionSize = this.ImageReader.ReadInt32(ref offset);
+                var flags = (ReadyToRunImportSectionFlags)this.ImageReader.ReadUInt16(ref offset);
+                var type = (ReadyToRunImportSectionType)this.ImageReader.ReadByte(ref offset);
+                byte entrySize = this.ImageReader.ReadByte(ref offset);
+
+                if (entrySize == 0)
+                {
+                    entrySize = this.Machine switch
+                    {
+                        Machine.I386 or Machine.ArmThumb2 => 4,
+                        Machine.Amd64 or Machine.Arm64 or Machine.LoongArch64 or Machine.RiscV64 => 8,
+                        _ => throw new System.NotImplementedException(this.Machine.ToString()),
+                    };
+                }
+
+                int signatureRva = this.ImageReader.ReadInt32(ref offset);
+                int auxiliaryDataRva = this.ImageReader.ReadInt32(ref offset);
+
+                int entryCount = entrySize != 0 ? sectionSize / entrySize : 0;
+
+                entries.Add(new ImportSectionEntry(
+                    index++,
+                    (ImportSlotTableHandle)sectionRva,
+                    sectionSize,
+                    flags,
+                    type,
+                    entrySize,
+                    entryCount,
+                    (SignatureTableHandle)signatureRva,
+                    (AuxiliaryDataTableHandle)auxiliaryDataRva));
+            }
+
+            return new ImportSectionsTableSection(entries);
+        }
+    }
+
     public enum SignatureHandle {}
     public enum SignatureTableHandle {}
     public enum ImportSlotTableHandle {}

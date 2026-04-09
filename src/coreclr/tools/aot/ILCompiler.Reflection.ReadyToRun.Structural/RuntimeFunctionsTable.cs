@@ -15,26 +15,29 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public IReadOnlyList<RuntimeFunctionEntry> Entries { get; }
 
-        private RuntimeFunctionsTable(List<RuntimeFunctionEntry> entries)
+        internal RuntimeFunctionsTable(List<RuntimeFunctionEntry> entries)
         {
             Entries = entries;
         }
+    }
 
-        public static RuntimeFunctionsTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
+    public partial class ReadyToRunReader
+    {
+        public RuntimeFunctionsTable GetRuntimeFunctionsTable(ReadyToRunSectionHandle section)
         {
-            int offset = reader.GetOffset(section.RelativeVirtualAddress);
-            int entrySize = reader.CalculateRuntimeFunctionSize();
+            int offset = GetOffset(section.RelativeVirtualAddress);
+            int entrySize = CalculateRuntimeFunctionSize();
             int count = section.Size / entrySize;
-            bool isAmd64 = reader.Machine == Machine.Amd64;
+            bool isAmd64 = Machine == Machine.Amd64;
             var entries = new List<RuntimeFunctionEntry>(count);
 
             for (int i = 0; i < count; i++)
             {
-                var startRva = (CodeRva)reader.ImageReader.ReadInt32(ref offset);
+                var startRva = (CodeRva)_imageReader.ReadInt32(ref offset);
                 CodeRva? endRva = null;
                 if (isAmd64)
-                    endRva = (CodeRva)reader.ImageReader.ReadInt32(ref offset);
-                var unwindRva = (UnwindInfoHandle)reader.ImageReader.ReadInt32(ref offset);
+                    endRva = (CodeRva)_imageReader.ReadInt32(ref offset);
+                var unwindRva = (UnwindInfoHandle)_imageReader.ReadInt32(ref offset);
                 entries.Add(new RuntimeFunctionEntry(i, startRva, endRva, unwindRva));
             }
 

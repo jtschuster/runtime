@@ -47,12 +47,23 @@ for (int i = 0; i < moduleNames.Length; i++)
 Console.WriteLine();
 
 // Dump imports
-ImportSectionsTable importSections = reader.ImportSections;
-if (importSections is null)
+ReadyToRunSectionHandle? importSectionsHandle = null;
+foreach (var s in reader.Sections)
+{
+    if (s.Type == ReadyToRunSectionType.ImportSections)
+    {
+        importSectionsHandle = s;
+        break;
+    }
+}
+
+if (importSectionsHandle is null)
 {
     Console.WriteLine("No import sections found.");
     return 0;
 }
+
+ImportSectionsTableSection importSections = reader.GetImportSectionsTableSection(importSectionsHandle.Value);
 
 Console.WriteLine($"=== Import Sections ({importSections.Entries.Count}) ===");
 foreach (ImportSectionEntry section in importSections.Entries)
@@ -486,7 +497,17 @@ static string[] BuildModuleNameTable(StructuralReader reader, PEReader peReader,
         mainAssemblyRefCount = mainMetadata.GetTableRowCount(TableIndex.AssemblyRef);
     }
 
-    ManifestMetadataSection manifest = reader.ManifestMetadata;
+    ReadyToRunSectionHandle? manifestHandle = null;
+    foreach (var s in reader.Sections)
+    {
+        if (s.Type == ReadyToRunSectionType.ManifestMetadata)
+        {
+            manifestHandle = s;
+            break;
+        }
+    }
+
+    ManifestMetadataSection manifest = manifestHandle is not null ? reader.GetManifestMetadataSection(manifestHandle.Value) : null;
     int manifestAssemblyRefCount = 0;
     MetadataReader manifestReader = null;
     if (manifest is not null)

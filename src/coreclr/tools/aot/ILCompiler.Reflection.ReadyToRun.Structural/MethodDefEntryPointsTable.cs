@@ -16,30 +16,18 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public IReadOnlyList<MethodDefEntry> Entries { get; }
 
-        private MethodDefEntryPointsTable(List<MethodDefEntry> entries)
+        internal MethodDefEntryPointsTable(List<MethodDefEntry> entries)
         {
             Entries = entries;
         }
+    }
 
-        /// <summary>
-        /// Create a table from a pre-built list of entries (used for composite aggregation).
-        /// </summary>
-        internal static MethodDefEntryPointsTable FromEntries(List<MethodDefEntry> entries)
+    public partial class ReadyToRunReader
+    {
+        public MethodDefEntryPointsTable GetMethodDefEntryPointsTable(ReadyToRunSectionHandle section)
         {
-            return new MethodDefEntryPointsTable(entries);
-        }
-
-        /// <summary>
-        /// Parse a MethodDefEntryPoints section from the R2R image using a <see cref="ReadyToRunReader"/>.
-        /// </summary>
-        public static MethodDefEntryPointsTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
-        {
-            return ParseCore(reader.ImageReader, reader.GetOffset(section.RelativeVirtualAddress));
-        }
-
-        private static MethodDefEntryPointsTable ParseCore(NativeReader imageReader, int sectionOffset)
-        {
-            NativeArray methodEntryPoints = new NativeArray(imageReader, (uint)sectionOffset);
+            int sectionOffset = GetOffset(section.RelativeVirtualAddress);
+            NativeArray methodEntryPoints = new NativeArray(_imageReader, (uint)sectionOffset);
             uint count = methodEntryPoints.GetCount();
 
             var entries = new List<MethodDefEntry>((int)count);
@@ -48,25 +36,20 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             {
                 int offset = 0;
                 if (!methodEntryPoints.TryGetAt(rid - 1, ref offset))
-                {
                     continue;
-                }
 
-                // Decode the entry point: compressed uint with RuntimeFunction index + fixup flag
                 uint id = 0;
-                offset = (int)imageReader.DecodeUnsigned((uint)offset, ref id);
+                offset = (int)_imageReader.DecodeUnsigned((uint)offset, ref id);
 
                 int? fixupOffset = null;
                 RuntimeFunctionIndex runtimeFunctionIndex;
 
                 if ((id & 1) != 0)
                 {
-                    // Has fixups
                     if ((id & 2) != 0)
                     {
-                        // Fixup list uses a backward offset
                         uint val = 0;
-                        imageReader.DecodeUnsigned((uint)offset, ref val);
+                        _imageReader.DecodeUnsigned((uint)offset, ref val);
                         offset -= (int)val;
                     }
 
@@ -78,11 +61,10 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
                     runtimeFunctionIndex = (RuntimeFunctionIndex)(id >> 1);
                 }
 
-                // Parse the fixup delay list (nibble-encoded import section/slot pairs)
                 var fixupCells = new List<FixupCellRef>();
                 if (fixupOffset.HasValue)
                 {
-                    NibbleReader nibbleReader = new NibbleReader(imageReader, fixupOffset.Value);
+                    NibbleReader nibbleReader = new NibbleReader(_imageReader, fixupOffset.Value);
                     uint curTableIndex = nibbleReader.ReadUInt();
 
                     while (true)

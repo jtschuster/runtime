@@ -16,7 +16,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
 
         private readonly byte[] _data;
 
-        private MethodIsGenericMapTable(int count, byte[] data)
+        internal MethodIsGenericMapTable(int count, byte[] data)
         {
             Count = count;
             _data = data;
@@ -35,16 +35,19 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             int bitIndex = index % 8;
             return (_data[byteIndex] & (1 << bitIndex)) != 0;
         }
+    }
 
-        public static MethodIsGenericMapTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
+    public partial class ReadyToRunReader
+    {
+        public MethodIsGenericMapTable GetMethodIsGenericMapTable(ReadyToRunSectionHandle section)
         {
-            int offset = reader.GetOffset(section.RelativeVirtualAddress);
-            int count = reader.ImageReader.ReadInt32(ref offset);
+            int offset = GetOffset(section.RelativeVirtualAddress);
+            int count = _imageReader.ReadInt32(ref offset);
             int byteCount = (count + 7) / 8;
             byte[] data = new byte[byteCount];
 
             for (int i = 0; i < byteCount; i++)
-                data[i] = reader.ImageReader.ReadByte(ref offset);
+                data[i] = _imageReader.ReadByte(ref offset);
 
             return new MethodIsGenericMapTable(count, data);
         }

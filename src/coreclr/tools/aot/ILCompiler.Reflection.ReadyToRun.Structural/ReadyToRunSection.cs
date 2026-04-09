@@ -7,7 +7,7 @@ using Internal.Runtime;
 
 namespace ILCompiler.Reflection.ReadyToRun.Structural
 {
-    public struct ReadyToRunSection
+    public struct ReadyToRunSectionHandle
     {
         /// <summary>
         /// The ReadyToRun section type
@@ -24,7 +24,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         /// </summary>
         public int Size { get; set; }
 
-        public ReadyToRunSection(ReadyToRunSectionType type, SectionRva rva, int size)
+        public ReadyToRunSectionHandle(ReadyToRunSectionType type, SectionRva rva, int size)
         {
             Type = type;
             RelativeVirtualAddress = rva;

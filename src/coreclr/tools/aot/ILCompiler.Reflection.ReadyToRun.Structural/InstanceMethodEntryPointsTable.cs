@@ -16,16 +16,19 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public IReadOnlyList<InstanceMethodEntry> Entries { get; }
 
-        private InstanceMethodEntryPointsTable(List<InstanceMethodEntry> entries)
+        internal InstanceMethodEntryPointsTable(List<InstanceMethodEntry> entries)
         {
             Entries = entries;
         }
+    }
 
-        public static InstanceMethodEntryPointsTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
+    public partial class ReadyToRunReader
+    {
+        public InstanceMethodEntryPointsTable GetInstanceMethodEntryPointsTable(ReadyToRunSectionHandle section)
         {
-            int sectionOffset = reader.GetOffset(section.RelativeVirtualAddress);
-            NativeParser parser = new NativeParser(reader.ImageReader, (uint)sectionOffset);
-            NativeHashtable hashtable = new NativeHashtable(reader.ImageReader, parser, (uint)(sectionOffset + section.Size));
+            int sectionOffset = GetOffset(section.RelativeVirtualAddress);
+            NativeParser parser = new NativeParser(_imageReader, (uint)sectionOffset);
+            NativeHashtable hashtable = new NativeHashtable(_imageReader, parser, (uint)(sectionOffset + section.Size));
             NativeHashtable.AllEntriesEnumerator enumerator = hashtable.EnumerateAllEntries();
             var entries = new List<InstanceMethodEntry>();
 
@@ -35,10 +38,6 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
                 int signatureBlobOffset = (int)curParser.Offset;
                 byte lowHashcode = curParser.LowHashcode;
 
-                // We need to skip past the signature to find the entrypoint encoding.
-                // The signature is a variable-length blob; we can't skip it without
-                // partially decoding it. Instead, we store the blob offset and let
-                // higher-level code decode it.
                 entries.Add(new InstanceMethodEntry(signatureBlobOffset, lowHashcode));
                 curParser = enumerator.GetNext();
             }

@@ -15,25 +15,28 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public IReadOnlyList<InliningInfoEntry> Entries { get; }
 
-        private InliningInfoTable(List<InliningInfoEntry> entries)
+        internal InliningInfoTable(List<InliningInfoEntry> entries)
         {
             Entries = entries;
         }
+    }
 
-        public static InliningInfoTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
+    public partial class ReadyToRunReader
+    {
+        public InliningInfoTable GetInliningInfoTable(ReadyToRunSectionHandle section)
         {
-            int startOffset = reader.GetOffset(section.RelativeVirtualAddress);
+            int startOffset = GetOffset(section.RelativeVirtualAddress);
             int offset = startOffset;
-            int sizeOfInlineIndex = reader.ImageReader.ReadInt32(ref offset);
+            int sizeOfInlineIndex = _imageReader.ReadInt32(ref offset);
             int inlineIndexEndOffset = offset + sizeOfInlineIndex;
             var entries = new List<InliningInfoEntry>();
 
             while (offset < inlineIndexEndOffset)
             {
-                int inlineeRid = reader.ImageReader.ReadInt32(ref offset);
-                int inlinersRelativeOffset = reader.ImageReader.ReadInt32(ref offset);
+                int inlineeRid = _imageReader.ReadInt32(ref offset);
+                int inlinersRelativeOffset = _imageReader.ReadInt32(ref offset);
 
-                var nibbleReader = new NibbleReader(reader.ImageReader, inlineIndexEndOffset + inlinersRelativeOffset);
+                var nibbleReader = new NibbleReader(_imageReader, inlineIndexEndOffset + inlinersRelativeOffset);
                 uint sameModuleCount = nibbleReader.ReadUInt();
 
                 var inlinerRids = new List<int>();

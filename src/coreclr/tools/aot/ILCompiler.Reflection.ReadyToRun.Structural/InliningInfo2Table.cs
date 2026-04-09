@@ -16,16 +16,19 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public IReadOnlyList<InliningInfo2Entry> Entries { get; }
 
-        private InliningInfo2Table(List<InliningInfo2Entry> entries)
+        internal InliningInfo2Table(List<InliningInfo2Entry> entries)
         {
             Entries = entries;
         }
+    }
 
-        public static InliningInfo2Table Parse(ReadyToRunReader reader, ReadyToRunSection section)
+    public partial class ReadyToRunReader
+    {
+        public InliningInfo2Table GetInliningInfo2Table(ReadyToRunSectionHandle section)
         {
-            int sectionOffset = reader.GetOffset(section.RelativeVirtualAddress);
-            NativeParser parser = new NativeParser(reader.ImageReader, (uint)sectionOffset);
-            NativeHashtable hashtable = new NativeHashtable(reader.ImageReader, parser, (uint)(sectionOffset + section.Size));
+            int sectionOffset = GetOffset(section.RelativeVirtualAddress);
+            NativeParser parser = new NativeParser(_imageReader, (uint)sectionOffset);
+            NativeHashtable hashtable = new NativeHashtable(_imageReader, parser, (uint)(sectionOffset + section.Size));
             var enumerator = hashtable.EnumerateAllEntries();
             var entries = new List<InliningInfo2Entry>();
 

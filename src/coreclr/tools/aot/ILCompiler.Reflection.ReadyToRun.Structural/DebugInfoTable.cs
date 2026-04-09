@@ -14,15 +14,18 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public IReadOnlyList<DebugInfoEntry> Entries { get; }
 
-        private DebugInfoTable(List<DebugInfoEntry> entries)
+        internal DebugInfoTable(List<DebugInfoEntry> entries)
         {
             Entries = entries;
         }
+    }
 
-        public static DebugInfoTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
+    public partial class ReadyToRunReader
+    {
+        public DebugInfoTable GetDebugInfoTable(ReadyToRunSectionHandle section)
         {
-            int sectionOffset = reader.GetOffset(section.RelativeVirtualAddress);
-            NativeArray debugInfoArray = new NativeArray(reader.ImageReader, (uint)sectionOffset);
+            int sectionOffset = GetOffset(section.RelativeVirtualAddress);
+            NativeArray debugInfoArray = new NativeArray(_imageReader, (uint)sectionOffset);
             uint count = debugInfoArray.GetCount();
             var entries = new List<DebugInfoEntry>();
 

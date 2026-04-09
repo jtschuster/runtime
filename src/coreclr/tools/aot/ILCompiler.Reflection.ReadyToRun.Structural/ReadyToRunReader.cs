@@ -47,27 +47,8 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         private List<AssemblyReferenceHandle> _manifestReferences;
         private MetadataReader _manifestReader;
 
-        // Section table caches (lazy)
-        private string _compilerIdentifier;
-        private string _ownerCompositeExecutable;
-        private RuntimeFunctionsTable _runtimeFunctions;
-        private ImportSectionsTable _importSections;
-        private MethodDefEntryPointsTable _methodDefEntryPoints;
-        private ExceptionInfoTable _exceptionInfo;
-        private DebugInfoTable _debugInfo;
-        private AvailableTypesTable _availableTypes;
-        private InstanceMethodEntryPointsTable _instanceMethodEntryPoints;
-        private InliningInfoTable _inliningInfo;
-        private InliningInfo2Table _inliningInfo2;
-        private PgoInstrumentationDataTable _pgoInstrumentationData;
-        private CrossModuleInlineInfoTable _crossModuleInlineInfo;
-        private HotColdMapTable _hotColdMap;
-        private MethodIsGenericMapTable _methodIsGenericMap;
-        private EnclosingTypeMapTable _enclosingTypeMap;
-        private TypeGenericInfoMapTable _typeGenericInfoMap;
-        private ComponentAssembliesTable _componentAssemblies;
+        // Misc caches
         private IReadOnlyList<Guid> _manifestAssemblyMvids;
-        private ManifestMetadataSection _manifestMetadata;
         private Dictionary<ReadyToRunSectionType, SectionData> _opaqueSections;
 
         public ReadyToRunReader(IBinaryImageReader compositeReader, NativeReader imageReader, byte[] image, string filename = null)
@@ -172,97 +153,33 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
 
         // ── Section properties ──────────────────────────────────────────
 
-        /// <summary>CompilerIdentifier (100): UTF-8 string identifying the compiler.</summary>
-        public string CompilerIdentifier =>
-            _compilerIdentifier ??= ParseCompilerIdentifier();
+        private bool TryFindSection(IReadOnlyList<ReadyToRunSectionHandle> sections, ReadyToRunSectionType sectionType, out ReadyToRunSectionHandle section)
+        {
+            for (int i = 0; i < sections.Count; i++)
+            {
+                if (sections[i].Type == sectionType)
+                {
+                    section = sections[i];
+                    return true;
+                }
+            }
+            section = default;
+            return false;
+        }
 
-        /// <summary>OwnerCompositeExecutable (116): filename of the owning composite image.</summary>
-        public string OwnerCompositeExecutable =>
-            _ownerCompositeExecutable ??= ParseOwnerCompositeExecutable();
-
-        /// <summary>RuntimeFunctions (102): sorted array of runtime function entries.</summary>
-        public RuntimeFunctionsTable RuntimeFunctions =>
-            _runtimeFunctions ??= ParseSection(ReadyToRunSectionType.RuntimeFunctions,
-                (s) => RuntimeFunctionsTable.Parse(this, s));
-
-        /// <summary>ImportSections (101): array of import section descriptors.</summary>
-        public ImportSectionsTable ImportSections =>
-            _importSections ??= ParseSection(ReadyToRunSectionType.ImportSections,
-                (s) => ImportSectionsTable.Parse(this, s));
-
-        /// <summary>MethodDefEntryPoints (103): sparse array mapping MethodDef RID → entry point.</summary>
-        public MethodDefEntryPointsTable MethodDefEntryPoints =>
-            _methodDefEntryPoints ??= ParseMethodDefEntryPointsFromHeaders();
-
-        /// <summary>ExceptionInfo (104): array of (methodRva, ehInfoRva) pairs.</summary>
-        public ExceptionInfoTable ExceptionInfo =>
-            _exceptionInfo ??= ParseSection(ReadyToRunSectionType.ExceptionInfo,
-                (s) => ExceptionInfoTable.Parse(this, s));
-
-        /// <summary>DebugInfo (105): sparse array mapping runtime function ID → debug data offset.</summary>
-        public DebugInfoTable DebugInfo =>
-            _debugInfo ??= ParseSection(ReadyToRunSectionType.DebugInfo,
-                (s) => DebugInfoTable.Parse(this, s));
-
-        /// <summary>AvailableTypes (108): hashtable of (rid, isExported) per available type.</summary>
-        public AvailableTypesTable AvailableTypes =>
-            _availableTypes ??= ParseAvailableTypesFromHeaders();
-
-        /// <summary>InstanceMethodEntryPoints (109): hashtable of generic method entry points.</summary>
-        public InstanceMethodEntryPointsTable InstanceMethodEntryPoints =>
-            _instanceMethodEntryPoints ??= ParseSection(ReadyToRunSectionType.InstanceMethodEntryPoints,
-                (s) => InstanceMethodEntryPointsTable.Parse(this, s));
-
-        /// <summary>InliningInfo (110): v1 inlining info (deprecated).</summary>
-        public InliningInfoTable InliningInfo =>
-            _inliningInfo ??= ParseSection(ReadyToRunSectionType.InliningInfo,
-                (s) => InliningInfoTable.Parse(this, s));
-
-        /// <summary>InliningInfo2 (114): v2 inlining info.</summary>
-        public InliningInfo2Table InliningInfo2 =>
-            _inliningInfo2 ??= ParseSection(ReadyToRunSectionType.InliningInfo2,
-                (s) => InliningInfo2Table.Parse(this, s));
-
-        /// <summary>PgoInstrumentationData (117): hashtable of PGO data entries.</summary>
-        public PgoInstrumentationDataTable PgoInstrumentationData =>
-            _pgoInstrumentationData ??= ParseSection(ReadyToRunSectionType.PgoInstrumentationData,
-                (s) => PgoInstrumentationDataTable.Parse(this, s));
-
-        /// <summary>CrossModuleInlineInfo (119): cross-module inlining data.</summary>
-        public CrossModuleInlineInfoTable CrossModuleInlineInfo =>
-            _crossModuleInlineInfo ??= ParseSection(ReadyToRunSectionType.CrossModuleInlineInfo,
-                (s) => CrossModuleInlineInfoTable.Parse(this, s));
-
-        /// <summary>HotColdMap (120): pairs of hot/cold runtime function indices.</summary>
-        public HotColdMapTable HotColdMap =>
-            _hotColdMap ??= ParseSection(ReadyToRunSectionType.HotColdMap,
-                (s) => HotColdMapTable.Parse(this, s));
-
-        /// <summary>MethodIsGenericMap (121): bitvector of generic method flags.</summary>
-        public MethodIsGenericMapTable MethodIsGenericMap =>
-            _methodIsGenericMap ??= ParseMethodIsGenericMapFromHeaders();
-
-        /// <summary>EnclosingTypeMap (122): RID array of enclosing types.</summary>
-        public EnclosingTypeMapTable EnclosingTypeMap =>
-            _enclosingTypeMap ??= ParseEnclosingTypeMapFromHeaders();
-
-        /// <summary>TypeGenericInfoMap (123): packed 4-bit generic info per type.</summary>
-        public TypeGenericInfoMapTable TypeGenericInfoMap =>
-            _typeGenericInfoMap ??= ParseTypeGenericInfoMapFromHeaders();
-
-        /// <summary>ComponentAssemblies (115): per-assembly header entries in composite images.</summary>
-        public ComponentAssembliesTable ComponentAssemblies =>
-            _componentAssemblies ??= ParseSection(ReadyToRunSectionType.ComponentAssemblies,
-                (s) => ComponentAssembliesTable.Parse(this, s));
+        /// <summary>All section handles from the global R2R header.</summary>
+        public IReadOnlyList<ReadyToRunSectionHandle> Sections
+        {
+            get
+            {
+                EnsureHeader();
+                return _header.Sections;
+            }
+        }
 
         /// <summary>ManifestAssemblyMvids (118): array of assembly MVIDs.</summary>
         public IReadOnlyList<Guid> ManifestAssemblyMvids =>
             _manifestAssemblyMvids ??= ParseManifestAssemblyMvids();
-
-        /// <summary>ManifestMetadata (112): raw ECMA-335 metadata blob location.</summary>
-        public ManifestMetadataSection ManifestMetadata =>
-            _manifestMetadata ??= ParseSection(ReadyToRunSectionType.ManifestMetadata,
-                (s) => new ManifestMetadataSection(GetOffset(s.RelativeVirtualAddress), s.Size));
 
         /// <summary>
         /// Gets the raw section data for an opaque/undocumented section type.
@@ -276,7 +193,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             if (_opaqueSections.TryGetValue(sectionType, out var cached))
                 return cached;
 
-            if (_header.Sections.TryGetValue(sectionType, out var section))
+            if (TryFindSection(_header.Sections, sectionType, out var section))
             {
                 var data = new SectionData(sectionType, section.RelativeVirtualAddress, section.Size, GetOffset(section.RelativeVirtualAddress));
                 _opaqueSections[sectionType] = data;
@@ -293,9 +210,9 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         public IEnumerable<SectionData> EnumerateAllSections()
         {
             EnsureHeader();
-            foreach (var kvp in _header.Sections)
+            foreach (var section in _header.Sections)
             {
-                yield return new SectionData(kvp.Key, kvp.Value.RelativeVirtualAddress, kvp.Value.Size, GetOffset(kvp.Value.RelativeVirtualAddress));
+                yield return new SectionData(section.Type, section.RelativeVirtualAddress, section.Size, GetOffset(section.RelativeVirtualAddress));
             }
         }
 
@@ -320,7 +237,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             _composite = isComposite;
 
             int headerOffset = GetOffset(headerRva);
-            _header = new ReadyToRunHeader(_imageReader, headerRva, headerOffset);
+            _header = ReadReadyToRunHeader(_imageReader, headerRva, headerOffset);
 
             if (_composite.Value)
             {
@@ -332,7 +249,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
 
         private void ParseAssemblyHeaders()
         {
-            if (!_header.Sections.TryGetValue(ReadyToRunSectionType.ComponentAssemblies, out var componentAssembliesSection))
+            if (!TryFindSection(_header.Sections, ReadyToRunSectionType.ComponentAssemblies, out var componentAssembliesSection))
             {
                 _assemblyHeaders = new List<ReadyToRunCoreHeader>();
                 return;
@@ -346,19 +263,11 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             {
                 var assembly = new ComponentAssembly(_imageReader, ref offset);
                 int asmHeaderOffset = GetOffset(assembly.AssemblyHeaderRVA);
-                _assemblyHeaders.Add(new ReadyToRunCoreHeader(_imageReader, ref asmHeaderOffset));
+                _assemblyHeaders.Add(ReadReadyToRunCoreHeader(_imageReader, ref asmHeaderOffset));
             }
         }
 
         // ── Section parsing helpers ─────────────────────────────────────
-
-        private T ParseSection<T>(ReadyToRunSectionType sectionType, Func<ReadyToRunSection, T> parser) where T : class
-        {
-            EnsureHeader();
-            if (_header.Sections.TryGetValue(sectionType, out var section))
-                return parser(section);
-            return null;
-        }
 
         /// <summary>
         /// Calculates the runtime function entry size based on the target machine.
@@ -369,132 +278,44 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             return Machine == Machine.Amd64 ? 3 * sizeof(int) : 2 * sizeof(int);
         }
 
-        // Per-assembly section aggregation for sections that can appear per-assembly in composite images
-
-        private MethodDefEntryPointsTable ParseMethodDefEntryPointsFromHeaders()
+        /// <summary>Gets the compiler identifier string from a CompilerIdentifier section.</summary>
+        public string GetCompilerIdentifier(ReadyToRunSectionHandle section)
         {
-            EnsureHeader();
-            // Try global header first (non-composite)
-            if (_header.Sections.TryGetValue(ReadyToRunSectionType.MethodDefEntryPoints, out var section))
-                return MethodDefEntryPointsTable.Parse(this, section);
-
-            // Composite: aggregate from per-assembly headers
-            if (_assemblyHeaders is not null)
-            {
-                var allEntries = new List<MethodDefEntry>();
-                foreach (var asmHeader in _assemblyHeaders)
-                {
-                    if (asmHeader.Sections.TryGetValue(ReadyToRunSectionType.MethodDefEntryPoints, out section))
-                    {
-                        var table = MethodDefEntryPointsTable.Parse(this, section);
-                        allEntries.AddRange(table.Entries);
-                    }
-                }
-                if (allEntries.Count > 0)
-                    return MethodDefEntryPointsTable.FromEntries(allEntries);
-            }
-            return null;
-        }
-
-        private AvailableTypesTable ParseAvailableTypesFromHeaders()
-        {
-            EnsureHeader();
-            if (_header.Sections.TryGetValue(ReadyToRunSectionType.AvailableTypes, out var section))
-                return AvailableTypesTable.Parse(this, section);
-
-            if (_assemblyHeaders is not null)
-            {
-                var allEntries = new List<AvailableTypeEntry>();
-                for (int i = 0; i < _assemblyHeaders.Count; i++)
-                {
-                    if (_assemblyHeaders[i].Sections.TryGetValue(ReadyToRunSectionType.AvailableTypes, out section))
-                    {
-                        var table = AvailableTypesTable.Parse(this, section);
-                        allEntries.AddRange(table.Entries);
-                    }
-                }
-                if (allEntries.Count > 0)
-                    return AvailableTypesTable.FromEntries(allEntries);
-            }
-            return null;
-        }
-
-        private MethodIsGenericMapTable ParseMethodIsGenericMapFromHeaders()
-        {
-            return ParsePerAssemblySection(ReadyToRunSectionType.MethodIsGenericMap,
-                (s) => MethodIsGenericMapTable.Parse(this, s));
-        }
-
-        private EnclosingTypeMapTable ParseEnclosingTypeMapFromHeaders()
-        {
-            return ParsePerAssemblySection(ReadyToRunSectionType.EnclosingTypeMap,
-                (s) => EnclosingTypeMapTable.Parse(this, s));
-        }
-
-        private TypeGenericInfoMapTable ParseTypeGenericInfoMapFromHeaders()
-        {
-            return ParsePerAssemblySection(ReadyToRunSectionType.TypeGenericInfoMap,
-                (s) => TypeGenericInfoMapTable.Parse(this, s));
-        }
-
-        private T ParsePerAssemblySection<T>(ReadyToRunSectionType sectionType, Func<ReadyToRunSection, T> parser) where T : class
-        {
-            EnsureHeader();
-            if (_header.Sections.TryGetValue(sectionType, out var section))
-                return parser(section);
-
-            // In composite images, try the first assembly header that has it
-            if (_assemblyHeaders is not null)
-            {
-                foreach (var asmHeader in _assemblyHeaders)
-                {
-                    if (asmHeader.Sections.TryGetValue(sectionType, out section))
-                        return parser(section);
-                }
-            }
-            return null;
-        }
-
-        // ── Simple section parsers ──────────────────────────────────────
-
-        private string ParseCompilerIdentifier()
-        {
-            EnsureHeader();
-            if (!_header.Sections.TryGetValue(ReadyToRunSectionType.CompilerIdentifier, out var section))
-                return null;
-
             if (section.Size <= 1)
                 return string.Empty;
 
             int offset = GetOffset(section.RelativeVirtualAddress);
-            byte[] bytes = new byte[section.Size - 1]; // exclude null terminator
+            byte[] bytes = new byte[section.Size - 1];
             for (int i = 0; i < bytes.Length; i++)
                 bytes[i] = _imageReader.ReadByte(ref offset);
 
             return System.Text.Encoding.UTF8.GetString(bytes);
         }
 
-        private string ParseOwnerCompositeExecutable()
+        /// <summary>Gets the owner composite executable filename from an OwnerCompositeExecutable section.</summary>
+        public string GetOwnerCompositeExecutable(ReadyToRunSectionHandle section)
         {
-            EnsureHeader();
-            if (!_header.Sections.TryGetValue(ReadyToRunSectionType.OwnerCompositeExecutable, out var section))
-                return null;
-
             if (section.Size <= 1)
                 return string.Empty;
 
             int offset = GetOffset(section.RelativeVirtualAddress);
-            byte[] bytes = new byte[section.Size - 1]; // exclude null terminator
+            byte[] bytes = new byte[section.Size - 1];
             for (int i = 0; i < bytes.Length; i++)
                 bytes[i] = _imageReader.ReadByte(ref offset);
 
             return System.Text.Encoding.UTF8.GetString(bytes);
+        }
+
+        /// <summary>Gets the manifest metadata location from a ManifestMetadata section.</summary>
+        public ManifestMetadataSection GetManifestMetadataSection(ReadyToRunSectionHandle section)
+        {
+            return new ManifestMetadataSection(GetOffset(section.RelativeVirtualAddress), section.Size);
         }
 
         private IReadOnlyList<Guid> ParseManifestAssemblyMvids()
         {
             EnsureHeader();
-            if (!_header.Sections.TryGetValue(ReadyToRunSectionType.ManifestAssemblyMvids, out var section))
+            if (!TryFindSection(_header.Sections, ReadyToRunSectionType.ManifestAssemblyMvids, out var section))
                 return null;
 
             int offset = GetOffset(section.RelativeVirtualAddress);
@@ -635,9 +456,10 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             EnsureHeader();
 
             // Get the manifest metadata section
-            var manifestSection = ManifestMetadata;
-            if (manifestSection is null)
+            if (!TryFindSection(_header.Sections, ReadyToRunSectionType.ManifestMetadata, out var manifestSectionHandle))
                 return;
+
+            var manifestSection = GetManifestMetadataSection(manifestSectionHandle);
 
             // Create the manifest metadata reader
             int manifestOffset = manifestSection.FileOffset;

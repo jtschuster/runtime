@@ -14,23 +14,24 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public IReadOnlyList<ExceptionInfoEntry> Entries { get; }
 
-        private ExceptionInfoTable(List<ExceptionInfoEntry> entries)
+        internal ExceptionInfoTable(List<ExceptionInfoEntry> entries)
         {
             Entries = entries;
         }
+    }
 
-        public static ExceptionInfoTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
+    public partial class ReadyToRunReader
+    {
+        public ExceptionInfoTable GetExceptionInfoTable(ReadyToRunSectionHandle section)
         {
-            int offset = reader.GetOffset(section.RelativeVirtualAddress);
+            int offset = GetOffset(section.RelativeVirtualAddress);
             int length = section.Size;
             var entries = new List<ExceptionInfoEntry>();
 
-            // Each record is 2 ints: (methodRva, ehInfoRva).
-            // We read pairs until we exhaust the section.
             while (length >= 2 * sizeof(int))
             {
-                var methodRva = (CodeRva)reader.ImageReader.ReadInt32(ref offset);
-                var ehInfoRva = (EHInfoHandle)reader.ImageReader.ReadInt32(ref offset);
+                var methodRva = (CodeRva)_imageReader.ReadInt32(ref offset);
+                var ehInfoRva = (EHInfoHandle)_imageReader.ReadInt32(ref offset);
                 entries.Add(new ExceptionInfoEntry(methodRva, ehInfoRva));
                 length -= 2 * sizeof(int);
             }

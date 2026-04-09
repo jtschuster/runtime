@@ -15,16 +15,19 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public IReadOnlyList<PgoEntry> Entries { get; }
 
-        private PgoInstrumentationDataTable(List<PgoEntry> entries)
+        internal PgoInstrumentationDataTable(List<PgoEntry> entries)
         {
             Entries = entries;
         }
+    }
 
-        public static PgoInstrumentationDataTable Parse(ReadyToRunReader reader, ReadyToRunSection section)
+    public partial class ReadyToRunReader
+    {
+        public PgoInstrumentationDataTable GetPgoInstrumentationDataTable(ReadyToRunSectionHandle section)
         {
-            int sectionOffset = reader.GetOffset(section.RelativeVirtualAddress);
-            NativeParser parser = new NativeParser(reader.ImageReader, (uint)sectionOffset);
-            NativeHashtable hashtable = new NativeHashtable(reader.ImageReader, parser, (uint)(sectionOffset + section.Size));
+            int sectionOffset = GetOffset(section.RelativeVirtualAddress);
+            NativeParser parser = new NativeParser(_imageReader, (uint)sectionOffset);
+            NativeHashtable hashtable = new NativeHashtable(_imageReader, parser, (uint)(sectionOffset + section.Size));
             var enumerator = hashtable.EnumerateAllEntries();
             var entries = new List<PgoEntry>();
 
@@ -34,8 +37,6 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
                 int signatureBlobOffset = (int)curParser.Offset;
                 byte lowHashcode = curParser.LowHashcode;
 
-                // Like InstanceMethodEntryPoints, the signature blob must be
-                // decoded by a higher-level reader. We store the blob offset only.
                 entries.Add(new PgoEntry(signatureBlobOffset, lowHashcode));
                 curParser = enumerator.GetNext();
             }
