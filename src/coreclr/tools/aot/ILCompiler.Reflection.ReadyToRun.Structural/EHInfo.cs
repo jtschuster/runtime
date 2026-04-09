@@ -28,39 +28,28 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     }
 
     /// <summary>
-    /// A single exception handling clause decoded from the image.
-    /// This is a raw projection — it exposes the token but not the resolved class name.
+    /// A single exception handling clause. Plain data — all fields are eagerly populated by the reader.
     /// </summary>
-    public class EHClause
+    public sealed class EHClause
     {
         /// <summary>
-        /// Length of the serialized EH clause in the PE image.
+        /// Length of the serialized EH clause in the PE image (6 × uint).
         /// </summary>
         internal const int Length = 6 * sizeof(uint);
 
-        /// <summary>
-        /// Flags describing the exception handler.
-        /// </summary>
+        /// <summary>Flags describing the exception handler.</summary>
         public CorExceptionFlag Flags { get; }
 
-        /// <summary>
-        /// Starting offset of the try block
-        /// </summary>
+        /// <summary>Starting offset of the try block.</summary>
         public uint TryOffset { get; }
 
-        /// <summary>
-        /// End offset of the try block
-        /// </summary>
+        /// <summary>End offset of the try block.</summary>
         public uint TryEnd { get; }
 
-        /// <summary>
-        /// Offset of the exception handler for the try block
-        /// </summary>
+        /// <summary>Offset of the exception handler for the try block.</summary>
         public uint HandlerOffset { get; }
 
-        /// <summary>
-        /// End offset of the exception handler
-        /// </summary>
+        /// <summary>End offset of the exception handler.</summary>
         public uint HandlerEnd { get; }
 
         /// <summary>
@@ -69,21 +58,18 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         /// </summary>
         public uint ClassTokenOrFilterOffset { get; }
 
-        /// <summary>
-        /// Read the EH clause from a given file offset in the PE image.
-        /// </summary>
-        public EHClause(NativeReader imageReader, int offset)
+        public EHClause(CorExceptionFlag flags, uint tryOffset, uint tryEnd, uint handlerOffset, uint handlerEnd, uint classTokenOrFilterOffset)
         {
-            Flags = (CorExceptionFlag)imageReader.ReadUInt32(ref offset);
-            TryOffset = imageReader.ReadUInt32(ref offset);
-            TryEnd = imageReader.ReadUInt32(ref offset);
-            HandlerOffset = imageReader.ReadUInt32(ref offset);
-            HandlerEnd = imageReader.ReadUInt32(ref offset);
-            ClassTokenOrFilterOffset = imageReader.ReadUInt32(ref offset);
+            Flags = flags;
+            TryOffset = tryOffset;
+            TryEnd = tryEnd;
+            HandlerOffset = handlerOffset;
+            HandlerEnd = handlerEnd;
+            ClassTokenOrFilterOffset = classTokenOrFilterOffset;
         }
 
         /// <summary>
-        /// Emit a textual representation of the EH info to a given text writer.
+        /// Emit a textual representation of the EH clause to a given text writer.
         /// </summary>
         public void WriteTo(TextWriter writer, int methodRva, bool dumpRva)
         {
@@ -137,56 +123,20 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     }
 
     /// <summary>
-    /// EH info for a single runtime function, decoded from a single offset in the image.
+    /// EH info for a single runtime function — a simple list of eagerly-parsed EH clauses.
     /// </summary>
-    public class EHInfo
+    public sealed class EHInfo
     {
-        private readonly NativeReader _imageReader;
-        private readonly int _offset;
-        private readonly int _clauseCount;
-
-        /// <summary>
-        /// RVA of the EH info in the PE image.
-        /// </summary>
-        public EHInfoHandle Handle { get; }
-
-        /// <summary>
-        /// Starting RVA of the corresponding runtime function.
-        /// </summary>
+        /// <summary>Starting RVA of the corresponding runtime function.</summary>
         public CodeRva MethodRelativeVirtualAddress { get; }
 
-        private List<EHClause> _clauses;
+        /// <summary>The EH clauses for this runtime function.</summary>
+        public IReadOnlyList<EHClause> EHClauses { get; }
 
-        /// <summary>
-        /// List of EH clauses for the runtime function.
-        /// </summary>
-        public IReadOnlyList<EHClause> EHClauses
+        public EHInfo(CodeRva methodRva, IReadOnlyList<EHClause> clauses)
         {
-            get
-            {
-                _clauses ??= ParseClauses();
-                return _clauses;
-            }
-        }
-
-        public EHInfo(NativeReader imageReader, EHInfoHandle handle, CodeRva methodRva, int offset, int clauseCount)
-        {
-            _imageReader = imageReader;
-            Handle = handle;
             MethodRelativeVirtualAddress = methodRva;
-            _offset = offset;
-            _clauseCount = clauseCount;
-        }
-
-        private List<EHClause> ParseClauses()
-        {
-            var clauses = new List<EHClause>(_clauseCount);
-            for (int i = 0; i < _clauseCount; i++)
-            {
-                clauses.Add(new EHClause(_imageReader, _offset + i * EHClause.Length));
-            }
-
-            return clauses;
+            EHClauses = clauses;
         }
 
         /// <summary>
@@ -211,27 +161,40 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
 
         /// <summary>
         /// Resolve an <see cref="EHInfoHandle"/> to its parsed exception handling information.
+        /// The clause count is derived from the byte distance between consecutive EH info RVAs,
+        /// so the caller must supply the byte length of the EH info region for this entry.
         /// </summary>
         /// <param name="handle">Handle pointing to the EH info RVA.</param>
         /// <param name="methodRva">Code RVA of the method this EH info belongs to.</param>
-        /// <param name="clauseCount">Number of EH clauses to read.</param>
-        public EHInfo GetEHInfo(EHInfoHandle handle, CodeRva methodRva, int clauseCount)
+        /// <param name="ehInfoByteLength">Byte length of the EH info region (distance to next entry or section end).</param>
+        public EHInfo GetEHInfo(EHInfoHandle handle, CodeRva methodRva, int ehInfoByteLength)
         {
             if (_ehInfoCache.TryGetValue(handle, out EHInfo cached))
                 return cached;
 
-            EHInfo result;
-            try
+            int clauseCount = ehInfoByteLength / EHClause.Length;
+            if (clauseCount <= 0)
             {
-                int offset = GetOffset((int)handle);
-                result = new EHInfo(ImageReader, handle, methodRva, offset, clauseCount);
-            }
-            catch
-            {
-                result = null;
+                _ehInfoCache[handle] = null;
+                return null;
             }
 
+            int offset = GetOffset((int)handle);
+            var clauses = new List<EHClause>(clauseCount);
+            for (int i = 0; i < clauseCount; i++)
+            {
+                var flags = (CorExceptionFlag)ImageReader.ReadUInt32(ref offset);
+                uint tryOffset = ImageReader.ReadUInt32(ref offset);
+                uint tryEnd = ImageReader.ReadUInt32(ref offset);
+                uint handlerOffset = ImageReader.ReadUInt32(ref offset);
+                uint handlerEnd = ImageReader.ReadUInt32(ref offset);
+                uint classTokenOrFilterOffset = ImageReader.ReadUInt32(ref offset);
+                clauses.Add(new EHClause(flags, tryOffset, tryEnd, handlerOffset, handlerEnd, classTokenOrFilterOffset));
+            }
+
+            var result = new EHInfo(methodRva, clauses);
             _ehInfoCache[handle] = result;
+
             return result;
         }
     }
