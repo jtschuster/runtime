@@ -15,15 +15,12 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural.Parsed;
 /// fully materialized, correlated objects. After parsing, no further image byte access is needed.
 ///
 /// <para>
-/// This parser requires an <see cref="IAssemblyResolver"/> for module-override signature parsing
-/// in composite images, and an existing (old) <see cref="ILCompiler.Reflection.ReadyToRun.ReadyToRunReader"/>
-/// for signature decoding infrastructure. A future refactoring may remove the latter dependency.
+/// This parser is fully standalone — it does not depend on any legacy libraries.
 /// </para>
 /// </summary>
 public sealed class RawReadyToRunParser
 {
     private readonly ReadyToRunReader _formatReader;
-    private readonly ILCompiler.Reflection.ReadyToRun.ReadyToRunReader _legacyReader;
 
     // Cached results
     private IReadOnlyList<ParsedMethod> _methods;
@@ -40,12 +37,10 @@ public sealed class RawReadyToRunParser
     /// <summary>
     /// Creates a new parser that cross-references sections from the given format reader.
     /// </summary>
-    /// <param name="formatReader">The structural format reader (Phase 1).</param>
-    /// <param name="legacyReader">The existing ReadyToRunReader for signature decoding infrastructure.</param>
-    public RawReadyToRunParser(ReadyToRunReader formatReader, ILCompiler.Reflection.ReadyToRun.ReadyToRunReader legacyReader)
+    /// <param name="formatReader">The structural format reader.</param>
+    public RawReadyToRunParser(ReadyToRunReader formatReader)
     {
         _formatReader = formatReader;
-        _legacyReader = legacyReader;
     }
 
     /// <summary>The underlying format reader.</summary>
@@ -107,7 +102,7 @@ public sealed class RawReadyToRunParser
         if (_pgoInfos != null)
             return _pgoInfos;
 
-        _pgoInfos = ParsedPgoInfo.ParseAll(_formatReader, _legacyReader, CreateStructuralDecoder);
+        _pgoInfos = ParsedPgoInfo.ParseAll(_formatReader, CreateStructuralDecoder, LookupImportSignature);
         return _pgoInfos;
     }
 
@@ -143,13 +138,25 @@ public sealed class RawReadyToRunParser
         }
 
         // Mark entry points from InstanceMethodEntryPoints
-        // Use the legacy reader which correctly parses the method signature to find
-        // the entry point index (the index is after the variable-length signature blob).
-        foreach (var instanceMethod in _legacyReader.InstanceMethods)
+        // Parse each entry's signature blob to find the entry point descriptor that follows.
+        var instanceEntries = _formatReader.InstanceMethodEntryPoints?.Entries;
+        if (instanceEntries is not null)
         {
-            int rtFuncIdx = instanceMethod.Method.EntryPointRuntimeFunctionId;
-            if (rtFuncIdx >= 0 && rtFuncIdx < _isEntryPoint.Length)
-                _isEntryPoint[rtFuncIdx] = true;
+            foreach (var entry in instanceEntries)
+            {
+                try
+                {
+                    var decoder = CreateStructuralDecoder(entry.SignatureBlobOffset);
+                    decoder.ParseMethod();
+                    _formatReader.GetRuntimeFunctionIndexFromOffset(decoder.Offset, out int rtFuncIdx, out _);
+                    if (rtFuncIdx >= 0 && rtFuncIdx < _isEntryPoint.Length)
+                        _isEntryPoint[rtFuncIdx] = true;
+                }
+                catch
+                {
+                    // Skip entries that fail to parse
+                }
+            }
         }
     }
 
@@ -241,105 +248,101 @@ public sealed class RawReadyToRunParser
     }
 
     /// <summary>
-    /// Parse the InstanceMethodEntryPoints using the legacy reader (which correctly
-    /// decodes the variable-length method signature blob before reading the entry point).
+    /// Parse the InstanceMethodEntryPoints by decoding each entry's signature blob and
+    /// entry point descriptor. Fully standalone — no legacy reader dependency.
     /// </summary>
     private void ParseInstanceMethodEntryPoints(List<ParsedMethod> methods)
     {
-        // Parse all instance method signature blobs eagerly.
-        // The Format-level entries and legacy reader enumerate the same NativeHashtable
-        // in the same order, so we can match them by index.
-        var instanceMethodRefs = ParseInstanceMethodRefs();
-        int refIndex = 0;
-
-        foreach (var instanceMethod in _legacyReader.InstanceMethods)
-        {
-            var legacyMethod = instanceMethod.Method;
-            int rtFuncIdx = legacyMethod.EntryPointRuntimeFunctionId;
-
-            // Match the corresponding structural method reference by enumeration order
-            R2RMethodRef methodRef = null;
-            if (refIndex < instanceMethodRefs.Count)
-                methodRef = instanceMethodRefs[refIndex];
-            refIndex++;
-
-            if (rtFuncIdx < 0)
-                continue;
-
-            var runtimeFunctions = CollectRuntimeFunctions(rtFuncIdx);
-            var coldFunctions = CollectColdRuntimeFunctions(rtFuncIdx);
-            var gcInfo = ParseGcInfo(rtFuncIdx);
-
-            uint rid = legacyMethod.Rid;
-            var fixups = CollectFixupsFromLegacyMethod(legacyMethod);
-
-            methods.Add(new ParsedMethod(
-                rid: rid,
-                methodRef: methodRef,
-                entryPointRuntimeFunctionIndex: rtFuncIdx,
-                runtimeFunctions: runtimeFunctions,
-                coldRuntimeFunctions: coldFunctions,
-                fixups: fixups,
-                gcInfo: gcInfo,
-                isInstanceMethod: true,
-                componentIndex: 0));
-        }
-    }
-
-    /// <summary>
-    /// Parse all instance method signature blobs into structural <see cref="R2RMethodRef"/> nodes.
-    /// Returns a list in the same order as <see cref="ReadyToRunReader.InstanceMethods"/>.
-    /// </summary>
-    private List<R2RMethodRef> ParseInstanceMethodRefs()
-    {
-        var result = new List<R2RMethodRef>();
         var entries = _formatReader.InstanceMethodEntryPoints?.Entries;
         if (entries is null)
-            return result;
+            return;
 
         foreach (var entry in entries)
         {
-            int offset = entry.SignatureBlobOffset;
             try
             {
+                int offset = entry.SignatureBlobOffset;
                 var decoder = CreateStructuralDecoder(offset);
                 var methodRef = decoder.ParseMethod();
-                result.Add(methodRef); // may be null on error
+
+                // After the method signature, the stream contains an encoded entry point descriptor.
+                // GetRuntimeFunctionIndexFromOffset decodes it (bit 0 = fixups present,
+                // bit 1 = delta-encoded fixup offset, remaining bits = runtime function index).
+                _formatReader.GetRuntimeFunctionIndexFromOffset(decoder.Offset, out int rtFuncIdx, out int? fixupOffset);
+
+                if (rtFuncIdx < 0)
+                    continue;
+
+                var runtimeFunctions = CollectRuntimeFunctions(rtFuncIdx);
+                var coldFunctions = CollectColdRuntimeFunctions(rtFuncIdx);
+                var gcInfo = ParseGcInfo(rtFuncIdx);
+
+                var fixups = fixupOffset.HasValue
+                    ? CollectFixupsFromOffset(fixupOffset.Value)
+                    : new List<ParsedFixupCell>();
+
+                methods.Add(new ParsedMethod(
+                    rid: 0, // Instance methods don't have a MethodDef RID in the entry point table
+                    methodRef: methodRef,
+                    entryPointRuntimeFunctionIndex: rtFuncIdx,
+                    runtimeFunctions: runtimeFunctions,
+                    coldRuntimeFunctions: coldFunctions,
+                    fixups: fixups,
+                    gcInfo: gcInfo,
+                    isInstanceMethod: true,
+                    componentIndex: 0));
             }
             catch
             {
-                result.Add(null);
+                // Skip entries that fail to parse
             }
         }
-
-        return result;
     }
 
     /// <summary>
-    /// Collect fixup cells from a legacy ReadyToRunMethod's fixup data.
+    /// Collect fixup cells starting at a given fixup blob offset in the image.
+    /// The fixup blob uses nibble-encoded delta lists — see Module::FixupDelayListAux in the VM.
     /// </summary>
-    private List<ParsedFixupCell> CollectFixupsFromLegacyMethod(ReadyToRunMethod legacyMethod)
+    private List<ParsedFixupCell> CollectFixupsFromOffset(int fixupOffset)
     {
         var result = new List<ParsedFixupCell>();
         try
         {
             var importSections = GetImportSections();
-            foreach (var fixupCell in legacyMethod.Fixups)
-            {
-                R2RFixupSignature signature = null;
-                int tableIdx = (int)fixupCell.TableIndex;
-                int cellIdx = (int)fixupCell.CellOffset;
+            var nibbleReader = new NibbleReader(_formatReader.ImageReader, fixupOffset);
 
-                if (tableIdx < importSections.Count)
+            uint curTableIndex = nibbleReader.ReadUInt();
+
+            while (true)
+            {
+                uint fixupIndex = nibbleReader.ReadUInt();
+
+                while (true)
                 {
-                    var section = importSections[tableIdx];
-                    if (cellIdx < section.Entries.Count)
+                    R2RFixupSignature signature = null;
+                    if ((int)curTableIndex < importSections.Count)
                     {
-                        signature = section.Entries[cellIdx].Signature;
+                        var section = importSections[(int)curTableIndex];
+                        if ((int)fixupIndex < section.Entries.Count)
+                        {
+                            signature = section.Entries[(int)fixupIndex].Signature;
+                        }
                     }
+
+                    result.Add(new ParsedFixupCell(curTableIndex, fixupIndex, signature));
+
+                    uint delta = nibbleReader.ReadUInt();
+                    if (delta == 0)
+                        break;
+
+                    fixupIndex += delta;
                 }
 
-                result.Add(new ParsedFixupCell(fixupCell.TableIndex, fixupCell.CellOffset, signature));
+                uint tableIndex = nibbleReader.ReadUInt();
+                if (tableIndex == 0)
+                    break;
+
+                curTableIndex = curTableIndex + tableIndex;
             }
         }
         catch
@@ -512,9 +515,9 @@ public sealed class RawReadyToRunParser
             return null;
 
         return ParsedDebugInfo.Parse(
-            _legacyReader.ImageReader,
-            _legacyReader.Machine,
-            _legacyReader.ReadyToRunHeader.MajorVersion,
+            _formatReader.ImageReader,
+            _formatReader.Machine,
+            _formatReader.ReadyToRunHeader.MajorVersion,
             offset);
     }
 
@@ -541,7 +544,7 @@ public sealed class RawReadyToRunParser
         try
         {
             int offset = _formatReader.GetOffset(ehInfoRva);
-            return new EHInfo(_legacyReader, ehInfoRva, startRva, offset, clauseCount);
+            return new EHInfo(_formatReader.ImageReader, ehInfoRva, startRva, offset, clauseCount);
         }
         catch
         {
@@ -720,12 +723,30 @@ public sealed class RawReadyToRunParser
             _structuralContext = new R2RStructuralContext(readerToModuleIndex: null);
         }
 
-        var globalMetadata = _legacyReader.GetGlobalMetadata();
+        var globalMetadata = _formatReader.GetGlobalMetadata();
         return new StructuralSignatureDecoder(
             _structuralContext,
             globalMetadata?.MetadataReader,
-            _legacyReader,
+            _formatReader,
             offset);
+    }
+
+    /// <summary>
+    /// Lookup a parsed import signature by table index and fixup index.
+    /// Used by PGO info parsing to resolve import references.
+    /// </summary>
+    private R2RFixupSignature LookupImportSignature(int tableIndex, int fixupIndex)
+    {
+        var importSections = GetImportSections();
+        if (tableIndex < importSections.Count)
+        {
+            var section = importSections[tableIndex];
+            if (fixupIndex < section.Entries.Count)
+            {
+                return section.Entries[fixupIndex].Signature;
+            }
+        }
+        return null;
     }
 
     // ── Available types parsing ──────────────────────────────────────

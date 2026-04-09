@@ -26,11 +26,11 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural.Parsed;
 /// </summary>
 public sealed class ReadyToRunMetadataResolver
 {
-    private readonly ILCompiler.Reflection.ReadyToRun.ReadyToRunReader _legacyReader;
+    private readonly ReadyToRunReader _reader;
 
-    public ReadyToRunMetadataResolver(ILCompiler.Reflection.ReadyToRun.ReadyToRunReader legacyReader)
+    public ReadyToRunMetadataResolver(ReadyToRunReader reader)
     {
-        _legacyReader = legacyReader;
+        _reader = reader;
     }
 
     // ── Public resolve methods ───────────────────────────────────────
@@ -177,12 +177,12 @@ public sealed class ReadyToRunMetadataResolver
     {
         if (moduleIndex < 0)
         {
-            return _legacyReader.GetGlobalMetadata()?.MetadataReader;
+            return _reader.GetGlobalMetadata()?.MetadataReader;
         }
 
         try
         {
-            return _legacyReader.OpenReferenceAssembly(moduleIndex)?.MetadataReader;
+            return _reader.OpenReferenceAssembly(moduleIndex)?.MetadataReader;
         }
         catch
         {

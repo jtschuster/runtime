@@ -67,18 +67,21 @@ public sealed class ParsedPgoInfo
     /// <summary>
     /// Parse all PGO entries from the PgoInstrumentationData section.
     /// </summary>
+    /// <param name="formatReader">The structural format reader.</param>
+    /// <param name="decoderFactory">Factory for creating signature decoders at given offsets.</param>
+    /// <param name="importSignatureLookup">Delegate to look up a parsed import signature by (tableIndex, fixupIndex).</param>
     internal static List<ParsedPgoInfo> ParseAll(
         ReadyToRunReader formatReader,
-        ILCompiler.Reflection.ReadyToRun.ReadyToRunReader legacyReader,
-        Func<int, StructuralSignatureDecoder> decoderFactory)
+        Func<int, StructuralSignatureDecoder> decoderFactory,
+        Func<int, int, R2RFixupSignature> importSignatureLookup)
     {
         var result = new List<ParsedPgoInfo>();
         var table = formatReader.PgoInstrumentationData;
         if (table is null)
             return result;
 
-        var imageReader = legacyReader.ImageReader;
-        var image = legacyReader.Image;
+        var imageReader = formatReader.ImageReader;
+        var image = formatReader.Image;
 
         foreach (var entry in table.Entries)
         {
@@ -111,7 +114,7 @@ public sealed class ParsedPgoInfo
 
                 // Parse the PGO schema data
                 var compressedIntParser = new PgoProcessor.PgoEncodedCompressedIntParser(image, offset);
-                var loader = new StructuralPgoDataLoader(legacyReader);
+                var loader = new StructuralPgoDataLoader(importSignatureLookup);
                 var schemaElements = PgoProcessor.ParsePgoData<string, string>(loader, compressedIntParser, true).ToArray();
                 int size = compressedIntParser.Offset - offset;
 
@@ -128,17 +131,15 @@ public sealed class ParsedPgoInfo
 
     /// <summary>
     /// Data loader that resolves type/method handles from import section references.
-    /// Uses the legacy reader's import sections for lookup, returning string descriptions.
+    /// Uses a delegate to look up parsed fixup signatures by (tableIndex, fixupIndex).
     /// </summary>
     private sealed class StructuralPgoDataLoader : IPgoSchemaDataLoader<string, string>
     {
-        private readonly ILCompiler.Reflection.ReadyToRun.ReadyToRunReader _legacyReader;
-        private readonly SignatureFormattingOptions _formatOptions;
+        private readonly Func<int, int, R2RFixupSignature> _importSignatureLookup;
 
-        public StructuralPgoDataLoader(ILCompiler.Reflection.ReadyToRun.ReadyToRunReader legacyReader)
+        public StructuralPgoDataLoader(Func<int, int, R2RFixupSignature> importSignatureLookup)
         {
-            _legacyReader = legacyReader;
-            _formatOptions = new SignatureFormattingOptions();
+            _importSignatureLookup = importSignatureLookup;
         }
 
         string IPgoSchemaDataLoader<string, string>.TypeFromLong(long input)
@@ -152,7 +153,8 @@ public sealed class ParsedPgoInfo
 
             try
             {
-                return _legacyReader.ImportSections[tableIndex].Entries[fixupIndex].Signature.ToString(_formatOptions);
+                var sig = _importSignatureLookup(tableIndex, fixupIndex);
+                return sig?.ToString() ?? $"Type[{tableIndex}:{fixupIndex}]";
             }
             catch
             {
@@ -171,7 +173,8 @@ public sealed class ParsedPgoInfo
 
             try
             {
-                return _legacyReader.ImportSections[tableIndex].Entries[fixupIndex].Signature.ToString(_formatOptions);
+                var sig = _importSignatureLookup(tableIndex, fixupIndex);
+                return sig?.ToString() ?? $"Method[{tableIndex}:{fixupIndex}]";
             }
             catch
             {

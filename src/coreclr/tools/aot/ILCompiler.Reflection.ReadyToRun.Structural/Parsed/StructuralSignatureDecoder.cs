@@ -27,9 +27,9 @@ internal sealed class StructuralSignatureDecoder
     public StructuralSignatureDecoder(
         R2RStructuralContext context,
         MetadataReader metadataReader,
-        ILCompiler.Reflection.ReadyToRun.ReadyToRunReader legacyReader,
+        IR2RImageContext imageContext,
         int offset)
-        : base(R2RStructuralTypeProvider.Instance, context, metadataReader, legacyReader, offset, skipOverrideMetadataReader: false)
+        : base(R2RStructuralTypeProvider.Instance, context, metadataReader, imageContext, offset, skipOverrideMetadataReader: false)
     {
     }
 

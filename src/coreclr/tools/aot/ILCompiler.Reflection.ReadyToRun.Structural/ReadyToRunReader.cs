@@ -3,6 +3,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 
 using Internal.ReadyToRunConstants;
@@ -15,11 +18,18 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     /// A low-level, structural reader for Ready-to-Run images. Parses headers and sections
     /// without cross-referencing metadata — each section table exposes only the raw indices,
     /// RIDs, offsets, and flags encoded in that section.
+    /// Also implements <see cref="IR2RImageContext"/> to support signature decoding.
     /// </summary>
-    public sealed class ReadyToRunReader
+    public sealed class ReadyToRunReader : IR2RImageContext
     {
         private readonly IBinaryImageReader _compositeReader;
         private readonly NativeReader _imageReader;
+        private readonly byte[] _image;
+        private readonly string _filename;
+
+        // Assembly resolution
+        private IAssemblyResolver _assemblyResolver;
+        private List<IAssemblyMetadata> _assemblyCache;
 
         // Lazy-init backing fields
         private ReadyToRunHeader _header;
@@ -29,6 +39,11 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         private int? _pointerSize;
         private bool? _composite;
         private List<ReadyToRunCoreHeader> _assemblyHeaders;
+
+        // Manifest metadata / reference resolution
+        private IAssemblyMetadata _manifestMetadataAssembly;
+        private List<AssemblyReferenceHandle> _manifestReferences;
+        private MetadataReader _manifestReader;
 
         // Section table caches (lazy)
         private string _compilerIdentifier;
@@ -53,10 +68,13 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         private ManifestMetadataSection _manifestMetadata;
         private Dictionary<ReadyToRunSectionType, SectionData> _opaqueSections;
 
-        public ReadyToRunReader(IBinaryImageReader compositeReader, NativeReader imageReader)
+        public ReadyToRunReader(IBinaryImageReader compositeReader, NativeReader imageReader, byte[] image, string filename = null)
         {
             _compositeReader = compositeReader;
             _imageReader = imageReader;
+            _image = image ?? throw new ArgumentNullException(nameof(image));
+            _filename = filename ?? string.Empty;
+            _assemblyCache = new List<IAssemblyMetadata>();
         }
 
         /// <summary>The underlying binary image reader (PE or MachO).</summary>
@@ -64,6 +82,28 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
 
         /// <summary>NativeReader for raw byte access into the image.</summary>
         public NativeReader ImageReader => _imageReader;
+
+        /// <summary>Raw bytes of the PE image (implements <see cref="IR2RImageContext"/>).</summary>
+        public byte[] Image => _image;
+
+        /// <summary>Filename of the R2R image being read.</summary>
+        public string Filename => _filename;
+
+        /// <summary>
+        /// Whether component assembly indices in the manifest start at 2 (V6+).
+        /// In older formats they start at 1.
+        /// </summary>
+        public bool ComponentAssemblyIndicesStartAtTwo
+        {
+            get
+            {
+                EnsureHeader();
+                return _header.MajorVersion >= 6;
+            }
+        }
+
+        /// <summary>Offset used for component assembly index adjustment.</summary>
+        public int ComponentAssemblyIndexOffset => ComponentAssemblyIndicesStartAtTwo ? 2 : 1;
 
         /// <summary>Machine architecture of the image.</summary>
         public Machine Machine
@@ -458,6 +498,204 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             }
 
             return mvids;
+        }
+
+        // ── Assembly resolution infrastructure ─────────────────────────────
+
+        /// <summary>
+        /// Sets the assembly resolver used by <see cref="OpenReferenceAssembly"/> for
+        /// locating reference assemblies on disk.
+        /// </summary>
+        public void SetAssemblyResolver(IAssemblyResolver resolver)
+        {
+            _assemblyResolver = resolver;
+        }
+
+        /// <summary>
+        /// Gets the global (component 0) metadata for non-composite images.
+        /// Returns null for composite images.
+        /// </summary>
+        public IAssemblyMetadata GetGlobalMetadata()
+        {
+            EnsureHeader();
+            EnsureManifestReferences();
+            return Composite ? null : (_assemblyCache.Count > 0 ? _assemblyCache[0] : null);
+        }
+
+        /// <summary>
+        /// Open a reference assembly by module index.
+        /// Implements <see cref="IR2RImageContext.OpenReferenceAssembly"/>.
+        /// </summary>
+        public IAssemblyMetadata OpenReferenceAssembly(int refAsmIndex)
+        {
+            EnsureHeader();
+            EnsureManifestReferences();
+
+            IAssemblyMetadata result = refAsmIndex < _assemblyCache.Count ? _assemblyCache[refAsmIndex] : null;
+            if (result is not null)
+                return result;
+
+            AssemblyReferenceHandle assemblyReferenceHandle = GetAssemblyAtIndex(refAsmIndex, out MetadataReader metadataReader);
+
+            if (assemblyReferenceHandle.IsNil)
+            {
+                result = _manifestMetadataAssembly;
+            }
+            else if (_assemblyResolver is not null)
+            {
+                result = _assemblyResolver.FindAssembly(metadataReader, assemblyReferenceHandle, _filename);
+                if (result is null)
+                {
+                    string name = metadataReader.GetString(metadataReader.GetAssemblyReference(assemblyReferenceHandle).Name);
+                    throw new Exception($"Missing reference assembly: {name}");
+                }
+            }
+
+            if (result is not null)
+            {
+                while (_assemblyCache.Count <= refAsmIndex)
+                    _assemblyCache.Add(null);
+                _assemblyCache[refAsmIndex] = result;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Gets the assembly name for a given module reference index.
+        /// </summary>
+        public string GetReferenceAssemblyName(int refAsmIndex)
+        {
+            EnsureManifestReferences();
+            AssemblyReferenceHandle handle = GetAssemblyAtIndex(refAsmIndex, out MetadataReader reader);
+            if (reader is null)
+                return $"Module#{refAsmIndex}";
+
+            if (handle.IsNil)
+                return reader.GetString(reader.GetAssemblyDefinition().Name);
+
+            return reader.GetString(reader.GetAssemblyReference(handle).Name);
+        }
+
+        private AssemblyReferenceHandle GetAssemblyAtIndex(int refAsmIndex, out MetadataReader metadataReader)
+        {
+            Debug.Assert(refAsmIndex != 0 || !Composite);
+
+            int assemblyRefCount = Composite ? 0 : (_assemblyCache.Count > 0 && _assemblyCache[0] is not null
+                ? _assemblyCache[0].MetadataReader.GetTableRowCount(TableIndex.AssemblyRef)
+                : 0);
+            AssemblyReferenceHandle assemblyReferenceHandle = default;
+            metadataReader = null;
+
+            if (refAsmIndex <= assemblyRefCount && assemblyRefCount > 0)
+            {
+                metadataReader = _assemblyCache[0].MetadataReader;
+                assemblyReferenceHandle = MetadataTokens.AssemblyReferenceHandle(refAsmIndex);
+            }
+            else
+            {
+                int index = refAsmIndex - assemblyRefCount;
+                if (ComponentAssemblyIndicesStartAtTwo)
+                {
+                    if (index == 1)
+                    {
+                        metadataReader = _manifestReader;
+                        assemblyReferenceHandle = default;
+                    }
+                    index--;
+                }
+                if (index > 0 && _manifestReferences is not null && index - 1 < _manifestReferences.Count)
+                {
+                    metadataReader = _manifestReader;
+                    assemblyReferenceHandle = _manifestReferences[index - 1];
+                }
+            }
+
+            return assemblyReferenceHandle;
+        }
+
+        private void EnsureManifestReferences()
+        {
+            if (_manifestReferences is not null)
+                return;
+
+            _manifestReferences = new List<AssemblyReferenceHandle>();
+            EnsureHeader();
+
+            // Get the manifest metadata section
+            var manifestSection = ManifestMetadata;
+            if (manifestSection is null)
+                return;
+
+            // Create the manifest metadata reader
+            int manifestOffset = manifestSection.FileOffset;
+            int manifestSize = manifestSection.Size;
+            if (manifestSize <= 0)
+                return;
+
+            unsafe
+            {
+                fixed (byte* pImage = _image)
+                {
+                    _manifestMetadataAssembly = _compositeReader.GetManifestAssemblyMetadata(
+                        new MetadataReader(pImage + manifestOffset, manifestSize));
+                }
+            }
+
+            if (_manifestMetadataAssembly is null)
+                return;
+
+            _manifestReader = _manifestMetadataAssembly.MetadataReader;
+
+            // For non-composite: seed the assembly cache with the standalone metadata
+            if (!Composite && _assemblyCache.Count == 0)
+            {
+                var standaloneMetadata = _compositeReader.GetStandaloneAssemblyMetadata();
+                if (standaloneMetadata is not null)
+                    _assemblyCache.Add(standaloneMetadata);
+            }
+
+            // Enumerate assembly references from the manifest
+            foreach (var handle in _manifestReader.AssemblyReferences)
+            {
+                _manifestReferences.Add(handle);
+            }
+        }
+
+        // ── Entry point descriptor decoding ────────────────────────────────
+
+        /// <summary>
+        /// Decode the runtime function index and optional fixup offset from a compressed
+        /// entry point descriptor at the given image offset. This is the same encoding used
+        /// after MethodDef and InstanceMethod signature blobs.
+        /// </summary>
+        /// <param name="offset">Image offset to start reading from.</param>
+        /// <param name="runtimeFunctionIndex">Decoded runtime function index.</param>
+        /// <param name="fixupOffset">Fixup list offset, or null if no fixups.</param>
+        public void GetRuntimeFunctionIndexFromOffset(int offset, out int runtimeFunctionIndex, out int? fixupOffset)
+        {
+            fixupOffset = null;
+
+            uint id = 0;
+            offset = (int)_imageReader.DecodeUnsigned((uint)offset, ref id);
+            if ((id & 1) != 0)
+            {
+                if ((id & 2) != 0)
+                {
+                    uint val = 0;
+                    _imageReader.DecodeUnsigned((uint)offset, ref val);
+                    offset -= (int)val;
+                }
+
+                fixupOffset = offset;
+                id >>= 2;
+            }
+            else
+            {
+                id >>= 1;
+            }
+
+            runtimeFunctionIndex = (int)id;
         }
     }
 }

@@ -26,7 +26,7 @@ byte[] image = File.ReadAllBytes(filename);
 PEReader peReader = new PEReader(new MemoryStream(image));
 PEImageReader peImageReader = new PEImageReader(peReader);
 NativeReader nativeReader = new NativeReader(new MemoryStream(image));
-StructuralReader reader = new StructuralReader(peImageReader, nativeReader);
+StructuralReader reader = new StructuralReader(peImageReader, nativeReader, image, filename);
 
 Console.WriteLine($"Image: {Path.GetFileName(filename)}");
 Console.WriteLine($"Machine: {reader.Machine}  Composite: {reader.Composite}");

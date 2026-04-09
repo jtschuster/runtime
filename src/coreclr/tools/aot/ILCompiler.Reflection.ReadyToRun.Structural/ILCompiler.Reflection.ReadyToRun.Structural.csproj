@@ -18,9 +18,4 @@
     <Compile Include="..\..\Common\Pgo\PgoFormat.cs" Link="Common\PgoFormat.cs" />
   </ItemGroup>
 
-  <!-- Exclude Parsed/ files until signature decoder is rewritten -->
-  <ItemGroup>
-    <Compile Remove="Parsed\**\*.cs" />
-  </ItemGroup>
-
 </Project>
