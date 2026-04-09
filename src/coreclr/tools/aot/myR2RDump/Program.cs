@@ -59,13 +59,13 @@ foreach (ImportSectionEntry section in importSections.Entries)
 {
     Console.WriteLine($"--- Section [{section.Index}] Type={section.Type} Flags={section.Flags} EntrySize={section.EntrySize} Entries={section.EntryCount} ---");
 
-    if (section.SignatureRva == 0 || section.EntryCount == 0)
+    if ((int)section.SignatureTableRva == 0 || section.EntryCount == 0)
     {
         Console.WriteLine("  (no signatures)");
         continue;
     }
 
-    int sigTableOffset = reader.GetOffset(section.SignatureRva);
+    int sigTableOffset = reader.GetOffset((int)section.SignatureTableRva);
 
     for (int i = 0; i < section.EntryCount; i++)
     {

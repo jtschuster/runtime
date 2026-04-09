@@ -111,7 +111,7 @@ public sealed class ParsedRuntimeFunction
     public BaseUnwindInfo UnwindInfo { get; }
 
     /// <summary>Parsed debug information (bounds and variables), or null.</summary>
-    public ParsedDebugInfo DebugInfo { get; }
+    public DebugInfo DebugInfo { get; }
 
     /// <summary>Parsed exception handling clauses, or null.</summary>
     public EHInfo EHInfo { get; }
@@ -124,7 +124,7 @@ public sealed class ParsedRuntimeFunction
         int unwindRva,
         int codeOffset,
         BaseUnwindInfo unwindInfo,
-        ParsedDebugInfo debugInfo,
+        DebugInfo debugInfo,
         EHInfo ehInfo)
     {
         Index = index;

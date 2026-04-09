@@ -28,10 +28,10 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
 
             for (uint i = 0; i < count; i++)
             {
-                int offset = 0;
+                int offset = default;
                 if (debugInfoArray.TryGetAt(i, ref offset))
                 {
-                    entries.Add(new DebugInfoEntry(i, offset));
+                    entries.Add(new DebugInfoEntry(i, (DebugInfoHandle)offset));
                 }
             }
 
@@ -49,12 +49,14 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         public uint RuntimeFunctionIndex { get; }
 
         /// <summary>File offset of the debug info data.</summary>
-        public int DebugInfoOffset { get; }
+        public DebugInfoHandle DebugInfoOffset { get; }
 
-        public DebugInfoEntry(uint runtimeFunctionIndex, int debugInfoOffset)
+        public DebugInfoEntry(uint runtimeFunctionIndex, DebugInfoHandle debugInfoOffset)
         {
             RuntimeFunctionIndex = runtimeFunctionIndex;
             DebugInfoOffset = debugInfoOffset;
         }
     }
+
+    public enum DebugInfoHandle {}
 }

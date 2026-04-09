@@ -503,22 +503,18 @@ public sealed class RawReadyToRunParser
         {
             foreach (var entry in debugInfo.Entries)
             {
-                _debugInfoOffsets[entry.RuntimeFunctionIndex] = entry.DebugInfoOffset;
+                _debugInfoOffsets[entry.RuntimeFunctionIndex] = (int)entry.DebugInfoOffset;
             }
         }
     }
 
-    private ParsedDebugInfo ParseDebugInfo(int runtimeFunctionIndex)
+    private DebugInfo ParseDebugInfo(int runtimeFunctionIndex)
     {
         int offset = GetDebugInfoOffset(runtimeFunctionIndex);
         if (offset < 0)
             return null;
 
-        return ParsedDebugInfo.Parse(
-            _formatReader.ImageReader,
-            _formatReader.Machine,
-            _formatReader.ReadyToRunHeader.MajorVersion,
-            offset);
+        return _formatReader.GetDebugInfo((DebugInfoHandle)offset);
     }
 
     /// <summary>
@@ -654,17 +650,17 @@ public sealed class RawReadyToRunParser
     private List<ParsedImportEntry> ParseImportSectionEntries(ImportSectionEntry section)
     {
         var entries = new List<ParsedImportEntry>();
-        if (section.SignatureRva == 0 || section.EntryCount == 0)
+        if ((int)section.SignatureTableRva == 0 || section.EntryCount == 0)
             return entries;
 
         try
         {
-            int signatureOffset = _formatReader.GetOffset(section.SignatureRva);
-            int sectionOffset = _formatReader.GetOffset(section.SectionRva);
+            int signatureOffset = _formatReader.GetOffset((int)section.SignatureTableRva);
+            int sectionOffset = _formatReader.GetOffset((int)section.SectionRva);
 
             for (int i = 0; i < section.EntryCount; i++)
             {
-                int entryRva = section.SectionRva + section.EntrySize * i;
+                int entryRva = (int)section.SectionRva + section.EntrySize * i;
                 R2RFixupSignature signature = null;
 
                 // Each entry in the signature table is a 4-byte RVA pointing to a signature blob

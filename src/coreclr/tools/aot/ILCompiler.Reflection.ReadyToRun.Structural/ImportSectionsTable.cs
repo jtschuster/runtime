@@ -54,14 +54,14 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
 
                 entries.Add(new ImportSectionEntry(
                     index++,
-                    sectionRva,
+                    (ImportSlotTableHandle)sectionRva,
                     sectionSize,
                     flags,
                     type,
                     entrySize,
                     entryCount,
-                    signatureRva,
-                    auxiliaryDataRva));
+                    (SignatureTableHandle)signatureRva,
+                    (AuxiliaryDataTableHandle)auxiliaryDataRva));
             }
 
             return new ImportSectionsTable(entries);
@@ -77,7 +77,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         public int Index { get; }
 
         /// <summary>RVA of the section containing values to be fixed up.</summary>
-        public int SectionRva { get; }
+        public ImportSlotTableHandle SectionRva { get; }
 
         /// <summary>Size of the section in bytes.</summary>
         public int SectionSize { get; }
@@ -94,22 +94,22 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         /// <summary>Number of entries in the import section.</summary>
         public int EntryCount { get; }
 
-        /// <summary>RVA of optional signature descriptors.</summary>
-        public int SignatureRva { get; }
+        /// <summary>RVA of the signature indirection table for this section.</summary>
+        public SignatureTableHandle SignatureTableRva { get; }
 
         /// <summary>RVA of optional auxiliary data (typically GC info).</summary>
-        public int AuxiliaryDataRva { get; }
+        public AuxiliaryDataTableHandle AuxiliaryDataRva { get; }
 
-        public ImportSectionEntry(
+        internal ImportSectionEntry(
             int index,
-            int sectionRva,
+            ImportSlotTableHandle sectionRva,
             int sectionSize,
             ReadyToRunImportSectionFlags flags,
             ReadyToRunImportSectionType type,
             byte entrySize,
             int entryCount,
-            int signatureRva,
-            int auxiliaryDataRva)
+            SignatureTableHandle signatureTableRva,
+            AuxiliaryDataTableHandle auxiliaryDataRva)
         {
             Index = index;
             SectionRva = sectionRva;
@@ -118,8 +118,12 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             Type = type;
             EntrySize = entrySize;
             EntryCount = entryCount;
-            SignatureRva = signatureRva;
+            SignatureTableRva = signatureTableRva;
             AuxiliaryDataRva = auxiliaryDataRva;
         }
     }
+    public enum SignatureHandle {}
+    public enum SignatureTableHandle {}
+    public enum ImportSlotTableHandle {}
+    public enum AuxiliaryDataTableHandle {}
 }

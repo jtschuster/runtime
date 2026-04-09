@@ -21,7 +21,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     /// RIDs, offsets, and flags encoded in that section.
     /// Also implements <see cref="IR2RImageContext"/> to support signature decoding.
     /// </summary>
-    public sealed class ReadyToRunReader : IR2RImageContext, IDisposable
+    public sealed partial class ReadyToRunReader : IR2RImageContext, IDisposable
     {
         private readonly IBinaryImageReader _compositeReader;
         private readonly NativeReader _imageReader;
