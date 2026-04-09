@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
+using System.Runtime.InteropServices;
 
 using Internal.ReadyToRunConstants;
 using Internal.Runtime;
@@ -20,12 +21,13 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     /// RIDs, offsets, and flags encoded in that section.
     /// Also implements <see cref="IR2RImageContext"/> to support signature decoding.
     /// </summary>
-    public sealed class ReadyToRunReader : IR2RImageContext
+    public sealed class ReadyToRunReader : IR2RImageContext, IDisposable
     {
         private readonly IBinaryImageReader _compositeReader;
         private readonly NativeReader _imageReader;
         private readonly byte[] _image;
         private readonly string _filename;
+        private readonly GCHandle _imagePin;
 
         // Assembly resolution
         private IAssemblyResolver _assemblyResolver;
@@ -75,6 +77,13 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             _image = image ?? throw new ArgumentNullException(nameof(image));
             _filename = filename ?? string.Empty;
             _assemblyCache = new List<IAssemblyMetadata>();
+            _imagePin = GCHandle.Alloc(_image, GCHandleType.Pinned);
+        }
+
+        public void Dispose()
+        {
+            if (_imagePin.IsAllocated)
+                _imagePin.Free();
         }
 
         /// <summary>The underlying binary image reader (PE or MachO).</summary>
