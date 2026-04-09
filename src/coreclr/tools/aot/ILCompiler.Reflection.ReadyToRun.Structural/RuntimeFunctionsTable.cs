@@ -30,11 +30,11 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
 
             for (int i = 0; i < count; i++)
             {
-                int startRva = reader.ImageReader.ReadInt32(ref offset);
-                int? endRva = null;
+                var startRva = (CodeRva)reader.ImageReader.ReadInt32(ref offset);
+                CodeRva? endRva = null;
                 if (isAmd64)
-                    endRva = reader.ImageReader.ReadInt32(ref offset);
-                int unwindRva = reader.ImageReader.ReadInt32(ref offset);
+                    endRva = (CodeRva)reader.ImageReader.ReadInt32(ref offset);
+                var unwindRva = (UnwindInfoHandle)reader.ImageReader.ReadInt32(ref offset);
                 entries.Add(new RuntimeFunctionEntry(i, startRva, endRva, unwindRva));
             }
 
@@ -51,15 +51,15 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         public int Index { get; }
 
         /// <summary>RVA of the start of the code.</summary>
-        public int StartRva { get; }
+        public CodeRva StartRva { get; }
 
         /// <summary>RVA of the end of the code (Amd64 only; null on other architectures).</summary>
-        public int? EndRva { get; }
+        public CodeRva? EndRva { get; }
 
         /// <summary>RVA of the unwind information.</summary>
-        public int UnwindRva { get; }
+        public UnwindInfoHandle UnwindRva { get; }
 
-        public RuntimeFunctionEntry(int index, int startRva, int? endRva, int unwindRva)
+        public RuntimeFunctionEntry(int index, CodeRva startRva, CodeRva? endRva, UnwindInfoHandle unwindRva)
         {
             Index = index;
             StartRva = startRva;
@@ -67,4 +67,10 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             UnwindRva = unwindRva;
         }
     }
+
+    /// <summary>Opaque handle representing an RVA pointing to code in the image.</summary>
+    public enum CodeRva {}
+
+    /// <summary>Opaque handle representing an RVA pointing to unwind information.</summary>
+    public enum UnwindInfoHandle {}
 }

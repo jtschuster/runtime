@@ -167,6 +167,9 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         /// <summary>Get the file offset corresponding to an RVA.</summary>
         public int GetOffset(int rva) => _compositeReader.GetOffset(rva);
 
+        /// <summary>Get the file offset corresponding to a section RVA.</summary>
+        public int GetOffset(SectionRva rva) => _compositeReader.GetOffset((int)rva);
+
         // ── Section properties ──────────────────────────────────────────
 
         /// <summary>CompilerIdentifier (100): UTF-8 string identifying the compiler.</summary>

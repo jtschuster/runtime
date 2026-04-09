@@ -29,8 +29,8 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             // We read pairs until we exhaust the section.
             while (length >= 2 * sizeof(int))
             {
-                int methodRva = reader.ImageReader.ReadInt32(ref offset);
-                int ehInfoRva = reader.ImageReader.ReadInt32(ref offset);
+                var methodRva = (CodeRva)reader.ImageReader.ReadInt32(ref offset);
+                var ehInfoRva = (EHInfoHandle)reader.ImageReader.ReadInt32(ref offset);
                 entries.Add(new ExceptionInfoEntry(methodRva, ehInfoRva));
                 length -= 2 * sizeof(int);
             }
@@ -46,15 +46,18 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     public sealed class ExceptionInfoEntry
     {
         /// <summary>RVA of the method code.</summary>
-        public int MethodRva { get; }
+        public CodeRva MethodRva { get; }
 
         /// <summary>RVA of the exception handling info.</summary>
-        public int EhInfoRva { get; }
+        public EHInfoHandle EhInfoRva { get; }
 
-        public ExceptionInfoEntry(int methodRva, int ehInfoRva)
+        public ExceptionInfoEntry(CodeRva methodRva, EHInfoHandle ehInfoRva)
         {
             MethodRva = methodRva;
             EhInfoRva = ehInfoRva;
         }
     }
+
+    /// <summary>Opaque handle representing an RVA pointing to exception handling information.</summary>
+    public enum EHInfoHandle {}
 }

@@ -17,14 +17,14 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         /// <summary>
         /// The RVA to the section
         /// </summary>
-        public int RelativeVirtualAddress { get; set; }
+        public SectionRva RelativeVirtualAddress { get; set; }
 
         /// <summary>
         /// The size of the section
         /// </summary>
         public int Size { get; set; }
 
-        public ReadyToRunSection(ReadyToRunSectionType type, int rva, int size)
+        public ReadyToRunSection(ReadyToRunSectionType type, SectionRva rva, int size)
         {
             Type = type;
             RelativeVirtualAddress = rva;
@@ -36,4 +36,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             throw new NotImplementedException();
         }
     }
+
+    /// <summary>Opaque handle representing an RVA pointing to the start of a ReadyToRun section.</summary>
+    public enum SectionRva {}
 }

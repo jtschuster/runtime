@@ -57,7 +57,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
                 offset = (int)imageReader.DecodeUnsigned((uint)offset, ref id);
 
                 int? fixupOffset = null;
-                uint runtimeFunctionIndex;
+                RuntimeFunctionIndex runtimeFunctionIndex;
 
                 if ((id & 1) != 0)
                 {
@@ -71,11 +71,11 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
                     }
 
                     fixupOffset = offset;
-                    runtimeFunctionIndex = id >> 2;
+                    runtimeFunctionIndex = (RuntimeFunctionIndex)(id >> 2);
                 }
                 else
                 {
-                    runtimeFunctionIndex = id >> 1;
+                    runtimeFunctionIndex = (RuntimeFunctionIndex)(id >> 1);
                 }
 
                 // Parse the fixup delay list (nibble-encoded import section/slot pairs)
@@ -127,12 +127,12 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         public uint Rid { get; }
 
         /// <summary>Index into the RuntimeFunctions array.</summary>
-        public uint EntryPointIndex { get; }
+        public RuntimeFunctionIndex EntryPointIndex { get; }
 
         /// <summary>Fixup cells this method needs resolved before execution.</summary>
         public IReadOnlyList<FixupCellRef> FixupCells { get; }
 
-        public MethodDefEntry(uint rid, uint entryPointIndex, List<FixupCellRef> fixupCells)
+        public MethodDefEntry(uint rid, RuntimeFunctionIndex entryPointIndex, List<FixupCellRef> fixupCells)
         {
             Rid = rid;
             EntryPointIndex = entryPointIndex;
@@ -158,4 +158,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             CellIndex = cellIndex;
         }
     }
+
+    /// <summary>Opaque handle representing an index into the RuntimeFunctions table.</summary>
+    public enum RuntimeFunctionIndex {}
 }

@@ -77,7 +77,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
                 }
                 int sectionStartRva = imageReader.ReadInt32(ref curOffset);
                 int sectionLength = imageReader.ReadInt32(ref curOffset);
-                Sections[sectionType] = new ReadyToRunSection(sectionType, sectionStartRva, sectionLength);
+                Sections[sectionType] = new ReadyToRunSection(sectionType, (SectionRva)sectionStartRva, sectionLength);
             }
         }
     }

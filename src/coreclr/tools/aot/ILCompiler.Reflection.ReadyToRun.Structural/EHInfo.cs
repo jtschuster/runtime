@@ -148,12 +148,12 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         /// <summary>
         /// RVA of the EH info in the PE image.
         /// </summary>
-        public int RelativeVirtualAddress { get; }
+        public EHInfoHandle Handle { get; }
 
         /// <summary>
         /// Starting RVA of the corresponding runtime function.
         /// </summary>
-        public int MethodRelativeVirtualAddress { get; }
+        public CodeRva MethodRelativeVirtualAddress { get; }
 
         private List<EHClause> _clauses;
 
@@ -169,10 +169,10 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             }
         }
 
-        public EHInfo(NativeReader imageReader, int ehInfoRva, int methodRva, int offset, int clauseCount)
+        public EHInfo(NativeReader imageReader, EHInfoHandle handle, CodeRva methodRva, int offset, int clauseCount)
         {
             _imageReader = imageReader;
-            RelativeVirtualAddress = ehInfoRva;
+            Handle = handle;
             MethodRelativeVirtualAddress = methodRva;
             _offset = offset;
             _clauseCount = clauseCount;
@@ -196,9 +196,43 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         {
             foreach (EHClause ehClause in EHClauses)
             {
-                ehClause.WriteTo(writer, MethodRelativeVirtualAddress, dumpRva: dumpRva);
+                ehClause.WriteTo(writer, (int)MethodRelativeVirtualAddress, dumpRva: dumpRva);
                 writer.WriteLine();
             }
+        }
+    }
+}
+
+namespace ILCompiler.Reflection.ReadyToRun.Structural
+{
+    public partial class ReadyToRunReader
+    {
+        private readonly Dictionary<EHInfoHandle, EHInfo> _ehInfoCache = new();
+
+        /// <summary>
+        /// Resolve an <see cref="EHInfoHandle"/> to its parsed exception handling information.
+        /// </summary>
+        /// <param name="handle">Handle pointing to the EH info RVA.</param>
+        /// <param name="methodRva">Code RVA of the method this EH info belongs to.</param>
+        /// <param name="clauseCount">Number of EH clauses to read.</param>
+        public EHInfo GetEHInfo(EHInfoHandle handle, CodeRva methodRva, int clauseCount)
+        {
+            if (_ehInfoCache.TryGetValue(handle, out EHInfo cached))
+                return cached;
+
+            EHInfo result;
+            try
+            {
+                int offset = GetOffset((int)handle);
+                result = new EHInfo(ImageReader, handle, methodRva, offset, clauseCount);
+            }
+            catch
+            {
+                result = null;
+            }
+
+            _ehInfoCache[handle] = result;
+            return result;
         }
     }
 }
