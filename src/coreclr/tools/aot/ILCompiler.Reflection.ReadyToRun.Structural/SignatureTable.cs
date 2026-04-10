@@ -40,13 +40,13 @@ public partial class ReadyToRunReader
         if (_signatureTableCache.TryGetValue(handle, out SignatureTable cached))
             return cached;
 
-        int tableOffset = GetOffset((int)handle);
+        int tableOffset = GetOffsetForRVA((int)handle);
         var entries = new SignatureHandle[entryCount];
 
         for (int i = 0; i < entryCount; i++)
         {
             int slotOffset = tableOffset + i * sizeof(int);
-            int sigRva = (int)_imageReader.ReadUInt32(ref slotOffset);
+            int sigRva = (int)_nativeReader.ReadUInt32(ref slotOffset);
             entries[i] = (SignatureHandle)sigRva;
         }
 

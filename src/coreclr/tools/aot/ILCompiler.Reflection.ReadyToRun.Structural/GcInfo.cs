@@ -41,7 +41,7 @@ public partial class ReadyToRunReader
                 gcInfoRva = (int)handle + unwindInfo.Size;
             }
 
-            int gcInfoOffset = GetOffset(gcInfoRva);
+            int gcInfoOffset = GetOffsetForRVA(gcInfoRva);
 
             if (Machine == Machine.I386)
             {

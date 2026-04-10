@@ -24,14 +24,14 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public ExceptionInfoTable GetExceptionInfoTable(ReadyToRunSectionHandle section)
         {
-            int offset = GetOffset(section.RelativeVirtualAddress);
+            int offset = GetOffsetForRVA(section.RelativeVirtualAddress);
             int length = section.Size;
             var entries = new List<ExceptionInfoEntry>();
 
             while (length >= 2 * sizeof(int))
             {
-                var methodRva = (CodeRva)_imageReader.ReadInt32(ref offset);
-                var ehInfoRva = (EHInfoHandle)_imageReader.ReadInt32(ref offset);
+                var methodRva = (CodeRva)_nativeReader.ReadInt32(ref offset);
+                var ehInfoRva = (EHInfoHandle)_nativeReader.ReadInt32(ref offset);
                 entries.Add(new ExceptionInfoEntry(methodRva, ehInfoRva));
                 length -= 2 * sizeof(int);
             }

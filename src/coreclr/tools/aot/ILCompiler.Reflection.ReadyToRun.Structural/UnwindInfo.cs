@@ -23,7 +23,7 @@ public partial class ReadyToRunReader
         BaseUnwindInfo result;
         try
         {
-            int unwindOffset = GetOffset((int)handle);
+            int unwindOffset = GetOffsetForRVA((int)handle);
             result = Machine switch
             {
                 Machine.I386 => new x86.UnwindInfo(ImageReader, unwindOffset),

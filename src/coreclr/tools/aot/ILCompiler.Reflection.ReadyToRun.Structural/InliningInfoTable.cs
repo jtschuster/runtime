@@ -25,18 +25,18 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public InliningInfoTable GetInliningInfoTable(ReadyToRunSectionHandle section)
         {
-            int startOffset = GetOffset(section.RelativeVirtualAddress);
+            int startOffset = GetOffsetForRVA(section.RelativeVirtualAddress);
             int offset = startOffset;
-            int sizeOfInlineIndex = _imageReader.ReadInt32(ref offset);
+            int sizeOfInlineIndex = _nativeReader.ReadInt32(ref offset);
             int inlineIndexEndOffset = offset + sizeOfInlineIndex;
             var entries = new List<InliningInfoEntry>();
 
             while (offset < inlineIndexEndOffset)
             {
-                int inlineeRid = _imageReader.ReadInt32(ref offset);
-                int inlinersRelativeOffset = _imageReader.ReadInt32(ref offset);
+                int inlineeRid = _nativeReader.ReadInt32(ref offset);
+                int inlinersRelativeOffset = _nativeReader.ReadInt32(ref offset);
 
-                var nibbleReader = new NibbleReader(_imageReader, inlineIndexEndOffset + inlinersRelativeOffset);
+                var nibbleReader = new NibbleReader(_nativeReader, inlineIndexEndOffset + inlinersRelativeOffset);
                 uint sameModuleCount = nibbleReader.ReadUInt();
 
                 var inlinerRids = new List<int>();

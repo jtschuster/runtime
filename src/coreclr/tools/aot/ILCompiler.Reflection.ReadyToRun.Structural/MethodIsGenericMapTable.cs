@@ -41,13 +41,13 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public MethodIsGenericMapTable GetMethodIsGenericMapTable(ReadyToRunSectionHandle section)
         {
-            int offset = GetOffset(section.RelativeVirtualAddress);
-            int count = _imageReader.ReadInt32(ref offset);
+            int offset = GetOffsetForRVA(section.RelativeVirtualAddress);
+            int count = _nativeReader.ReadInt32(ref offset);
             int byteCount = (count + 7) / 8;
             byte[] data = new byte[byteCount];
 
             for (int i = 0; i < byteCount; i++)
-                data[i] = _imageReader.ReadByte(ref offset);
+                data[i] = _nativeReader.ReadByte(ref offset);
 
             return new MethodIsGenericMapTable(count, data);
         }

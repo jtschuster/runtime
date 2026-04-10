@@ -26,8 +26,8 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public MethodDefEntryPointsTable GetMethodDefEntryPointsTable(ReadyToRunSectionHandle section)
         {
-            int sectionOffset = GetOffset(section.RelativeVirtualAddress);
-            NativeArray methodEntryPoints = new NativeArray(_imageReader, (uint)sectionOffset);
+            int sectionOffset = GetOffsetForRVA(section.RelativeVirtualAddress);
+            NativeArray methodEntryPoints = new NativeArray(_nativeReader, (uint)sectionOffset);
             uint count = methodEntryPoints.GetCount();
 
             var entries = new List<MethodDefEntry>((int)count);
@@ -39,7 +39,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
                     continue;
 
                 uint id = 0;
-                offset = (int)_imageReader.DecodeUnsigned((uint)offset, ref id);
+                offset = (int)_nativeReader.DecodeUnsigned((uint)offset, ref id);
 
                 int? fixupOffset = null;
                 RuntimeFunctionIndex runtimeFunctionIndex;
@@ -49,7 +49,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
                     if ((id & 2) != 0)
                     {
                         uint val = 0;
-                        _imageReader.DecodeUnsigned((uint)offset, ref val);
+                        _nativeReader.DecodeUnsigned((uint)offset, ref val);
                         offset -= (int)val;
                     }
 
@@ -64,7 +64,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
                 var fixupCells = new List<FixupCellRef>();
                 if (fixupOffset.HasValue)
                 {
-                    NibbleReader nibbleReader = new NibbleReader(_imageReader, fixupOffset.Value);
+                    NibbleReader nibbleReader = new NibbleReader(_nativeReader, fixupOffset.Value);
                     uint curTableIndex = nibbleReader.ReadUInt();
 
                     while (true)

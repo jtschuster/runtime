@@ -25,7 +25,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public RuntimeFunctionsTable GetRuntimeFunctionsTable(ReadyToRunSectionHandle section)
         {
-            int offset = GetOffset(section.RelativeVirtualAddress);
+            int offset = GetOffsetForRVA(section.RelativeVirtualAddress);
             int entrySize = CalculateRuntimeFunctionSize();
             int count = section.Size / entrySize;
             bool isAmd64 = Machine == Machine.Amd64;
@@ -33,16 +33,26 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
 
             for (int i = 0; i < count; i++)
             {
-                var startRva = (CodeRva)_imageReader.ReadInt32(ref offset);
+                var startRva = (CodeRva)_nativeReader.ReadInt32(ref offset);
                 CodeRva? endRva = null;
                 if (isAmd64)
-                    endRva = (CodeRva)_imageReader.ReadInt32(ref offset);
-                var unwindRva = (UnwindInfoHandle)_imageReader.ReadInt32(ref offset);
+                    endRva = (CodeRva)_nativeReader.ReadInt32(ref offset);
+                var unwindRva = (UnwindInfoHandle)_nativeReader.ReadInt32(ref offset);
                 entries.Add(new RuntimeFunctionEntry(i, startRva, endRva, unwindRva));
             }
 
             return new RuntimeFunctionsTable(entries);
         }
+
+        /// <summary>
+        /// Calculates the runtime function entry size based on the target machine.
+        /// Amd64 has 3 ints (start, end, unwind); others have 2 (start, unwind).
+        /// </summary>
+        internal int CalculateRuntimeFunctionSize()
+        {
+            return Machine == Machine.Amd64 ? 3 * sizeof(int) : 2 * sizeof(int);
+        }
+
     }
 
     /// <summary>

@@ -48,7 +48,7 @@ Console.WriteLine();
 
 // Dump imports
 ReadyToRunSectionHandle? importSectionsHandle = null;
-foreach (var s in reader.Sections)
+foreach (var s in reader.GetSections())
 {
     if (s.Type == ReadyToRunSectionType.ImportSections)
     {
@@ -76,7 +76,7 @@ foreach (ImportSectionEntry section in importSections.Entries)
         continue;
     }
 
-    int sigTableOffset = reader.GetOffset((int)section.SignatureTableRva);
+    int sigTableOffset = reader.GetOffsetForRVA((int)section.SignatureTableRva);
 
     for (int i = 0; i < section.EntryCount; i++)
     {
@@ -87,7 +87,7 @@ foreach (ImportSectionEntry section in importSections.Entries)
             Console.WriteLine($"  [{i}] (null signature)");
             continue;
         }
-        int sigOffset = reader.GetOffset((int)sigRva);
+        int sigOffset = reader.GetOffsetForRVA((int)sigRva);
 
         // Read fixup kind byte
         byte fixupByte = nativeReader.ReadByte(ref sigOffset);
@@ -498,7 +498,7 @@ static string[] BuildModuleNameTable(StructuralReader reader, PEReader peReader,
     }
 
     ReadyToRunSectionHandle? manifestHandle = null;
-    foreach (var s in reader.Sections)
+    foreach (var s in reader.GetSections())
     {
         if (s.Type == ReadyToRunSectionType.ManifestMetadata)
         {
@@ -507,20 +507,9 @@ static string[] BuildModuleNameTable(StructuralReader reader, PEReader peReader,
         }
     }
 
-    ManifestMetadataSection manifest = manifestHandle is not null ? reader.GetManifestMetadataSection(manifestHandle.Value) : null;
+    IAssemblyMetadata manifest = manifestHandle is not null ? reader.GetManifestMetadataReader(manifestHandle.Value) : null;
+    var manifestReader = manifest.MetadataReader;
     int manifestAssemblyRefCount = 0;
-    MetadataReader manifestReader = null;
-    if (manifest is not null)
-    {
-        unsafe
-        {
-            fixed (byte* ptr = image)
-            {
-                manifestReader = new MetadataReader(ptr + manifest.FileOffset, manifest.Size);
-                manifestAssemblyRefCount = manifestReader.GetTableRowCount(TableIndex.AssemblyRef);
-            }
-        }
-    }
 
     int totalSlots = mainAssemblyRefCount + 1 + manifestAssemblyRefCount + 1;
     string[] names = new string[totalSlots];

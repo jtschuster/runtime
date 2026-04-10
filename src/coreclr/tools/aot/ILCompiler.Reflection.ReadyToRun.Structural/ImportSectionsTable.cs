@@ -82,7 +82,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public ImportSectionsTableSection GetImportSectionsTableSection(ReadyToRunSectionHandle section)
         {
-            int offset = this.GetOffset(section.RelativeVirtualAddress);
+            int offset = this.GetOffsetForRVA(section.RelativeVirtualAddress);
             int endOffset = offset + section.Size;
             var entries = new List<ImportSectionEntry>();
             int index = 0;

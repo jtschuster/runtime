@@ -50,13 +50,13 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public TypeGenericInfoMapTable GetTypeGenericInfoMapTable(ReadyToRunSectionHandle section)
         {
-            int offset = GetOffset(section.RelativeVirtualAddress);
-            int count = _imageReader.ReadInt32(ref offset);
+            int offset = GetOffsetForRVA(section.RelativeVirtualAddress);
+            int count = _nativeReader.ReadInt32(ref offset);
             int byteCount = (count + 1) / 2;
             byte[] data = new byte[byteCount];
 
             for (int i = 0; i < byteCount; i++)
-                data[i] = _imageReader.ReadByte(ref offset);
+                data[i] = _nativeReader.ReadByte(ref offset);
 
             return new TypeGenericInfoMapTable(count, data);
         }

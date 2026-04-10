@@ -38,12 +38,12 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public EnclosingTypeMapTable GetEnclosingTypeMapTable(ReadyToRunSectionHandle section)
         {
-            int offset = GetOffset(section.RelativeVirtualAddress);
-            ushort count = _imageReader.ReadUInt16(ref offset);
+            int offset = GetOffsetForRVA(section.RelativeVirtualAddress);
+            ushort count = _nativeReader.ReadUInt16(ref offset);
             ushort[] rids = new ushort[count];
 
             for (int i = 0; i < count; i++)
-                rids[i] = _imageReader.ReadUInt16(ref offset);
+                rids[i] = _nativeReader.ReadUInt16(ref offset);
 
             return new EnclosingTypeMapTable(count, rids);
         }

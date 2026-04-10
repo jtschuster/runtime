@@ -24,8 +24,8 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public DebugInfoTable GetDebugInfoTable(ReadyToRunSectionHandle section)
         {
-            int sectionOffset = GetOffset(section.RelativeVirtualAddress);
-            NativeArray debugInfoArray = new NativeArray(_imageReader, (uint)sectionOffset);
+            int sectionOffset = GetOffsetForRVA(section.RelativeVirtualAddress);
+            NativeArray debugInfoArray = new NativeArray(_nativeReader, (uint)sectionOffset);
             uint count = debugInfoArray.GetCount();
             var entries = new List<DebugInfoEntry>();
 

@@ -29,9 +29,9 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         {
             bool multiModuleFormat = (ReadyToRunHeader.Flags & (uint)ReadyToRunFlags.READYTORUN_FLAG_MultiModuleVersionBubble) != 0;
 
-            int sectionOffset = GetOffset(section.RelativeVirtualAddress);
-            NativeParser parser = new NativeParser(_imageReader, (uint)sectionOffset);
-            NativeHashtable hashtable = new NativeHashtable(_imageReader, parser, (uint)(sectionOffset + section.Size));
+            int sectionOffset = GetOffsetForRVA(section.RelativeVirtualAddress);
+            NativeParser parser = new NativeParser(_nativeReader, (uint)sectionOffset);
+            NativeHashtable hashtable = new NativeHashtable(_nativeReader, parser, (uint)(sectionOffset + section.Size));
             var enumerator = hashtable.EnumerateAllEntries();
             var entries = new List<CrossModuleInlineEntry>();
 

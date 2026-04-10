@@ -25,14 +25,14 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public HotColdMapTable GetHotColdMapTable(ReadyToRunSectionHandle section)
         {
-            int offset = GetOffset(section.RelativeVirtualAddress);
+            int offset = GetOffsetForRVA(section.RelativeVirtualAddress);
             int count = section.Size / (2 * sizeof(int));
             var entries = new List<HotColdMapEntry>(count);
 
             for (int i = 0; i < count; i++)
             {
-                int coldRuntimeFunctionIndex = _imageReader.ReadInt32(ref offset);
-                int hotRuntimeFunctionIndex = _imageReader.ReadInt32(ref offset);
+                int coldRuntimeFunctionIndex = _nativeReader.ReadInt32(ref offset);
+                int hotRuntimeFunctionIndex = _nativeReader.ReadInt32(ref offset);
                 entries.Add(new HotColdMapEntry(hotRuntimeFunctionIndex, coldRuntimeFunctionIndex));
             }
 

@@ -24,11 +24,5 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         /// Size of a pointer on the target architecture (4 or 8).
         /// </summary>
         int TargetPointerSize { get; }
-
-        /// <summary>
-        /// Open a reference assembly by its module index in the manifest metadata.
-        /// Returns <see cref="IAssemblyMetadata"/> for the referenced module.
-        /// </summary>
-        IAssemblyMetadata OpenReferenceAssembly(int index);
     }
 }

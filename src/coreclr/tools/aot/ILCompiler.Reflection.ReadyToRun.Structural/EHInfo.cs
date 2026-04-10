@@ -179,7 +179,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
                 return null;
             }
 
-            int offset = GetOffset((int)handle);
+            int offset = GetOffsetForRVA((int)handle);
             var clauses = new List<EHClause>(clauseCount);
             for (int i = 0; i < clauseCount; i++)
             {

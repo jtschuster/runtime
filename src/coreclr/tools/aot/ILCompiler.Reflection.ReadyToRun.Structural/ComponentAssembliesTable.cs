@@ -24,16 +24,16 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         public ComponentAssembliesTable GetComponentAssembliesTable(ReadyToRunSectionHandle section)
         {
-            int offset = GetOffset(section.RelativeVirtualAddress);
+            int offset = GetOffsetForRVA(section.RelativeVirtualAddress);
             int count = section.Size / ComponentAssembly.Size;
             var entries = new List<ComponentAssemblyEntry>(count);
 
             for (int i = 0; i < count; i++)
             {
-                int corHeaderRva = _imageReader.ReadInt32(ref offset);
-                int corHeaderSize = _imageReader.ReadInt32(ref offset);
-                int assemblyHeaderRva = _imageReader.ReadInt32(ref offset);
-                int assemblyHeaderSize = _imageReader.ReadInt32(ref offset);
+                int corHeaderRva = _nativeReader.ReadInt32(ref offset);
+                int corHeaderSize = _nativeReader.ReadInt32(ref offset);
+                int assemblyHeaderRva = _nativeReader.ReadInt32(ref offset);
+                int assemblyHeaderSize = _nativeReader.ReadInt32(ref offset);
                 entries.Add(new ComponentAssemblyEntry(i, corHeaderRva, corHeaderSize, assemblyHeaderRva, assemblyHeaderSize));
             }
 

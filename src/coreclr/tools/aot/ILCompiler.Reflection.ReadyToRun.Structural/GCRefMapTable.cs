@@ -102,7 +102,7 @@ public partial class ReadyToRunReader
         if (_gcRefMapTableCache.TryGetValue(handle, out GCRefMapTable cached))
             return cached;
 
-        int auxDataOffset = GetOffset((int)handle);
+        int auxDataOffset = GetOffsetForRVA((int)handle);
         var entries = new GCRefMap[entryCount];
 
         for (int i = 0; i < entryCount; i++)
