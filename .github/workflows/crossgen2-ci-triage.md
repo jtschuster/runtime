@@ -60,7 +60,7 @@ timeout-minutes: 30
 
 permissions:
   contents: read
-  issues: read
+  issues: write
   actions: read
   pull-requests: read
 
@@ -203,7 +203,19 @@ For each unknown failure, search GitHub for existing issues that might already t
 
 3. **Check MihuBot results**: The CI analysis script with `-SearchMihuBot` may have already found related issues — use those results.
 
-If an existing open issue already tracks the failure, skip creating a new one. Note the existing issue number in your analysis.
+If an existing open issue already tracks the failure, **do not create a new issue**. Instead, add a comment to the existing issue with the new build link and any additional failure details:
+
+```markdown
+### Recurrence
+
+This failure was observed again in a recent build:
+
+- **Pipeline**: <pipeline name>
+- **Build**: [<build_id>](https://dev.azure.com/dnceng-public/public/_build/results?buildId=<build_id>)
+- **Configuration**: <OS/arch/config if available>
+```
+
+This helps track how frequently the failure is occurring and on which configurations.
 
 ## Step 5: Create Issues for New Failures
 
@@ -300,12 +312,54 @@ For Option B (disabling tests), provide specific guidance:
 - Suggest the correct `[ActiveIssue]` attribute syntax
 - Note which configurations to disable for (e.g., only crossgen2, only specific OS)
 
-## Step 6: Update Cache Memory
+## Step 6: Close Stale Issues
+
+Search for open GitHub issues with the `[Crossgen2 CI]` title prefix that may no longer be relevant. For each such issue:
+
+### Check Recent Builds
+
+1. Query the last 3 completed builds on `main` for each target pipeline (using the same approach as Step 1, but with a larger time window or higher `$top` count).
+2. Run CI analysis on those builds (or use cached results from Step 2 if they overlap).
+3. Determine whether the failure described in the issue **reproduced in any of the last 3 builds on `main`**.
+
+### If the Failure Has NOT Reproduced in the Last 3 Builds
+
+1. **Search for a potential fix in the commit history.** Look through recent commits in `dotnet/runtime` on `main` (from the time the issue was opened until now) for commits that might have fixed the issue. Look for:
+   - Commits that modify files related to the failing test (test source files, the code under test)
+   - Commit messages mentioning the test name, the issue number, or keywords related to the failure
+   - PRs that fixed related bugs or addressed the same area of code
+
+2. **If a likely fix is found**, close the issue with a comment:
+
+   ```markdown
+   ### Auto-Closed: Likely Fixed
+
+   This failure has not reproduced in the last 3 builds on `main`. A commit that likely fixed this issue was found:
+
+   - **Commit**: <commit SHA link>
+   - **Summary**: <commit message summary>
+
+   Closing as resolved. Reopen if the failure recurs.
+   ```
+
+3. **If no likely fix is found but the issue is older than 7 days**, close the issue with a comment:
+
+   ```markdown
+   ### Auto-Closed: Not Reproducing
+
+   This failure has not reproduced in the last 3 builds on `main` and the issue has been open for more than 7 days. Closing as no longer reproducing. Reopen if the failure recurs.
+   ```
+
+4. **If no likely fix is found and the issue is less than 7 days old**, leave the issue open — it may still be intermittent and needs more time to confirm resolution.
+
+## Step 7: Update Cache Memory
 
 After processing all builds, write the updated `triaged-builds.json` to `cache-memory` with:
 - Build IDs that were analyzed from the crossgen2 target pipelines
 - Build IDs from the `runtime` cross-reference pipeline that were checked (to avoid re-analyzing them)
 - Failure signatures (test name + error category) that were triaged
+- Issues that were closed as stale (issue number and reason)
+- Issues that were updated with new build links (issue number and build ID)
 - Timestamp of this triage run
 
 Use filesystem-safe timestamp format `YYYY-MM-DD-HH-MM-SS` (no colons).
@@ -323,7 +377,11 @@ Use filesystem-safe timestamp format `YYYY-MM-DD-HH-MM-SS` (no colons).
   - Do NOT say "Helix console logs are not accessible without authentication" as a substitute for error details. The CI analysis script already extracts error information — use it.
 - **Include enough context in issues** for Copilot Coding Agent to act without further investigation.
 - **Group related failures.** If the same test fails across multiple pipelines or configurations, create a single issue covering all occurrences.
+- **Update existing issues with new build links.** When a failure matches an already-open issue, always add a comment with the new build link instead of creating a duplicate.
+- **Close stale issues proactively.** If a failure hasn't reproduced in the last 3 builds on `main`, check the commit history for a likely fix. Close the issue if a fix is found or if the issue has been open for more than 7 days without reproducing.
 - When calling the `noop` safe output, include:
   - A summary of what was analyzed (which pipelines, how many builds)
   - Any failures that were skipped because they also appear in the `runtime` pipeline (list the test names and note they are shared with `runtime`)
   - Any failures that were skipped because they match known issues or cached entries
+  - Any existing issues that were updated with new build links (list issue numbers and build IDs)
+  - Any stale issues that were closed (list issue numbers and the reason — likely fix found or not reproducing for over 7 days)
