@@ -1011,7 +1011,7 @@ static string DecodeGenericInst(NativeReader reader, ref int offset, MetadataRea
     // outerDecoder pattern where _outerReader is used instead of _metadataReader.
     for (int i = 0; i < (int)argCount; i++)
         args[i] = DecodeType(reader, ref offset, outerMdReader, resolver, outerMdReader);
-    return $"{openType}<{string.Join(", ", args)}>";
+    return $"{openType}<{string.Join(",", args)}>";
 }
 
 static string DecodeArrayType(NativeReader reader, ref int offset, MetadataReader mdReader, DiskAssemblyResolver resolver, MetadataReader outerMdReader)
