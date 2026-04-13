@@ -8,6 +8,7 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 
+using ILCompiler.Reflection.ReadyToRun.MachO;
 using ILCompiler.Reflection.ReadyToRun.Structural;
 using Internal.CorConstants;
 using Internal.ReadyToRunConstants;
@@ -22,11 +23,24 @@ if (args.Length < 1)
 }
 
 string filename = args[0];
-using PEReader peReader = new PEReader(File.OpenRead(filename));
-PEImageReader peImageReader = new PEImageReader(peReader);
-using NativeReader nativeReader = new NativeReader(File.OpenRead(filename));
-using StructuralReader reader = new StructuralReader(peImageReader, nativeReader, filename);
-using DiskAssemblyResolver resolver = new DiskAssemblyResolver(reader, peReader, filename);
+byte[] imageBytes = File.ReadAllBytes(filename);
+bool isMachO = imageBytes.Length >= 4
+    && imageBytes[0] == 0xCF && imageBytes[1] == 0xFA && imageBytes[2] == 0xED && imageBytes[3] == 0xFE;
+
+IBinaryImageReader imageReader;
+using PEReader peReader = isMachO ? null : new PEReader(new MemoryStream(imageBytes));
+if (isMachO)
+{
+    imageReader = new MachOImageReader(imageBytes);
+}
+else
+{
+    imageReader = new PEImageReader(peReader);
+}
+
+using NativeReader nativeReader = new NativeReader(new MemoryStream(imageBytes));
+using StructuralReader reader = new StructuralReader(imageReader, nativeReader, filename);
+using DiskAssemblyResolver resolver = new DiskAssemblyResolver(reader, imageReader, filename);
 
 Console.WriteLine($"Image: {Path.GetFileName(filename)}");
 Console.WriteLine($"Machine: {reader.Machine}  Composite: {reader.Composite}");

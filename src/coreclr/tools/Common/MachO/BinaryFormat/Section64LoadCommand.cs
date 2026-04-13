@@ -33,4 +33,6 @@ internal readonly struct Section64LoadCommand
     internal ulong GetVMAddress(MachHeader header) => header.ConvertValue(_address);
     internal ulong GetSize(MachHeader header) => header.ConvertValue(_size);
     internal uint GetFileOffset(MachHeader header) => header.ConvertValue(_fileOffset);
+    internal uint GetRelocationOffset(MachHeader header) => header.ConvertValue(_relocationOffset);
+    internal uint GetNumberOfRelocationEntries(MachHeader header) => header.ConvertValue(_numberOfReloationEntries);
 }

@@ -28,15 +28,15 @@ internal sealed class DiskAssemblyResolver : IAssemblyResolver
 
     public DiskAssemblyResolver(
         StructuralReader reader,
-        PEReader mainPeReader,
+        IBinaryImageReader imageReader,
         string mainFilePath)
     {
         _imageDirectory = Path.GetDirectoryName(Path.GetFullPath(mainFilePath));
         _keepAlive = new List<(byte[] bytes, PEReader pe)>();
         _moduleMetadata = new Dictionary<int, MetadataReader>();
 
-        _moduleNames = BuildModuleNameTable(reader, mainPeReader);
-        LoadModuleMetadata(mainPeReader);
+        _moduleNames = BuildModuleNameTable(reader, imageReader);
+        LoadModuleMetadata(imageReader);
 
         // For composite images with startAtTwo, index 1 = manifest metadata
         var header = reader.GetHeader();
@@ -133,11 +133,11 @@ internal sealed class DiskAssemblyResolver : IAssemblyResolver
         _moduleMetadata.Clear();
     }
 
-    private static string[] BuildModuleNameTable(StructuralReader reader, PEReader peReader)
+    private static string[] BuildModuleNameTable(StructuralReader reader, IBinaryImageReader imageReader)
     {
-        MetadataReader mainMetadata = peReader.GetMetadataReader();
+        MetadataReader mainMetadata = imageReader.GetStandaloneAssemblyMetadata();
         bool isComposite = reader.Composite;
-        int mainAssemblyRefCount = isComposite
+        int mainAssemblyRefCount = isComposite || mainMetadata is null
             ? 0
             : mainMetadata.GetTableRowCount(TableIndex.AssemblyRef);
 
@@ -168,7 +168,14 @@ internal sealed class DiskAssemblyResolver : IAssemblyResolver
         var names = new string[totalSlots];
 
         // Module 0 = self
-        names[0] = mainMetadata.GetString(mainMetadata.GetAssemblyDefinition().Name) + " (self)";
+        if (mainMetadata is not null)
+        {
+            names[0] = mainMetadata.GetString(mainMetadata.GetAssemblyDefinition().Name) + " (self)";
+        }
+        else
+        {
+            names[0] = "ManifestMetadata (self)";
+        }
 
         // Modules 1..mainAssemblyRefCount come from the main assembly's AssemblyRef table
         for (int i = 1; i <= mainAssemblyRefCount; i++)
@@ -206,11 +213,12 @@ internal sealed class DiskAssemblyResolver : IAssemblyResolver
         return names;
     }
 
-    private void LoadModuleMetadata(PEReader mainPeReader)
+    private void LoadModuleMetadata(IBinaryImageReader imageReader)
     {
-        // Module 0: main assembly
-        if (mainPeReader.HasMetadata)
-            _moduleMetadata[0] = mainPeReader.GetMetadataReader();
+        // Module 0: main assembly (PE images have standalone metadata; Mach-O composites don't)
+        MetadataReader standaloneMetadata = imageReader.GetStandaloneAssemblyMetadata();
+        if (standaloneMetadata is not null)
+            _moduleMetadata[0] = standaloneMetadata;
 
         for (int i = 1; i < _moduleNames.Length; i++)
         {
