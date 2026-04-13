@@ -808,7 +808,16 @@ static string DecodeMethod(NativeReader reader, ref int offset, MetadataReader m
 
     string methodName;
     bool isMemberRef = flags.HasFlag(ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_MemberRefToken);
-    if (mdReader is not null)
+    if (owningType is not null)
+    {
+        // OwnerType already provides the fully-qualified type (with generic args).
+        // Just append the simple method name to avoid duplicating the type path.
+        string simpleName = isMemberRef
+            ? FormatMemberRefSimpleName(mdReader, (int)rid)
+            : FormatMethodDefSimpleName(mdReader, (int)rid);
+        methodName = $"{owningType}.{simpleName}";
+    }
+    else if (mdReader is not null)
     {
         methodName = isMemberRef
             ? FormatMemberRef(mdReader, (int)rid)
@@ -818,9 +827,6 @@ static string DecodeMethod(NativeReader reader, ref int offset, MetadataReader m
     {
         methodName = isMemberRef ? $"MemberRef#{rid}" : $"MethodDef#{rid}";
     }
-
-    if (owningType is not null)
-        methodName = $"{owningType}::{methodName}";
 
     if (flags.HasFlag(ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_MethodInstantiation))
     {
@@ -865,7 +871,14 @@ static string DecodeField(NativeReader reader, ref int offset, MetadataReader md
     bool isMemberRef = (fieldFlags & (uint)ReadyToRunFieldSigFlags.READYTORUN_FIELD_SIG_MemberRefToken) != 0;
 
     string fieldName;
-    if (mdReader is not null)
+    if (owningType is not null)
+    {
+        string simpleName = isMemberRef
+            ? FormatMemberRefSimpleName(mdReader, (int)rid)
+            : FormatFieldDefSimpleName(mdReader, (int)rid);
+        fieldName = $"{owningType}.{simpleName}";
+    }
+    else if (mdReader is not null)
     {
         fieldName = isMemberRef
             ? FormatMemberRef(mdReader, (int)rid)
@@ -876,7 +889,7 @@ static string DecodeField(NativeReader reader, ref int offset, MetadataReader md
         fieldName = isMemberRef ? $"MemberRef#{rid}" : $"FieldDef#{rid}";
     }
 
-    return owningType is not null ? $"{owningType}::{fieldName}" : fieldName;
+    return fieldName;
 }
 
 static string DecodeStringHandle(NativeReader reader, ref int offset)
@@ -1060,8 +1073,15 @@ static string FormatTypeDef(MetadataReader mdReader, int rid)
 {
     var handle = MetadataTokens.TypeDefinitionHandle(rid);
     var typeDef = mdReader.GetTypeDefinition(handle);
-    string ns = mdReader.GetString(typeDef.Namespace);
     string name = mdReader.GetString(typeDef.Name);
+    var declaringType = typeDef.GetDeclaringType();
+    if (!declaringType.IsNil)
+    {
+        int enclosingRid = MetadataTokens.GetRowNumber(declaringType);
+        string enclosing = FormatTypeDef(mdReader, enclosingRid);
+        return $"{enclosing}+{name}";
+    }
+    string ns = mdReader.GetString(typeDef.Namespace);
     return string.IsNullOrEmpty(ns) ? name : $"{ns}.{name}";
 }
 
@@ -1069,8 +1089,15 @@ static string FormatTypeRef(MetadataReader mdReader, int rid)
 {
     var handle = MetadataTokens.TypeReferenceHandle(rid);
     var typeRef = mdReader.GetTypeReference(handle);
-    string ns = mdReader.GetString(typeRef.Namespace);
     string name = mdReader.GetString(typeRef.Name);
+    var resScope = typeRef.ResolutionScope;
+    if (resScope.Kind == HandleKind.TypeReference)
+    {
+        int enclosingRid = MetadataTokens.GetRowNumber((TypeReferenceHandle)resScope);
+        string enclosing = FormatTypeRef(mdReader, enclosingRid);
+        return $"{enclosing}+{name}";
+    }
+    string ns = mdReader.GetString(typeRef.Namespace);
     return string.IsNullOrEmpty(ns) ? name : $"{ns}.{name}";
 }
 
@@ -1084,10 +1111,8 @@ static string FormatMethodDef(MetadataReader mdReader, int rid)
     var declaringType = methodDef.GetDeclaringType();
     if (!declaringType.IsNil)
     {
-        var typeDef = mdReader.GetTypeDefinition(declaringType);
-        string typeName = mdReader.GetString(typeDef.Name);
-        string ns = mdReader.GetString(typeDef.Namespace);
-        string fullType = string.IsNullOrEmpty(ns) ? typeName : $"{ns}.{typeName}";
+        int typeRid = MetadataTokens.GetRowNumber(declaringType);
+        string fullType = FormatTypeDef(mdReader, typeRid);
         return $"{fullType}.{name}";
     }
     return name;
@@ -1101,10 +1126,8 @@ static string FormatFieldDef(MetadataReader mdReader, int rid)
     var declaringType = fieldDef.GetDeclaringType();
     if (!declaringType.IsNil)
     {
-        var typeDef = mdReader.GetTypeDefinition(declaringType);
-        string typeName = mdReader.GetString(typeDef.Name);
-        string ns = mdReader.GetString(typeDef.Namespace);
-        string fullType = string.IsNullOrEmpty(ns) ? typeName : $"{ns}.{typeName}";
+        int typeRid = MetadataTokens.GetRowNumber(declaringType);
+        string fullType = FormatTypeDef(mdReader, typeRid);
         return $"{fullType}.{name}";
     }
     return name;
@@ -1120,21 +1143,42 @@ static string FormatMemberRef(MetadataReader mdReader, int rid)
     var parent = memberRef.Parent;
     if (parent.Kind == HandleKind.TypeReference)
     {
-        var typeRef = mdReader.GetTypeReference((TypeReferenceHandle)parent);
-        string typeName = mdReader.GetString(typeRef.Name);
-        string ns = mdReader.GetString(typeRef.Namespace);
-        string fullType = string.IsNullOrEmpty(ns) ? typeName : $"{ns}.{typeName}";
-        return $"{fullType}.{name}";
+        int typeRid = MetadataTokens.GetRowNumber((TypeReferenceHandle)parent);
+        return $"{FormatTypeRef(mdReader, typeRid)}.{name}";
     }
     if (parent.Kind == HandleKind.TypeDefinition)
     {
-        var typeDef = mdReader.GetTypeDefinition((TypeDefinitionHandle)parent);
-        string typeName = mdReader.GetString(typeDef.Name);
-        string ns = mdReader.GetString(typeDef.Namespace);
-        string fullType = string.IsNullOrEmpty(ns) ? typeName : $"{ns}.{typeName}";
-        return $"{fullType}.{name}";
+        int typeRid = MetadataTokens.GetRowNumber((TypeDefinitionHandle)parent);
+        return $"{FormatTypeDef(mdReader, typeRid)}.{name}";
     }
     return name;
+}
+
+static string FormatMethodDefSimpleName(MetadataReader mdReader, int rid)
+{
+    if (mdReader is null || rid <= 0 || rid > mdReader.GetTableRowCount(TableIndex.MethodDef))
+        return $"MethodDef#{rid}";
+    var handle = MetadataTokens.MethodDefinitionHandle(rid);
+    var methodDef = mdReader.GetMethodDefinition(handle);
+    return mdReader.GetString(methodDef.Name);
+}
+
+static string FormatMemberRefSimpleName(MetadataReader mdReader, int rid)
+{
+    if (mdReader is null || rid <= 0 || rid > mdReader.GetTableRowCount(TableIndex.MemberRef))
+        return $"MemberRef#{rid}";
+    var handle = MetadataTokens.MemberReferenceHandle(rid);
+    var memberRef = mdReader.GetMemberReference(handle);
+    return mdReader.GetString(memberRef.Name);
+}
+
+static string FormatFieldDefSimpleName(MetadataReader mdReader, int rid)
+{
+    if (mdReader is null || rid <= 0 || rid > mdReader.GetTableRowCount(TableIndex.Field))
+        return $"FieldDef#{rid}";
+    var handle = MetadataTokens.FieldDefinitionHandle(rid);
+    var fieldDef = mdReader.GetFieldDefinition(handle);
+    return mdReader.GetString(fieldDef.Name);
 }
 
 // ─── Compressed uint helper (ECMA-335 encoding) ────────────────────────────
