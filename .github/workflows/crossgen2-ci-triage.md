@@ -325,7 +325,8 @@ Search for open GitHub issues with the `[Crossgen2 CI]` title prefix that may no
 ### If the Failure Has NOT Reproduced in the Last 3 Builds
 
 1. **Search for a potential fix in the commit history.** Look through recent commits in `dotnet/runtime` on `main` (from the time the issue was opened until now) for commits that might have fixed the issue. Look for:
-   - Commits that modify files related to the failing test (test source files, the code under test)
+   - Commits that modify files related to the failing test — extract the test's fully qualified name from the issue body and use it to locate the test source file (e.g., `Namespace.Class.Method` → search for the class name in `src/libraries/` or `src/tests/`)
+   - Commits that modify the code under test (the production code exercised by the failing test)
    - Commit messages mentioning the test name, the issue number, or keywords related to the failure
    - PRs that fixed related bugs or addressed the same area of code
 
