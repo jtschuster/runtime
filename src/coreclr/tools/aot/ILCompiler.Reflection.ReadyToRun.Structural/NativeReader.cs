@@ -3,13 +3,11 @@
 
 using System;
 using System.Buffers.Binary;
-using System.Collections.Generic;
 using System.IO;
-using System.Text;
 
 namespace ILCompiler.Reflection.ReadyToRun.Structural
 {
-    public class NativeReader(Stream backingStream, bool littleEndian = true)
+    public class NativeReader(Stream backingStream, bool littleEndian = true, bool leaveOpen = false) : IDisposable
     {
         private const int BITS_PER_BYTE = 8;
         private const int BITS_PER_SIZE_T = 32;
@@ -380,6 +378,14 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         {
             uint delta = DecodeUnsignedGc(ref start);
             return lastValue + delta;
+        }
+
+        public void Dispose()
+        {
+            if (!leaveOpen)
+            {
+                _backingStream.Dispose();
+            }
         }
     }
 }

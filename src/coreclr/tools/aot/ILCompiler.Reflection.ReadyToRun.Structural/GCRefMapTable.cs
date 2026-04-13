@@ -110,14 +110,18 @@ public partial class ReadyToRunReader
             int strideIndex = i / GCRefMapLookupStride;
             int remaining = i % GCRefMapLookupStride;
 
-            int entryOffset = auxDataOffset + System.BitConverter.ToInt32(_image, auxDataOffset + sizeof(int) * strideIndex);
+            int lookupOffset = auxDataOffset + sizeof(int) * strideIndex;
+            int entryOffset = auxDataOffset + _nativeReader.ReadInt32(ref lookupOffset);
 
             // Skip forward through compressed records to reach the target slot
             while (remaining > 0)
             {
-                while ((_image[entryOffset] & 0x80) != 0)
-                    entryOffset++;
-                entryOffset++;
+                byte b;
+                do
+                {
+                    b = _nativeReader.ReadByte(ref entryOffset);
+                }
+                while ((b & 0x80) != 0);
                 remaining--;
             }
 
@@ -133,7 +137,7 @@ public partial class ReadyToRunReader
 
     private GCRefMap DecodeGCRefMap(int offset)
     {
-        var decoder = new GCRefMapBitReader(_image, offset);
+        var decoder = new GCRefMapBitReader(_nativeReader, offset);
 
         uint stackPop = GCRefMap.InvalidStackPop;
         if (Machine == Machine.I386)
@@ -189,13 +193,13 @@ public partial class ReadyToRunReader
     /// </summary>
     private struct GCRefMapBitReader
     {
-        private readonly byte[] _image;
+        private readonly NativeReader _reader;
         private int _offset;
         private int _pendingByte;
 
-        public GCRefMapBitReader(byte[] image, int offset)
+        public GCRefMapBitReader(NativeReader reader, int offset)
         {
-            _image = image;
+            _reader = reader;
             _offset = offset;
             _pendingByte = 0x80;
         }
@@ -205,8 +209,8 @@ public partial class ReadyToRunReader
             int x = _pendingByte;
             if ((x & 0x80) != 0)
             {
-                x = _image[_offset++];
-                x |= ((x & 0x80) << 7);
+                x = _reader.ReadByte(ref _offset);
+                x |= (x & 0x80) << 7;
             }
             _pendingByte = x >> 1;
             return x & 1;

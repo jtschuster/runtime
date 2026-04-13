@@ -34,7 +34,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
                 int corHeaderSize = _nativeReader.ReadInt32(ref offset);
                 int assemblyHeaderRva = _nativeReader.ReadInt32(ref offset);
                 int assemblyHeaderSize = _nativeReader.ReadInt32(ref offset);
-                entries.Add(new ComponentAssemblyEntry(i, corHeaderRva, corHeaderSize, assemblyHeaderRva, assemblyHeaderSize));
+                entries.Add(new ComponentAssemblyEntry(corHeaderRva, corHeaderSize, assemblyHeaderRva, assemblyHeaderSize));
             }
 
             return new ComponentAssembliesTable(entries);
@@ -46,9 +46,6 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     /// </summary>
     public sealed class ComponentAssemblyEntry
     {
-        /// <summary>Index of this component assembly.</summary>
-        public int Index { get; }
-
         /// <summary>RVA of the COR header for this assembly.</summary>
         public int CorHeaderRva { get; }
 
@@ -61,9 +58,8 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         /// <summary>Size of the per-assembly R2R header.</summary>
         public int AssemblyHeaderSize { get; }
 
-        public ComponentAssemblyEntry(int index, int corHeaderRva, int corHeaderSize, int assemblyHeaderRva, int assemblyHeaderSize)
+        public ComponentAssemblyEntry(int corHeaderRva, int corHeaderSize, int assemblyHeaderRva, int assemblyHeaderSize)
         {
-            Index = index;
             CorHeaderRva = corHeaderRva;
             CorHeaderSize = corHeaderSize;
             AssemblyHeaderRva = assemblyHeaderRva;

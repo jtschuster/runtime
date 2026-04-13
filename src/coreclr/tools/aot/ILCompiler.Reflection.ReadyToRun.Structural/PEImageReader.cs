@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
+using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 
 namespace ILCompiler.Reflection.ReadyToRun.Structural
@@ -15,14 +16,16 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     public class PEImageReader : IBinaryImageReader
     {
         private readonly PEReader _peReader;
+        private readonly bool _leaveOpen;
 
         public Machine Machine { get; }
         public OperatingSystem OperatingSystem { get; }
         public ulong ImageBase => _peReader.PEHeaders.PEHeader.ImageBase;
 
-        public PEImageReader(PEReader peReader)
+        public PEImageReader(PEReader peReader, bool leaveOpen = false)
         {
             _peReader = peReader;
+            _leaveOpen = leaveOpen;
 
             // Extract machine and OS from PE header
             // The OS is encoded in the machine type
@@ -43,6 +46,14 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             if (OperatingSystem == OperatingSystem.Unknown)
             {
                 throw new BadImageFormatException($"Invalid PE Machine type: {rawMachine}");
+            }
+        }
+
+        public void Dispose()
+        {
+            if (!_leaveOpen)
+            {
+                _peReader.Dispose();
             }
         }
 
@@ -77,11 +88,14 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             return false;
         }
 
-        public IAssemblyMetadata GetStandaloneAssemblyMetadata()
-            => _peReader.HasMetadata ? new StandaloneAssemblyMetadata(_peReader) : null;
+        public MetadataReader GetStandaloneAssemblyMetadata()
+            => _peReader.HasMetadata ? _peReader.GetMetadataReader() : null;
 
-        public IAssemblyMetadata GetManifestAssemblyMetadata(System.Reflection.Metadata.MetadataReader manifestReader)
-            => new ManifestAssemblyMetadata(_peReader, manifestReader);
+        public unsafe MetadataReader GetManifestAssemblyMetadata(int offset, int size)
+        {
+            byte* pImage = _peReader.GetEntireImage().Pointer;
+            return new MetadataReader(pImage + offset, size);
+        }
 
         public void DumpImageInformation(TextWriter writer)
         {

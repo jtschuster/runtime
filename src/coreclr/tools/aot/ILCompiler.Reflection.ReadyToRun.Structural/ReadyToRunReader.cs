@@ -5,9 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection.Metadata;
-using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
-using System.Runtime.InteropServices;
 
 using Internal.ReadyToRunConstants;
 using Internal.Runtime;
@@ -25,37 +23,27 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     {
         private readonly IBinaryImageReader _platformBinaryReader;
         private readonly NativeReader _nativeReader;
-        private readonly byte[] _image;
         private readonly string _filename;
-        private readonly GCHandle _imagePin;
 
         // Lazy-init backing fields
         private ReadyToRunHeader _header;
         private bool? _isComposite;
 
-        public ReadyToRunReader(IBinaryImageReader platformBinaryReader, NativeReader nativeReader, byte[] image, string filename = null)
+        public ReadyToRunReader(IBinaryImageReader platformBinaryReader, NativeReader nativeReader, string filename = null)
         {
             _platformBinaryReader = platformBinaryReader;
             _nativeReader = nativeReader;
-            _image = image ?? throw new ArgumentNullException(nameof(image));
             _filename = filename ?? string.Empty;
-            _imagePin = GCHandle.Alloc(_image, GCHandleType.Pinned);
         }
 
         public void Dispose()
         {
-            if (_imagePin.IsAllocated)
-                _imagePin.Free();
+            _nativeReader.Dispose();
+            _platformBinaryReader.Dispose();
         }
-
-        /// <summary>The underlying binary image reader (PE or MachO).</summary>
-        public IBinaryImageReader PlatformBinaryReader => _platformBinaryReader;
 
         /// <summary>NativeReader for raw byte access into the image.</summary>
         public NativeReader ImageReader => _nativeReader;
-
-        /// <summary>Raw bytes of the PE image (implements <see cref="IR2RImageContext"/>).</summary>
-        public byte[] Image => _image;
 
         /// <summary>Filename of the R2R image being read.</summary>
         public string Filename => _filename;
@@ -80,7 +68,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         {
             get
             {
-                return PlatformBinaryReader.Machine;
+                return _platformBinaryReader.Machine;
             }
         }
 
@@ -179,9 +167,9 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         /// <summary>
         /// Gets the standalone (component 0) metadata for non-composite images.
         /// Returns null for composite images.
-        /// The ReadyToRunReader must remain alive while the returned reader is in use.
+        /// The ReadyToRunReader must remain alive and undisposed while the returned reader is in use.
         /// </summary>
-        public IAssemblyMetadata GetStandaloneMetadata()
+        public MetadataReader GetStandaloneMetadata()
         {
             if (Composite)
                 return null;
@@ -189,20 +177,17 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         }
 
         /// <summary>
-        /// Returns a reader for the ManifestMetadata module. The ReadyToRunReader must remain alive while the returned reader is in use.
+        /// Returns a MetadataReader for the ManifestMetadata module.
+        /// The ReadyToRunReader must remain alive and undisposed while the returned reader is in use.
         /// </summary>
-        public unsafe IAssemblyMetadata GetManifestMetadataReader(ReadyToRunSectionHandle manifestSection)
+        public MetadataReader GetManifestMetadataReader(ReadyToRunSectionHandle manifestSection)
         {
             int manifestOffset = GetOffsetForRVA(manifestSection.RelativeVirtualAddress);
             int manifestSize = manifestSection.Size;
             if (manifestSize <= 0)
                 return null;
 
-            byte* pImage = (byte*)_imagePin.AddrOfPinnedObject();
-            var manifestMetadataAssembly = _platformBinaryReader.GetManifestAssemblyMetadata(
-                new MetadataReader(pImage + manifestOffset, manifestSize));
-
-            return manifestMetadataAssembly;
+            return _platformBinaryReader.GetManifestAssemblyMetadata(manifestOffset, manifestSize);
         }
 
         // ── Entry point descriptor decoding ────────────────────────────────

@@ -18,7 +18,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         /// <summary>
         /// Raw bytes of the PE image.
         /// </summary>
-        byte[] Image { get; }
+        NativeReader ImageReader { get; }
 
         /// <summary>
         /// Size of a pointer on the target architecture (4 or 8).

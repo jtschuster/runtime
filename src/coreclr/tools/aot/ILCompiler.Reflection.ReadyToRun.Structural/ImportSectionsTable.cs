@@ -28,9 +28,6 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     /// </summary>
     public sealed class ImportSectionEntry
     {
-        /// <summary>Index of this import section.</summary>
-        public int Index { get; }
-
         /// <summary>RVA of the section containing values to be fixed up.</summary>
         public ImportSlotTableHandle SectionRva { get; }
 
@@ -56,7 +53,6 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         public AuxiliaryDataTableHandle AuxiliaryDataRva { get; }
 
         internal ImportSectionEntry(
-            int index,
             ImportSlotTableHandle sectionRva,
             int sectionSize,
             ReadyToRunImportSectionFlags flags,
@@ -66,7 +62,6 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             SignatureTableHandle signatureTableRva,
             AuxiliaryDataTableHandle auxiliaryDataRva)
         {
-            Index = index;
             SectionRva = sectionRva;
             SectionSize = sectionSize;
             Flags = flags;
@@ -85,7 +80,6 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
             int offset = this.GetOffsetForRVA(section.RelativeVirtualAddress);
             int endOffset = offset + section.Size;
             var entries = new List<ImportSectionEntry>();
-            int index = 0;
 
             while (offset < endOffset)
             {
@@ -111,7 +105,6 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
                 int entryCount = entrySize != 0 ? sectionSize / entrySize : 0;
 
                 entries.Add(new ImportSectionEntry(
-                    index++,
                     (ImportSlotTableHandle)sectionRva,
                     sectionSize,
                     flags,

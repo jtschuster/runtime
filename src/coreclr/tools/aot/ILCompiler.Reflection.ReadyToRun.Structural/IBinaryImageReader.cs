@@ -1,17 +1,19 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
+using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 
 namespace ILCompiler.Reflection.ReadyToRun.Structural
 {
     /// <summary>
-    /// Interface for abstracting binary image reading across different formats (PE, MachO)
+    /// Interface for abstracting binary image reading across different formats (PE, MachO).
     /// </summary>
-    public interface IBinaryImageReader
+    public interface IBinaryImageReader : IDisposable
     {
         /// <summary>
         /// Gets the machine type of the binary image
@@ -27,11 +29,6 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         /// Gets the image base address
         /// </summary>
         ulong ImageBase { get; }
-
-        /// <summary>
-        /// Get the entire image content
-        /// </summary>
-        ImmutableArray<byte> GetEntireImage();
 
         /// <summary>
         /// Get the index in the image byte array corresponding to the RVA
@@ -50,15 +47,26 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         /// <summary>
         /// Creates standalone assembly metadata from the image's embedded metadata.
         /// </summary>
+        /// <remarks>
+        /// The IBinaryImageReader object MUST not be disposed while the returned MetadataReader is still in use.
+        /// The implementor of IBinaryImageReader MUST ensure that the returned MetadataReader remains valid until the implementor is disposed.
+        /// Failure to do so may result in unsafe behavior.
+        /// </remarks>
         /// <returns>Assembly metadata, or null if the image has no embedded metadata</returns>
-        IAssemblyMetadata GetStandaloneAssemblyMetadata();
+        MetadataReader GetStandaloneAssemblyMetadata();
 
         /// <summary>
-        /// Creates manifest assembly metadata from the R2R manifest
+        /// Creates manifest assembly metadata from the R2R manifest section at the given file offset and size.
         /// </summary>
-        /// <param name="manifestReader">Manifest metadata reader</param>
+        /// <remarks>
+        /// The IBinaryImageReader object MUST not be disposed while the returned MetadataReader is still in use.
+        /// The implementor of IBinaryImageReader MUST ensure that the returned MetadataReader remains valid until the implementor is disposed.
+        /// Failure to do so may result in unsafe behavior.
+        /// </remarks>
+        /// <param name="offset">File offset of the manifest metadata section.</param>
+        /// <param name="size">Size of the manifest metadata section in bytes.</param>
         /// <returns>Manifest assembly metadata</returns>
-        IAssemblyMetadata GetManifestAssemblyMetadata(System.Reflection.Metadata.MetadataReader manifestReader);
+        MetadataReader GetManifestAssemblyMetadata(int offset, int size);
 
         /// <summary>
         /// Write out image information using the specified writer
@@ -71,5 +79,6 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         /// </summary>
         Dictionary<string, int> GetSections();
 
+        // static abstract IBinaryImageReader Create(Stream stream);
     }
 }
