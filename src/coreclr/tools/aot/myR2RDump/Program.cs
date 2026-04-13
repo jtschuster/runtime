@@ -241,13 +241,16 @@ static void DumpImportSections(
 
         int sigTableOffset = reader.GetOffsetForRVA((int)importSection.SignatureTableRva);
 
+        int slotRva = (int)importSection.SectionRva;
+
         for (int i = 0; i < importSection.EntryCount; i++)
         {
+            int currentSlotRva = slotRva + i * importSection.EntrySize;
             int sigPtrOffset = sigTableOffset + i * sizeof(int);
             uint sigRva = nativeReader.ReadUInt32(ref sigPtrOffset);
             if (sigRva == 0)
             {
-                Console.WriteLine($"  [{i}] (null signature)");
+                Console.WriteLine($"  [{i}] Slot=0x{currentSlotRva:X8} (null signature)");
                 continue;
             }
             int sigOffset = reader.GetOffsetForRVA((int)sigRva);
@@ -281,7 +284,7 @@ static void DumpImportSections(
                 Console.WriteLine($"  DEBUG moduleIndex={moduleIndex} mdReader.MemberRef={mdReader?.GetTableRowCount(TableIndex.MemberRef)} mdReader.MethodDef={mdReader?.GetTableRowCount(TableIndex.MethodDef)}");
             }
 
-            Console.WriteLine($"  [{i}] Fixup={fixupKind,-30} Module={moduleName,-40} Target={target}");
+            Console.WriteLine($"  [{i}] Slot=0x{currentSlotRva:X8} Fixup={fixupKind,-30} Module={moduleName,-40} Target={target}");
         }
         sectionIdx++;
     }
@@ -704,12 +707,14 @@ static string DecodeSignatureTarget(
             ReadyToRunFixupKind.FieldHandle
                 or ReadyToRunFixupKind.FieldAddress
                 or ReadyToRunFixupKind.FieldOffset
-                or ReadyToRunFixupKind.CctorTrigger
+                => DecodeField(reader, ref offset, mdReader, resolver),
+
+            ReadyToRunFixupKind.CctorTrigger
                 or ReadyToRunFixupKind.StaticBaseGC
                 or ReadyToRunFixupKind.StaticBaseNonGC
                 or ReadyToRunFixupKind.ThreadStaticBaseGC
                 or ReadyToRunFixupKind.ThreadStaticBaseNonGC
-                => DecodeField(reader, ref offset, mdReader, resolver),
+                => DecodeType(reader, ref offset, mdReader, resolver),
 
             ReadyToRunFixupKind.Verify_FieldOffset =>
                 DecodeVerifyFieldOffset(reader, ref offset, mdReader, resolver),
