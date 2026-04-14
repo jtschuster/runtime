@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection.PortableExecutable;
 
+using ILCompiler.Reflection.ReadyToRun.Structural;
 using Internal.ReadyToRunConstants;
 
 

@@ -21,7 +21,6 @@
     <!-- Exclude Parsed layer until structural handle conversion is complete -->
     <Compile Remove="Parsed\**" />
     <!-- R2RSignatureDecoder depends on OpenReferenceAssembly which moved to the Parsed layer -->
-    <Compile Remove="R2RSignatureDecoder.cs" />
   </ItemGroup>
 
 </Project>

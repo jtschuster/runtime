@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Immutable;
 using System.Reflection.Metadata;
+using ILCompiler.Reflection.ReadyToRun.Structural;
 using Internal.ReadyToRunConstants;
 
 

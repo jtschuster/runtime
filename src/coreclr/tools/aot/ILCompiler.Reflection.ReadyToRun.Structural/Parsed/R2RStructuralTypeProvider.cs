@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
+using ILCompiler.Reflection.ReadyToRun.Structural;
 using Internal.ReadyToRunConstants;
 
 

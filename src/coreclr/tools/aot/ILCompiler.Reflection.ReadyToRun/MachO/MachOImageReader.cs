@@ -2,7 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
-using System.Buffers.Binary;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
@@ -36,10 +35,6 @@ namespace ILCompiler.Reflection.ReadyToRun.MachO
             // Determine machine type from CPU type
             Machine = GetMachineType(_header.CpuType);
 
-            // Mach-O MH_OBJECT files have unresolved relocations. crossgen2 emits
-            // IMAGE_REL_BASED_ADDR32NB and IMAGE_REL_SYMBOL_SIZE as SUBTRACTOR+UNSIGNED
-            // relocation pairs. Apply them so RVA fields in the R2R header are resolved.
-            ApplyRelocations();
         }
 
         public ImmutableArray<byte> GetEntireImage()
@@ -224,171 +219,6 @@ namespace ILCompiler.Reflection.ReadyToRun.MachO
             }
 
             return false;
-        }
-
-        // Mach-O relocation type constants
-        private const byte X86_64_RELOC_UNSIGNED = 0;
-        private const byte X86_64_RELOC_SUBTRACTOR = 5;
-        private const byte ARM64_RELOC_UNSIGNED = 0;
-        private const byte ARM64_RELOC_SUBTRACTOR = 1;
-
-        /// <summary>
-        /// Applies Mach-O relocations to resolve RVA fields in the image.
-        /// crossgen2 emits MH_OBJECT files where IMAGE_REL_BASED_ADDR32NB and IMAGE_REL_SYMBOL_SIZE
-        /// are represented as SUBTRACTOR+UNSIGNED relocation pairs. The SUBTRACTOR symbol is typically
-        /// __mh_dylib_header (the image base). The resolved value is:
-        ///   unsigned_symbol.value - subtractor_symbol.value + existing_addend
-        /// </summary>
-        private unsafe void ApplyRelocations()
-        {
-            ulong[] symbolValues = BuildSymbolValueTable();
-            if (symbolValues is null)
-                return;
-
-            bool isArm64 = Machine == Machine.Arm64;
-            byte subtractorType = isArm64 ? ARM64_RELOC_SUBTRACTOR : X86_64_RELOC_SUBTRACTOR;
-            byte unsignedType = isArm64 ? ARM64_RELOC_UNSIGNED : X86_64_RELOC_UNSIGNED;
-
-            long commandsPtr = sizeof(MachHeader);
-            for (int i = 0; i < _header.NumberOfCommands; i++)
-            {
-                Read(commandsPtr, out LoadCommand loadCommand);
-
-                if (loadCommand.GetCommandType(_header) == MachLoadCommandType.Segment64)
-                {
-                    Read(commandsPtr, out Segment64LoadCommand segment);
-                    uint sectionsCount = segment.GetSectionsCount(_header);
-
-                    long sectionPtr = commandsPtr + sizeof(Segment64LoadCommand);
-                    for (uint j = 0; j < sectionsCount; j++)
-                    {
-                        Read(sectionPtr, out Section64LoadCommand section);
-                        uint relocOffset = section.GetRelocationOffset(_header);
-                        uint relocCount = section.GetNumberOfRelocationEntries(_header);
-                        uint sectionFileOffset = section.GetFileOffset(_header);
-
-                        if (relocCount > 0)
-                        {
-                            ApplySectionRelocations(
-                                symbolValues, relocOffset, relocCount,
-                                sectionFileOffset, subtractorType, unsignedType);
-                        }
-
-                        sectionPtr += sizeof(Section64LoadCommand);
-                    }
-                }
-
-                commandsPtr += loadCommand.GetCommandSize(_header);
-            }
-        }
-
-        private unsafe ulong[] BuildSymbolValueTable()
-        {
-            long commandsPtr = sizeof(MachHeader);
-            for (int i = 0; i < _header.NumberOfCommands; i++)
-            {
-                Read(commandsPtr, out LoadCommand loadCommand);
-
-                if (loadCommand.GetCommandType(_header) == MachLoadCommandType.SymbolTable)
-                {
-                    Read(commandsPtr, out SymbolTableLoadCommand symtabCommand);
-                    uint symbolTableOffset = symtabCommand.GetSymbolTableOffset(_header);
-                    uint symbolsCount = symtabCommand.GetSymbolsCount(_header);
-
-                    ulong[] values = new ulong[symbolsCount];
-                    for (uint s = 0; s < symbolsCount; s++)
-                    {
-                        long symOffset = symbolTableOffset + (s * sizeof(NList64));
-                        Read(symOffset, out NList64 symbol);
-                        values[s] = symbol.GetValue(_header);
-                    }
-                    return values;
-                }
-
-                commandsPtr += loadCommand.GetCommandSize(_header);
-            }
-
-            return null;
-        }
-
-        private void ApplySectionRelocations(
-            ulong[] symbolValues,
-            uint relocOffset,
-            uint relocCount,
-            uint sectionFileOffset,
-            byte subtractorType,
-            byte unsignedType)
-        {
-            for (uint r = 0; r < relocCount; r++)
-            {
-                long relocEntryOffset = relocOffset + (r * 8);
-                int rAddress = BinaryPrimitives.ReadInt32LittleEndian(_image.AsSpan((int)relocEntryOffset, 4));
-                uint rInfo = BinaryPrimitives.ReadUInt32LittleEndian(_image.AsSpan((int)relocEntryOffset + 4, 4));
-
-                uint symbolNum = rInfo & 0x00FF_FFFF;
-                byte length = (byte)((rInfo >> 25) & 0x3);
-                bool isExternal = (rInfo & 0x0800_0000) != 0;
-                byte relocType = (byte)((rInfo >> 28) & 0xF);
-
-                if (relocType != subtractorType)
-                    continue;
-
-                if (r + 1 >= relocCount)
-                    throw new BadImageFormatException("SUBTRACTOR relocation without following UNSIGNED relocation");
-
-                r++;
-                long nextRelocOffset = relocOffset + (r * 8);
-                int nextRAddress = BinaryPrimitives.ReadInt32LittleEndian(_image.AsSpan((int)nextRelocOffset, 4));
-                uint nextRInfo = BinaryPrimitives.ReadUInt32LittleEndian(_image.AsSpan((int)nextRelocOffset + 4, 4));
-
-                uint nextSymbolNum = nextRInfo & 0x00FF_FFFF;
-                byte nextLength = (byte)((nextRInfo >> 25) & 0x3);
-                bool nextIsExternal = (nextRInfo & 0x0800_0000) != 0;
-                byte nextRelocType = (byte)((nextRInfo >> 28) & 0xF);
-
-                if (nextRelocType != unsignedType || nextRAddress != rAddress || nextLength != length)
-                {
-                    throw new BadImageFormatException(
-                        $"Invalid SUBTRACTOR+UNSIGNED relocation pair: " +
-                        $"SUBTRACTOR(addr=0x{rAddress:X},len={length},type={relocType}) " +
-                        $"UNSIGNED(addr=0x{nextRAddress:X},len={nextLength},type={nextRelocType})");
-                }
-
-                if (!isExternal || !nextIsExternal)
-                {
-                    throw new BadImageFormatException(
-                        "Non-external SUBTRACTOR+UNSIGNED relocation pair is not supported");
-                }
-
-                if (symbolNum >= (uint)symbolValues.Length || nextSymbolNum >= (uint)symbolValues.Length)
-                {
-                    throw new BadImageFormatException(
-                        $"Relocation symbol index out of range: {symbolNum} or {nextSymbolNum} >= {symbolValues.Length}");
-                }
-
-                ulong subtractorValue = symbolValues[symbolNum];
-                ulong unsignedValue = symbolValues[nextSymbolNum];
-
-                int patchFileOffset = (int)sectionFileOffset + rAddress;
-
-                if (length == 2)
-                {
-                    int addend = BinaryPrimitives.ReadInt32LittleEndian(_image.AsSpan(patchFileOffset, 4));
-                    long resolved = (long)unsignedValue - (long)subtractorValue + addend;
-                    BinaryPrimitives.WriteInt32LittleEndian(_image.AsSpan(patchFileOffset, 4), checked((int)resolved));
-                }
-                else if (length == 3)
-                {
-                    long addend = BinaryPrimitives.ReadInt64LittleEndian(_image.AsSpan(patchFileOffset, 8));
-                    long resolved = (long)unsignedValue - (long)subtractorValue + addend;
-                    BinaryPrimitives.WriteInt64LittleEndian(_image.AsSpan(patchFileOffset, 8), resolved);
-                }
-                else
-                {
-                    throw new BadImageFormatException(
-                        $"Unsupported SUBTRACTOR+UNSIGNED relocation length: {length} (expected 2 or 3)");
-                }
-            }
         }
 
         /// <summary>

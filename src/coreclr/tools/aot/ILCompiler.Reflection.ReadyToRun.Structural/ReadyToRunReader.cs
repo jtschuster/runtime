@@ -225,5 +225,20 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
 
             runtimeFunctionIndex = (int)id;
         }
+
+        /// <summary>
+        /// Decode a fixup signature at the given RVA into an AST representation.
+        /// The returned <see cref="R2RFixupSignature"/> contains the fixup kind,
+        /// optional module override index, and a payload with raw token RIDs and
+        /// module indices — no assembly resolution is performed.
+        /// </summary>
+        /// <param name="signatureRva">The RVA of the signature in the image.</param>
+        /// <returns>The decoded fixup signature AST node.</returns>
+        public R2RFixupSignature DecodeFixupSignature(int signatureRva)
+        {
+            int offset = _platformBinaryReader.GetOffset(signatureRva);
+            var decoder = new RawSignatureDecoder(_nativeReader, offset, TargetPointerSize);
+            return decoder.ParseFixupSignature();
+        }
     }
 }

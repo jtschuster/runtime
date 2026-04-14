@@ -267,38 +267,19 @@ static void DumpImportSections(
                 Console.WriteLine($"  [{i}] Slot=0x{currentSlotRva:X8} (null signature)");
                 continue;
             }
-            int sigOffset = reader.GetOffsetForRVA((int)sigRva);
 
-            byte fixupByte = nativeReader.ReadByte(ref sigOffset);
-            bool hasModuleOverride = (fixupByte & (byte)ReadyToRunFixupKind.ModuleOverride) != 0;
-            ReadyToRunFixupKind fixupKind = (ReadyToRunFixupKind)(fixupByte & ~(byte)ReadyToRunFixupKind.ModuleOverride);
-
-            int moduleIndex = 0;
-            string moduleName = resolver.ModuleCount > 0 ? resolver.ModuleNames[0] : "(current)";
-            if (hasModuleOverride)
+            string decoded;
+            try
             {
-                moduleIndex = (int)nativeReader.ReadCompressedData(ref sigOffset);
-                moduleName = moduleIndex < resolver.ModuleCount ? resolver.ModuleNames[moduleIndex] : $"(unknown #{moduleIndex})";
+                R2RFixupSignature fixupSig = reader.DecodeFixupSignature((int)sigRva);
+                decoded = fixupSig.ToString();
+            }
+            catch (Exception ex)
+            {
+                decoded = $"(decode error: {ex.Message})";
             }
 
-            MetadataReader mdReader = resolver.GetMetadataReader(moduleIndex);
-            string target = DecodeSignatureTarget(nativeReader, sigOffset, fixupKind, mdReader, resolver);
-
-            // DEBUG: hex dump for OOB entries
-            if (target.Contains("OOB"))
-            {
-                int debugRawOffset = reader.GetOffsetForRVA((int)sigRva);
-                var hexBytes = new System.Text.StringBuilder("  DEBUG hex: ");
-                for (int h = 0; h < 30; h++)
-                {
-                    int tempOff = debugRawOffset + h;
-                    hexBytes.Append($"{nativeReader.ReadByte(ref tempOff):X2} ");
-                }
-                Console.WriteLine(hexBytes.ToString());
-                Console.WriteLine($"  DEBUG moduleIndex={moduleIndex} mdReader.MemberRef={mdReader?.GetTableRowCount(TableIndex.MemberRef)} mdReader.MethodDef={mdReader?.GetTableRowCount(TableIndex.MethodDef)}");
-            }
-
-            Console.WriteLine($"  [{i}] Slot=0x{currentSlotRva:X8} Fixup={fixupKind,-30} Module={moduleName,-40} Target={target}");
+            Console.WriteLine($"  [{i}] Slot=0x{currentSlotRva:X8} {decoded}");
         }
         sectionIdx++;
     }
@@ -686,101 +667,6 @@ static string DecodeSignatureBlobAsMethod(
 
 // ─── Signature target decoding ──────────────────────────────────────────────
 
-static string DecodeSignatureTarget(
-    NativeReader reader, int offset, ReadyToRunFixupKind fixupKind,
-    MetadataReader mdReader, DiskAssemblyResolver resolver)
-{
-    try
-    {
-        return fixupKind switch
-        {
-            ReadyToRunFixupKind.TypeHandle
-                or ReadyToRunFixupKind.NewObject
-                or ReadyToRunFixupKind.NewArray
-                or ReadyToRunFixupKind.IsInstanceOf
-                or ReadyToRunFixupKind.TypeDictionary
-                or ReadyToRunFixupKind.DeclaringTypeHandle
-                or ReadyToRunFixupKind.ChkCast
-                => DecodeType(reader, ref offset, mdReader, resolver),
-
-            ReadyToRunFixupKind.MethodHandle
-                or ReadyToRunFixupKind.MethodEntry
-                or ReadyToRunFixupKind.VirtualEntry
-                or ReadyToRunFixupKind.MethodDictionary
-                => DecodeMethod(reader, ref offset, mdReader, resolver),
-
-            // DefToken/RefToken fixups encode just a raw RID, not a full method signature
-            ReadyToRunFixupKind.MethodEntry_DefToken
-                or ReadyToRunFixupKind.VirtualEntry_DefToken
-                => DecodeMethodDefToken(reader, ref offset, mdReader),
-
-            ReadyToRunFixupKind.MethodEntry_RefToken
-                or ReadyToRunFixupKind.VirtualEntry_RefToken
-                => DecodeMethodRefToken(reader, ref offset, mdReader),
-
-            ReadyToRunFixupKind.FieldHandle
-                or ReadyToRunFixupKind.FieldAddress
-                or ReadyToRunFixupKind.FieldOffset
-                => DecodeField(reader, ref offset, mdReader, resolver),
-
-            ReadyToRunFixupKind.CctorTrigger
-                or ReadyToRunFixupKind.StaticBaseGC
-                or ReadyToRunFixupKind.StaticBaseNonGC
-                or ReadyToRunFixupKind.ThreadStaticBaseGC
-                or ReadyToRunFixupKind.ThreadStaticBaseNonGC
-                => DecodeType(reader, ref offset, mdReader, resolver),
-
-            ReadyToRunFixupKind.Verify_FieldOffset =>
-                DecodeVerifyFieldOffset(reader, ref offset, mdReader, resolver),
-
-            ReadyToRunFixupKind.Check_FieldOffset =>
-                DecodeCheckFieldOffset(reader, ref offset, mdReader, resolver),
-
-            ReadyToRunFixupKind.StringHandle =>
-                DecodeStringHandle(reader, ref offset),
-
-            ReadyToRunFixupKind.Helper =>
-                DecodeHelper(reader, ref offset),
-
-            ReadyToRunFixupKind.DelegateCtor =>
-                DecodeMethod(reader, ref offset, mdReader, resolver) + " => " + DecodeType(reader, ref offset, mdReader, resolver),
-
-            _ => "(undecoded)"
-        };
-    }
-    catch (Exception ex)
-    {
-        return $"(decode error: {ex.Message})";
-    }
-}
-
-static string DecodeVerifyFieldOffset(NativeReader reader, ref int offset, MetadataReader mdReader, DiskAssemblyResolver resolver)
-{
-    uint val1 = ReadCompressedUInt(reader, ref offset);
-    uint val2 = ReadCompressedUInt(reader, ref offset);
-    string field = DecodeField(reader, ref offset, mdReader, resolver);
-    return $"offset={val1} flags=0x{val2:X} {field}";
-}
-
-static string DecodeCheckFieldOffset(NativeReader reader, ref int offset, MetadataReader mdReader, DiskAssemblyResolver resolver)
-{
-    uint expectedOffset = ReadCompressedUInt(reader, ref offset);
-    string field = DecodeField(reader, ref offset, mdReader, resolver);
-    return $"offset={expectedOffset} {field}";
-}
-
-static string DecodeMethodDefToken(NativeReader reader, ref int offset, MetadataReader mdReader)
-{
-    uint rid = ReadCompressedUInt(reader, ref offset);
-    return SafeFormatMethodDef(mdReader, (int)rid);
-}
-
-static string DecodeMethodRefToken(NativeReader reader, ref int offset, MetadataReader mdReader)
-{
-    uint rid = ReadCompressedUInt(reader, ref offset);
-    return SafeFormatMemberRef(mdReader, (int)rid);
-}
-
 static string DecodeMethod(NativeReader reader, ref int offset, MetadataReader mdReader, DiskAssemblyResolver resolver, bool peekModuleOverride = false)
 {
     uint methodFlags = ReadCompressedUInt(reader, ref offset);
@@ -871,56 +757,6 @@ static string DecodeMethod(NativeReader reader, ref int offset, MetadataReader m
         methodName += $" [{string.Join(",", extra)}]";
 
     return methodName;
-}
-
-static string DecodeField(NativeReader reader, ref int offset, MetadataReader mdReader, DiskAssemblyResolver resolver)
-{
-    uint fieldFlags = ReadCompressedUInt(reader, ref offset);
-    MetadataReader outerMdReader = mdReader;
-
-    string owningType = null;
-    if ((fieldFlags & (uint)ReadyToRunFieldSigFlags.READYTORUN_FIELD_SIG_OwnerType) != 0)
-    {
-        // MODULE_ZAPSIG inside the owning type is handled by DecodeType internally.
-        // For import fixups, the fixup-level module override already set the correct mdReader.
-        owningType = DecodeType(reader, ref offset, mdReader, resolver, outerMdReader);
-    }
-
-    uint rid = ReadCompressedUInt(reader, ref offset);
-    bool isMemberRef = (fieldFlags & (uint)ReadyToRunFieldSigFlags.READYTORUN_FIELD_SIG_MemberRefToken) != 0;
-
-    string fieldName;
-    if (owningType is not null)
-    {
-        string simpleName = isMemberRef
-            ? FormatMemberRefSimpleName(mdReader, (int)rid)
-            : FormatFieldDefSimpleName(mdReader, (int)rid);
-        fieldName = $"{owningType}.{simpleName}";
-    }
-    else if (mdReader is not null)
-    {
-        fieldName = isMemberRef
-            ? FormatMemberRef(mdReader, (int)rid)
-            : FormatFieldDef(mdReader, (int)rid);
-    }
-    else
-    {
-        fieldName = isMemberRef ? $"MemberRef#{rid}" : $"FieldDef#{rid}";
-    }
-
-    return fieldName;
-}
-
-static string DecodeStringHandle(NativeReader reader, ref int offset)
-{
-    uint rid = ReadCompressedUInt(reader, ref offset);
-    return $"UserString#0x{rid:X}";
-}
-
-static string DecodeHelper(NativeReader reader, ref int offset)
-{
-    uint helperId = ReadCompressedUInt(reader, ref offset);
-    return $"Helper({(ReadyToRunHelper)helperId})";
 }
 
 // ─── Type signature decoding ────────────────────────────────────────────────
@@ -1074,20 +910,6 @@ static string SafeFormatTypeDef(MetadataReader mdReader, int rid)
     }
 }
 
-static string SafeFormatMemberRef(MetadataReader mdReader, int rid)
-{
-    if (mdReader is null)
-        return $"MemberRef#{rid}";
-    try
-    {
-        return FormatMemberRef(mdReader, rid);
-    }
-    catch
-    {
-        return $"MemberRef#{rid}";
-    }
-}
-
 static string FormatTypeDef(MetadataReader mdReader, int rid)
 {
     var handle = MetadataTokens.TypeDefinitionHandle(rid);
@@ -1137,21 +959,6 @@ static string FormatMethodDef(MetadataReader mdReader, int rid)
     return name;
 }
 
-static string FormatFieldDef(MetadataReader mdReader, int rid)
-{
-    var handle = MetadataTokens.FieldDefinitionHandle(rid);
-    var fieldDef = mdReader.GetFieldDefinition(handle);
-    string name = mdReader.GetString(fieldDef.Name);
-    var declaringType = fieldDef.GetDeclaringType();
-    if (!declaringType.IsNil)
-    {
-        int typeRid = MetadataTokens.GetRowNumber(declaringType);
-        string fullType = FormatTypeDef(mdReader, typeRid);
-        return $"{fullType}.{name}";
-    }
-    return name;
-}
-
 static string FormatMemberRef(MetadataReader mdReader, int rid)
 {
     if (rid <= 0 || rid > mdReader.GetTableRowCount(TableIndex.MemberRef))
@@ -1189,15 +996,6 @@ static string FormatMemberRefSimpleName(MetadataReader mdReader, int rid)
     var handle = MetadataTokens.MemberReferenceHandle(rid);
     var memberRef = mdReader.GetMemberReference(handle);
     return mdReader.GetString(memberRef.Name);
-}
-
-static string FormatFieldDefSimpleName(MetadataReader mdReader, int rid)
-{
-    if (mdReader is null || rid <= 0 || rid > mdReader.GetTableRowCount(TableIndex.Field))
-        return $"FieldDef#{rid}";
-    var handle = MetadataTokens.FieldDefinitionHandle(rid);
-    var fieldDef = mdReader.GetFieldDefinition(handle);
-    return mdReader.GetString(fieldDef.Name);
 }
 
 // ─── Compressed uint helper (ECMA-335 encoding) ────────────────────────────
