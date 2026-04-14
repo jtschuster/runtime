@@ -22,7 +22,7 @@
 #
 # Daily triage of crossgen2 CI pipeline failures - analyzes builds, creates issues, and assigns Copilot to fix or disable failing tests
 #
-# gh-aw-metadata: {"schema_version":"v3","frontmatter_hash":"d44a5e48fa6b2fc3f700bf3858f0bf05e8b9ca09bbdc310eb664b57cfc672c5e","compiler_version":"v0.64.2","strict":true,"agent_id":"copilot","agent_model":"claude-opus-4.6"}
+# gh-aw-metadata: {"schema_version":"v3","frontmatter_hash":"a6458e036ce20c8f3f927e721183233824dcfe6e5c50e03f2f7fd66fdf1337a0","compiler_version":"v0.64.2","strict":true,"agent_id":"copilot","agent_model":"claude-opus-4.6"}
 
 name: "Crossgen2 CI Failure Triage"
 "on":
@@ -276,7 +276,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-      issues: read
+      issues: write
       pull-requests: read
     concurrency:
       group: "gh-aw-copilot-${{ github.workflow }}"
