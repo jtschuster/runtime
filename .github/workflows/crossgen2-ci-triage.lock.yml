@@ -22,7 +22,7 @@
 #
 # Daily triage of crossgen2 CI pipeline failures - analyzes builds, creates issues, and assigns Copilot to fix or disable failing tests
 #
-# gh-aw-metadata: {"schema_version":"v3","frontmatter_hash":"d44a5e48fa6b2fc3f700bf3858f0bf05e8b9ca09bbdc310eb664b57cfc672c5e","compiler_version":"v0.64.2","strict":true,"agent_id":"copilot","agent_model":"claude-opus-4.6"}
+# gh-aw-metadata: {"schema_version":"v3","frontmatter_hash":"997f361b10533b031fed86fb05989185b932d46879b58416355faa912926c5cb","compiler_version":"v0.64.2","strict":true,"agent_id":"copilot","agent_model":"claude-opus-4.6"}
 
 name: "Crossgen2 CI Failure Triage"
 "on":
@@ -150,17 +150,17 @@ jobs:
         run: |
           bash ${RUNNER_TEMP}/gh-aw/actions/create_prompt_first.sh
           {
-          cat << 'GH_AW_PROMPT_cbb12d0a2eefb802_EOF'
+          cat << 'GH_AW_PROMPT_35bc79d248a3e584_EOF'
           <system>
-          GH_AW_PROMPT_cbb12d0a2eefb802_EOF
+          GH_AW_PROMPT_35bc79d248a3e584_EOF
           cat "${RUNNER_TEMP}/gh-aw/prompts/xpia.md"
           cat "${RUNNER_TEMP}/gh-aw/prompts/temp_folder_prompt.md"
           cat "${RUNNER_TEMP}/gh-aw/prompts/markdown.md"
           cat "${RUNNER_TEMP}/gh-aw/prompts/cache_memory_prompt.md"
           cat "${RUNNER_TEMP}/gh-aw/prompts/safe_outputs_prompt.md"
-          cat << 'GH_AW_PROMPT_cbb12d0a2eefb802_EOF'
+          cat << 'GH_AW_PROMPT_35bc79d248a3e584_EOF'
           <safe-output-tools>
-          Tools: create_issue(max:10), missing_tool, missing_data, noop
+          Tools: add_comment(max:10), create_issue(max:10), close_issue(max:20), update_issue(max:10), assign_to_agent(max:5), missing_tool, missing_data, noop
           </safe-output-tools>
           <github-context>
           The following GitHub context information is available for this workflow:
@@ -190,14 +190,14 @@ jobs:
           {{/if}}
           </github-context>
           
-          GH_AW_PROMPT_cbb12d0a2eefb802_EOF
+          GH_AW_PROMPT_35bc79d248a3e584_EOF
           cat "${RUNNER_TEMP}/gh-aw/prompts/github_mcp_tools_with_safeoutputs_prompt.md"
-          cat << 'GH_AW_PROMPT_cbb12d0a2eefb802_EOF'
+          cat << 'GH_AW_PROMPT_35bc79d248a3e584_EOF'
           </system>
-          GH_AW_PROMPT_cbb12d0a2eefb802_EOF
-          cat << 'GH_AW_PROMPT_cbb12d0a2eefb802_EOF'
+          GH_AW_PROMPT_35bc79d248a3e584_EOF
+          cat << 'GH_AW_PROMPT_35bc79d248a3e584_EOF'
           {{#runtime-import .github/workflows/crossgen2-ci-triage.md}}
-          GH_AW_PROMPT_cbb12d0a2eefb802_EOF
+          GH_AW_PROMPT_35bc79d248a3e584_EOF
           } > "$GH_AW_PROMPT"
       - name: Interpolate variables and render templates
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
@@ -370,22 +370,87 @@ jobs:
           mkdir -p ${RUNNER_TEMP}/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/safeoutputs
           mkdir -p /tmp/gh-aw/mcp-logs/safeoutputs
-          cat > ${RUNNER_TEMP}/gh-aw/safeoutputs/config.json << 'GH_AW_SAFE_OUTPUTS_CONFIG_4a4a87ef2c599b25_EOF'
-          {"create_issue":{"assignees":["copilot"],"expires":720,"labels":["area-CodeGen-coreclr"],"max":10,"title_prefix":"[Crossgen2 CI] "},"mentions":{"enabled":false},"missing_data":{},"missing_tool":{},"noop":{"max":1,"report-as-issue":"true"}}
-          GH_AW_SAFE_OUTPUTS_CONFIG_4a4a87ef2c599b25_EOF
+          cat > ${RUNNER_TEMP}/gh-aw/safeoutputs/config.json << 'GH_AW_SAFE_OUTPUTS_CONFIG_37a6757a92ae5b5c_EOF'
+          {"add_comment":{"footer":true,"hide_older_comments":true,"max":10,"target":"*","target-repo":"jtschuster/runtime"},"assign_to_agent":{"max":5,"model":"claude-opus-4.6","name":"copilot","pull-request-repo":"jtschuster/runtime","target-repo":"jtschuster/runtime"},"close_issue":{"max":20,"target":"*","target-repo":"jtschuster/runtime"},"create_issue":{"assignees":["copilot"],"expires":720,"labels":["area-CodeGen-coreclr"],"max":10,"title_prefix":"[Crossgen2 CI] "},"mentions":{"enabled":false},"missing_data":{},"missing_tool":{},"noop":{"max":1,"report-as-issue":"true"},"update_issue":{"allow_body":true,"allow_status":true,"allow_title":true,"max":10,"target":"*","target-repo":"jtschuster/runtime","title_prefix":"[crossgen2-ci-triage] "}}
+          GH_AW_SAFE_OUTPUTS_CONFIG_37a6757a92ae5b5c_EOF
       - name: Write Safe Outputs Tools
         run: |
-          cat > ${RUNNER_TEMP}/gh-aw/safeoutputs/tools_meta.json << 'GH_AW_SAFE_OUTPUTS_TOOLS_META_33af0b75731912b2_EOF'
+          cat > ${RUNNER_TEMP}/gh-aw/safeoutputs/tools_meta.json << 'GH_AW_SAFE_OUTPUTS_TOOLS_META_cfa7a9bf7455c976_EOF'
           {
             "description_suffixes": {
-              "create_issue": " CONSTRAINTS: Maximum 10 issue(s) can be created. Title will be prefixed with \"[Crossgen2 CI] \". Labels [\"area-CodeGen-coreclr\"] will be automatically added. Assignees [\"copilot\"] will be automatically assigned."
+              "add_comment": " CONSTRAINTS: Maximum 10 comment(s) can be added. Target: *. Comments will be added in repository \"jtschuster/runtime\".",
+              "assign_to_agent": " CONSTRAINTS: Maximum 5 issue(s) can be assigned to agent. Issues will be assigned to agent in repository \"jtschuster/runtime\".",
+              "close_issue": " CONSTRAINTS: Maximum 20 issue(s) can be closed. Target: *.",
+              "create_issue": " CONSTRAINTS: Maximum 10 issue(s) can be created. Title will be prefixed with \"[Crossgen2 CI] \". Labels [\"area-CodeGen-coreclr\"] will be automatically added. Assignees [\"copilot\"] will be automatically assigned.",
+              "update_issue": " CONSTRAINTS: Maximum 10 issue(s) can be updated. Target: *. The target issue title must start with \"[crossgen2-ci-triage] \". Body updates are allowed."
             },
             "repo_params": {},
             "dynamic_tools": []
           }
-          GH_AW_SAFE_OUTPUTS_TOOLS_META_33af0b75731912b2_EOF
-          cat > ${RUNNER_TEMP}/gh-aw/safeoutputs/validation.json << 'GH_AW_SAFE_OUTPUTS_VALIDATION_e5513dbdb514de38_EOF'
+          GH_AW_SAFE_OUTPUTS_TOOLS_META_cfa7a9bf7455c976_EOF
+          cat > ${RUNNER_TEMP}/gh-aw/safeoutputs/validation.json << 'GH_AW_SAFE_OUTPUTS_VALIDATION_15a02caa8aab0afd_EOF'
           {
+            "add_comment": {
+              "defaultMax": 1,
+              "fields": {
+                "body": {
+                  "required": true,
+                  "type": "string",
+                  "sanitize": true,
+                  "maxLength": 65000
+                },
+                "item_number": {
+                  "issueOrPRNumber": true
+                },
+                "repo": {
+                  "type": "string",
+                  "maxLength": 256
+                }
+              }
+            },
+            "assign_to_agent": {
+              "defaultMax": 1,
+              "fields": {
+                "agent": {
+                  "type": "string",
+                  "sanitize": true,
+                  "maxLength": 128
+                },
+                "issue_number": {
+                  "issueNumberOrTemporaryId": true
+                },
+                "pull_number": {
+                  "optionalPositiveInteger": true
+                },
+                "pull_request_repo": {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                "repo": {
+                  "type": "string",
+                  "maxLength": 256
+                }
+              },
+              "customValidation": "requiresOneOf:issue_number,pull_number"
+            },
+            "close_issue": {
+              "defaultMax": 1,
+              "fields": {
+                "body": {
+                  "required": true,
+                  "type": "string",
+                  "sanitize": true,
+                  "maxLength": 65000
+                },
+                "issue_number": {
+                  "optionalPositiveInteger": true
+                },
+                "repo": {
+                  "type": "string",
+                  "maxLength": 256
+                }
+              }
+            },
             "create_issue": {
               "defaultMax": 1,
               "fields": {
@@ -475,9 +540,63 @@ jobs:
                   "maxLength": 65000
                 }
               }
+            },
+            "update_issue": {
+              "defaultMax": 1,
+              "fields": {
+                "assignees": {
+                  "type": "array",
+                  "itemType": "string",
+                  "itemSanitize": true,
+                  "itemMaxLength": 39
+                },
+                "body": {
+                  "type": "string",
+                  "sanitize": true,
+                  "maxLength": 65000
+                },
+                "issue_number": {
+                  "issueOrPRNumber": true
+                },
+                "labels": {
+                  "type": "array",
+                  "itemType": "string",
+                  "itemSanitize": true,
+                  "itemMaxLength": 128
+                },
+                "milestone": {
+                  "optionalPositiveInteger": true
+                },
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "replace",
+                    "append",
+                    "prepend",
+                    "replace-island"
+                  ]
+                },
+                "repo": {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "open",
+                    "closed"
+                  ]
+                },
+                "title": {
+                  "type": "string",
+                  "sanitize": true,
+                  "maxLength": 128
+                }
+              },
+              "customValidation": "requiresOneOf:status,title,body"
             }
           }
-          GH_AW_SAFE_OUTPUTS_VALIDATION_e5513dbdb514de38_EOF
+          GH_AW_SAFE_OUTPUTS_VALIDATION_15a02caa8aab0afd_EOF
           node ${RUNNER_TEMP}/gh-aw/actions/generate_safe_outputs_tools.cjs
       - name: Generate Safe Outputs MCP Server Config
         id: safe-outputs-config
@@ -543,7 +662,7 @@ jobs:
           export MCP_GATEWAY_DOCKER_COMMAND='docker run -i --rm --network host -v /var/run/docker.sock:/var/run/docker.sock -e MCP_GATEWAY_PORT -e MCP_GATEWAY_DOMAIN -e MCP_GATEWAY_API_KEY -e MCP_GATEWAY_PAYLOAD_DIR -e MCP_GATEWAY_PAYLOAD_SIZE_THRESHOLD -e DEBUG -e MCP_GATEWAY_LOG_DIR -e GH_AW_MCP_LOG_DIR -e GH_AW_SAFE_OUTPUTS -e GH_AW_SAFE_OUTPUTS_CONFIG_PATH -e GH_AW_SAFE_OUTPUTS_TOOLS_PATH -e GH_AW_ASSETS_BRANCH -e GH_AW_ASSETS_MAX_SIZE_KB -e GH_AW_ASSETS_ALLOWED_EXTS -e DEFAULT_BRANCH -e GITHUB_MCP_SERVER_TOKEN -e GITHUB_MCP_GUARD_MIN_INTEGRITY -e GITHUB_MCP_GUARD_REPOS -e GITHUB_REPOSITORY -e GITHUB_SERVER_URL -e GITHUB_SHA -e GITHUB_WORKSPACE -e GITHUB_TOKEN -e GITHUB_RUN_ID -e GITHUB_RUN_NUMBER -e GITHUB_RUN_ATTEMPT -e GITHUB_JOB -e GITHUB_ACTION -e GITHUB_EVENT_NAME -e GITHUB_EVENT_PATH -e GITHUB_ACTOR -e GITHUB_ACTOR_ID -e GITHUB_TRIGGERING_ACTOR -e GITHUB_WORKFLOW -e GITHUB_WORKFLOW_REF -e GITHUB_WORKFLOW_SHA -e GITHUB_REF -e GITHUB_REF_NAME -e GITHUB_REF_TYPE -e GITHUB_HEAD_REF -e GITHUB_BASE_REF -e GH_AW_SAFE_OUTPUTS_PORT -e GH_AW_SAFE_OUTPUTS_API_KEY -v /tmp/gh-aw/mcp-payloads:/tmp/gh-aw/mcp-payloads:rw -v /opt:/opt:ro -v /tmp:/tmp:rw -v '"${GITHUB_WORKSPACE}"':'"${GITHUB_WORKSPACE}"':rw ghcr.io/github/gh-aw-mcpg:v0.2.6'
           
           mkdir -p /home/runner/.copilot
-          cat << GH_AW_MCP_CONFIG_4fe7628130205168_EOF | bash ${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.sh
+          cat << GH_AW_MCP_CONFIG_39fc90722f08ae4b_EOF | bash ${RUNNER_TEMP}/gh-aw/actions/start_mcp_gateway.sh
           {
             "mcpServers": {
               "github": {
@@ -586,7 +705,7 @@ jobs:
               "payloadDir": "${MCP_GATEWAY_PAYLOAD_DIR}"
             }
           }
-          GH_AW_MCP_CONFIG_4fe7628130205168_EOF
+          GH_AW_MCP_CONFIG_39fc90722f08ae4b_EOF
       - name: Download activation artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -810,6 +929,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: write
     concurrency:
       group: "gh-aw-conclusion-crossgen2-ci-triage"
       cancel-in-progress: false
@@ -879,6 +999,8 @@ jobs:
           GH_AW_SECRET_VERIFICATION_RESULT: ${{ needs.activation.outputs.secret_verification_result }}
           GH_AW_CHECKOUT_PR_SUCCESS: ${{ needs.agent.outputs.checkout_pr_success }}
           GH_AW_INFERENCE_ACCESS_ERROR: ${{ needs.agent.outputs.inference_access_error }}
+          GH_AW_ASSIGNMENT_ERRORS: ${{ needs.safe_outputs.outputs.assign_to_agent_assignment_errors }}
+          GH_AW_ASSIGNMENT_ERROR_COUNT: ${{ needs.safe_outputs.outputs.assign_to_agent_assignment_error_count }}
           GH_AW_ASSIGN_COPILOT_FAILURE_COUNT: ${{ needs.safe_outputs.outputs.assign_copilot_failure_count }}
           GH_AW_ASSIGN_COPILOT_ERRORS: ${{ needs.safe_outputs.outputs.assign_copilot_errors }}
           GH_AW_LOCKDOWN_CHECK_FAILED: ${{ needs.activation.outputs.lockdown_check_failed }}
@@ -1100,6 +1222,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: write
     timeout-minutes: 15
     env:
       GH_AW_CALLER_WORKFLOW_ID: "${{ github.repository }}/crossgen2-ci-triage"
@@ -1111,8 +1234,13 @@ jobs:
     outputs:
       assign_copilot_errors: ${{ steps.assign_copilot_to_created_issues.outputs.assign_copilot_errors }}
       assign_copilot_failure_count: ${{ steps.assign_copilot_to_created_issues.outputs.assign_copilot_failure_count }}
+      assign_to_agent_assigned: ${{ steps.assign_to_agent.outputs.assigned }}
+      assign_to_agent_assignment_error_count: ${{ steps.assign_to_agent.outputs.assignment_error_count }}
+      assign_to_agent_assignment_errors: ${{ steps.assign_to_agent.outputs.assignment_errors }}
       code_push_failure_count: ${{ steps.process_safe_outputs.outputs.code_push_failure_count }}
       code_push_failure_errors: ${{ steps.process_safe_outputs.outputs.code_push_failure_errors }}
+      comment_id: ${{ steps.process_safe_outputs.outputs.comment_id }}
+      comment_url: ${{ steps.process_safe_outputs.outputs.comment_url }}
       create_discussion_error_count: ${{ steps.process_safe_outputs.outputs.create_discussion_error_count }}
       create_discussion_errors: ${{ steps.process_safe_outputs.outputs.create_discussion_errors }}
       created_issue_number: ${{ steps.process_safe_outputs.outputs.created_issue_number }}
@@ -1155,7 +1283,7 @@ jobs:
           GH_AW_ALLOWED_DOMAINS: "api.business.githubcopilot.com,api.enterprise.githubcopilot.com,api.github.com,api.githubcopilot.com,api.individual.githubcopilot.com,api.snapcraft.io,archive.ubuntu.com,azure.archive.ubuntu.com,crl.geotrust.com,crl.globalsign.com,crl.identrust.com,crl.sectigo.com,crl.thawte.com,crl.usertrust.com,crl.verisign.com,crl3.digicert.com,crl4.digicert.com,crls.ssl.com,dev.azure.com,github.com,helix.dot.net,host.docker.internal,json-schema.org,json.schemastore.org,keyserver.ubuntu.com,mihubot.xyz,ocsp.digicert.com,ocsp.geotrust.com,ocsp.globalsign.com,ocsp.identrust.com,ocsp.sectigo.com,ocsp.ssl.com,ocsp.thawte.com,ocsp.usertrust.com,ocsp.verisign.com,packagecloud.io,packages.cloud.google.com,packages.microsoft.com,ppa.launchpad.net,raw.githubusercontent.com,registry.npmjs.org,s.symcb.com,s.symcd.com,security.ubuntu.com,telemetry.enterprise.githubcopilot.com,ts-crl.ws.symantec.com,ts-ocsp.ws.symantec.com,www.googleapis.com"
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_API_URL: ${{ github.api_url }}
-          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"create_issue\":{\"assignees\":[\"copilot\"],\"expires\":720,\"labels\":[\"area-CodeGen-coreclr\"],\"max\":10,\"title_prefix\":\"[Crossgen2 CI] \"},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"true\"}}"
+          GH_AW_SAFE_OUTPUTS_HANDLER_CONFIG: "{\"add_comment\":{\"footer\":true,\"hide_older_comments\":true,\"max\":10,\"target\":\"*\",\"target-repo\":\"jtschuster/runtime\"},\"assign_to_agent\":{\"max\":5,\"model\":\"claude-opus-4.6\",\"name\":\"copilot\",\"pull-request-repo\":\"jtschuster/runtime\",\"target-repo\":\"jtschuster/runtime\"},\"close_issue\":{\"max\":20,\"target\":\"*\",\"target-repo\":\"jtschuster/runtime\"},\"create_issue\":{\"assignees\":[\"copilot\"],\"expires\":720,\"labels\":[\"area-CodeGen-coreclr\"],\"max\":10,\"title_prefix\":\"[Crossgen2 CI] \"},\"missing_data\":{},\"missing_tool\":{},\"noop\":{\"max\":1,\"report-as-issue\":\"true\"},\"update_issue\":{\"allow_body\":true,\"allow_status\":true,\"allow_title\":true,\"max\":10,\"target\":\"*\",\"target-repo\":\"jtschuster/runtime\",\"title_prefix\":\"[crossgen2-ci-triage] \"}}"
           GH_AW_ASSIGN_COPILOT: "true"
         with:
           github-token: ${{ secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
@@ -1177,6 +1305,25 @@ jobs:
             const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
             const { main } = require('${{ runner.temp }}/gh-aw/actions/assign_copilot_to_created_issues.cjs');
+            await main();
+      - name: Assign to Agent
+        id: assign_to_agent
+        if: (!cancelled()) && needs.agent.result != 'skipped' && contains(needs.agent.outputs.output_types, 'assign_to_agent')
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          GH_AW_AGENT_OUTPUT: ${{ steps.setup-agent-output-env.outputs.GH_AW_AGENT_OUTPUT }}
+          GH_AW_TARGET_REPO_SLUG: "jtschuster/runtime"
+          GH_AW_AGENT_MAX_COUNT: 5
+          GH_AW_AGENT_DEFAULT: "copilot"
+          GH_AW_AGENT_DEFAULT_MODEL: "claude-opus-4.6"
+          GH_AW_AGENT_PULL_REQUEST_REPO: "jtschuster/runtime"
+          GH_AW_TEMPORARY_ID_MAP: ${{ steps.process_safe_outputs.outputs.temporary_id_map }}
+        with:
+          github-token: ${{ secrets.GH_AW_AGENT_TOKEN || secrets.GH_AW_GITHUB_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const { setupGlobals } = require('${{ runner.temp }}/gh-aw/actions/setup_globals.cjs');
+            setupGlobals(core, github, context, exec, io);
+            const { main } = require('${{ runner.temp }}/gh-aw/actions/assign_to_agent.cjs');
             await main();
       - name: Upload Safe Output Items
         if: always()
