@@ -60,7 +60,7 @@ timeout-minutes: 30
 
 permissions:
   contents: read
-  issues: write
+  issues: read
   actions: read
   pull-requests: read
 
@@ -87,6 +87,31 @@ safe-outputs:
     labels: [area-CodeGen-coreclr]
     title-prefix: "[Crossgen2 CI] "
     expires: 30
+  close-issue:
+    target: "*"              # "triggering" (default), "*", or number
+    max: 20                           # max closures (default: 1)
+    target-repo: "jtschuster/runtime"         # cross-repository
+  assign-to-agent:
+    name: "copilot"            # default agent (default: "copilot")
+    model: "claude-opus-4.6"   # default AI model (default: "auto")
+    max: 5                     # max assignments (default: 1)
+    target-repo: "jtschuster/runtime"  # where the issue lives (cross-repository)
+    pull-request-repo: "jtschuster/runtime"      # where the PR should be created (may differ from issue repo)
+  add-comment:
+    max: 10                       # max comments (default: 1)
+    target: "*"                  # "triggering" (default), "*", or number
+    discussions: false           # exclude discussions:write permission (default: true)
+    target-repo: "jtschuster/runtime"    # cross-repository
+    hide-older-comments: true    # hide previous comments from same workflow
+    footer: true                # omit AI-generated footer (default: true)
+  update-issue:
+    status:                   # enable status updates
+    title:               # enable title updates
+    body:                    # enable body updates
+    title-prefix: "[crossgen2-ci-triage] "    # only update issues with this title prefix
+    max: 10                    # max updates (default: 1)
+    target: "*"               # "triggering" (default), "*", or number
+    target-repo: "jtschuster/runtime" # cross-repository
   noop:
 
 tracker-id: crossgen2-ci-triage
