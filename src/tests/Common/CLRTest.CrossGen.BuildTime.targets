@@ -212,4 +212,136 @@
     <Touch Files="$(_BuildTimeR2RStamp)" AlwaysCreate="true" Condition="'$(_BuildTimeR2RRun)' == 'true'" />
   </Target>
 
+  <!--
+    Construct the runnable overlay at $(OutDir)/$(__BuildTimeOutputSubdir)/.
+
+    Four scenarios:
+      1. -o=. + R2R=false : _BuildTimeStagingActive is false; this target is skipped.
+                            Per-project Build output is already the runnable layout.
+      2. -o=. + R2R=true  : Overlay managed DLLs from R2R/ on top of base $(OutDir).
+                            Native libs, launch scripts, satellite resources stay put.
+      3. -o=Named + R2R=false : Create Named/ as a full overlay. Copy every
+                                top-level file (excluding staging subdirs and self)
+                                plus managed DLLs from IL/.
+      4. -o=Named + R2R=true  : Same as 3 but managed DLLs come from R2R/.
+
+    DependsOnTargets="_RunBuildTimeCrossgen2" ensures the R2R build finishes
+    before the overlay assembles. _StageBuildTimeIL already ran in the per-project
+    Build invocation preceding CrossgenTestAssemblies, so IL/ is populated by
+    project-load time of this child MSBuild call.
+
+    Incrementality inputs (union across scenarios, only the relevant one is
+    populated per run):
+      * R2R=true  : $(_BuildTimeR2RStamp) - literal path; mtime evaluated when
+                     the target's Inputs check runs (after DependsOnTargets).
+                     Using a literal (not a glob) is critical because top-level
+                     ItemGroup globs evaluate at project-load time, BEFORE
+                     _RunBuildTimeCrossgen2 has produced R2R/*.dll this session.
+      * R2R=false : $(_BuildTimeIlDir)*.dll - safe as a top-level glob because
+                     IL staging happened in a previous MSBuild invocation.
+
+    Stamp key: $(_BuildTimeIlDir)overlay-<subdir>.r2r-<bool>.stamp. Keying by
+    both overlay subdir and R2R flag makes the stamp config-safe: switching
+    from VariantA to VariantB or flipping the r2r flag picks a different stamp
+    so the overlay rebuilds even if OutDir contents appear unchanged.
+  -->
+  <ItemGroup Condition="'$(IsMergedTestRunnerAssembly)' == 'true' and '$(_BuildTimeStagingActive)' == 'true'">
+    <!-- Heterogeneous Inputs: exactly one of these is populated per run. -->
+    <_BuildTimeOverlayIncrementalInput
+        Include="$([MSBuild]::NormalizeDirectory('$(OutDir)', '$(__BuildTimeReadyToRunOutputSubdir)'))crossgen2.stamp"
+        Condition="'$(__BuildTimeReadyToRun)' == 'true'" />
+    <_BuildTimeOverlayIncrementalInput
+        Include="$([MSBuild]::NormalizeDirectory('$(OutDir)', '$(__BuildTimeIlOutputSubdir)'))*.dll"
+        Condition="'$(__BuildTimeReadyToRun)' != 'true'" />
+  </ItemGroup>
+
+  <Target Name="_ConstructBuildTimeOverlay"
+          DependsOnTargets="_RunBuildTimeCrossgen2"
+          Inputs="@(_BuildTimeOverlayIncrementalInput)"
+          Outputs="$([MSBuild]::NormalizeDirectory('$(OutDir)', '$(__BuildTimeIlOutputSubdir)'))overlay-$(__BuildTimeOutputSubdir).r2r-$(__BuildTimeReadyToRun).stamp"
+          Condition="'$(IsMergedTestRunnerAssembly)' == 'true' and '$(_BuildTimeStagingActive)' == 'true'">
+
+    <!-- Configuration validation. Collisions here would silently destroy data. -->
+    <Error Condition="'$(__BuildTimeIlOutputSubdir)' == '.' or '$(__BuildTimeIlOutputSubdir)' == ''"
+           Text="[overlay] $(MSBuildProjectName): --il-output-subdir='.' is not supported; IL staging requires a dedicated subdirectory." />
+    <Error Condition="'$(__BuildTimeReadyToRun)' == 'true' and ('$(__BuildTimeReadyToRunOutputSubdir)' == '.' or '$(__BuildTimeReadyToRunOutputSubdir)' == '')"
+           Text="[overlay] $(MSBuildProjectName): --readytorun-output-subdir='.' is not supported when --readytorun is set." />
+    <Error Condition="'$(__BuildTimeReadyToRun)' == 'true' and '$(__BuildTimeIlOutputSubdir)' == '$(__BuildTimeReadyToRunOutputSubdir)'"
+           Text="[overlay] $(MSBuildProjectName): --il-output-subdir and --readytorun-output-subdir must differ ('$(__BuildTimeIlOutputSubdir)')." />
+    <Error Condition="'$(__BuildTimeOutputSubdir)' == '$(__BuildTimeIlOutputSubdir)'"
+           Text="[overlay] $(MSBuildProjectName): --output-subdir collides with --il-output-subdir ('$(__BuildTimeIlOutputSubdir)'); pick a different name." />
+    <Error Condition="'$(__BuildTimeReadyToRun)' == 'true' and '$(__BuildTimeOutputSubdir)' == '$(__BuildTimeReadyToRunOutputSubdir)'"
+           Text="[overlay] $(MSBuildProjectName): --output-subdir collides with --readytorun-output-subdir ('$(__BuildTimeReadyToRunOutputSubdir)'); pick a different name." />
+    <Error Condition="$(__BuildTimeOutputSubdir.Contains('..')) or $(__BuildTimeOutputSubdir.Contains('/')) or $(__BuildTimeOutputSubdir.Contains('\'))"
+           Text="[overlay] $(MSBuildProjectName): --output-subdir '$(__BuildTimeOutputSubdir)' must be a single directory name (no path separators, no '..')." />
+
+    <PropertyGroup>
+      <_OverlayIlDir>$([MSBuild]::NormalizeDirectory('$(OutDir)', '$(__BuildTimeIlOutputSubdir)'))</_OverlayIlDir>
+      <_OverlayR2RDir>$([MSBuild]::NormalizeDirectory('$(OutDir)', '$(__BuildTimeReadyToRunOutputSubdir)'))</_OverlayR2RDir>
+      <_OverlayDestDir>$([MSBuild]::NormalizeDirectory('$(OutDir)', '$(__BuildTimeOutputSubdir)'))</_OverlayDestDir>
+      <_OverlayStamp>$(_OverlayIlDir)overlay-$(__BuildTimeOutputSubdir).r2r-$(__BuildTimeReadyToRun).stamp</_OverlayStamp>
+      <_OverlayManagedSourceDir Condition="'$(__BuildTimeReadyToRun)' == 'true'">$(_OverlayR2RDir)</_OverlayManagedSourceDir>
+      <_OverlayManagedSourceDir Condition="'$(__BuildTimeReadyToRun)' != 'true'">$(_OverlayIlDir)</_OverlayManagedSourceDir>
+      <!-- True when the overlay destination is its own directory, not the base. -->
+      <_OverlayIsDistinctDir Condition="'$(__BuildTimeOutputSubdir)' != '.'">true</_OverlayIsDistinctDir>
+    </PropertyGroup>
+
+    <!-- Missing managed source dir = upstream skip (disabled project, priority filter). -->
+    <Message Importance="Normal"
+             Condition="!Exists('$(_OverlayManagedSourceDir)')"
+             Text="[overlay] $(MSBuildProjectName): skipping - managed source dir '$(_OverlayManagedSourceDir)' does not exist." />
+
+    <PropertyGroup Condition="Exists('$(_OverlayManagedSourceDir)')">
+      <_OverlayRun>true</_OverlayRun>
+    </PropertyGroup>
+
+    <!--
+      For named overlays, wipe the destination before repopulating so stale
+      files (a renamed native lib, a satellite resource removed from the base
+      build) don't leak forward. For -o=. we do NOT wipe; the base dir holds
+      native deps and launch scripts we don't own.
+    -->
+    <RemoveDir Directories="$(_OverlayDestDir)"
+               Condition="'$(_OverlayRun)' == 'true' and '$(_OverlayIsDistinctDir)' == 'true'" />
+    <MakeDir Directories="$(_OverlayDestDir)" Condition="'$(_OverlayRun)' == 'true'" />
+
+    <!--
+      Named-overlay base copy: every file under $(OutDir) except the staging
+      subdirs and the overlay itself. Inside-target ItemGroup evaluates now
+      (after RemoveDir), so globs reflect current state.
+    -->
+    <ItemGroup Condition="'$(_OverlayRun)' == 'true' and '$(_OverlayIsDistinctDir)' == 'true'">
+      <_OverlayBaseFile Include="$(OutDir)**\*"
+          Exclude="$(_OverlayIlDir)**;$(_OverlayR2RDir)**;$(_OverlayDestDir)**" />
+    </ItemGroup>
+
+    <Copy SourceFiles="@(_OverlayBaseFile)"
+          DestinationFiles="@(_OverlayBaseFile->'$(_OverlayDestDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true"
+          Retries="2"
+          Condition="'$(_OverlayRun)' == 'true' and '$(_OverlayIsDistinctDir)' == 'true' and '@(_OverlayBaseFile)' != ''" />
+
+    <!--
+      Managed overlay: copy DLLs + PDBs from the chosen source (R2R/ or IL/)
+      into the overlay destination. For -o=. this overwrites the base IL
+      managed DLLs with R2R; for -o=Named it populates the fresh overlay dir.
+    -->
+    <ItemGroup Condition="'$(_OverlayRun)' == 'true'">
+      <_OverlayManagedFile Include="$(_OverlayManagedSourceDir)*.dll" />
+      <_OverlayManagedFile Include="$(_OverlayManagedSourceDir)*.pdb" />
+    </ItemGroup>
+
+    <Message Importance="High"
+             Text="[overlay] $(MSBuildProjectName): $(_OverlayManagedSourceDir) -> $(_OverlayDestDir) (@(_OverlayManagedFile->Count()) managed files, base-copy=$(_OverlayIsDistinctDir))"
+             Condition="'$(_OverlayRun)' == 'true'" />
+
+    <Copy SourceFiles="@(_OverlayManagedFile)"
+          DestinationFolder="$(_OverlayDestDir)"
+          SkipUnchangedFiles="true"
+          Retries="2"
+          Condition="'$(_OverlayRun)' == 'true' and '@(_OverlayManagedFile)' != ''" />
+
+    <Touch Files="$(_OverlayStamp)" AlwaysCreate="true" Condition="'$(_OverlayRun)' == 'true'" />
+  </Target>
+
 </Project>

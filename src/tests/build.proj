@@ -330,11 +330,22 @@
     populated before any child MSBuild call. Gated on __BuildTimeReadyToRun so it is
     a no-op when the user did not request build-time R2R on build.sh / build.cmd.
   -->
+  <!--
+    Staging is active whenever downstream work needs to run: either the user asked
+    for build-time R2R, or the user asked for a non-base overlay subdir. Mirrors
+    the _BuildTimeStagingActive property computed inside CLRTest.CrossGen.BuildTime.targets;
+    keeping them in sync ensures the invoker doesn't fire child builds when every
+    merged-runner target would no-op.
+  -->
+  <PropertyGroup>
+    <_BuildTimeStagingActiveTopLevel Condition="'$(__BuildTimeReadyToRun)' == 'true' or ('$(__BuildTimeOutputSubdir)' != '.' and '$(__BuildTimeOutputSubdir)' != '')">true</_BuildTimeStagingActiveTopLevel>
+  </PropertyGroup>
+
   <Target Name="CrossgenTestAssemblies"
       DependsOnTargets="GenerateLayout"
-      Condition="'$(__CopyNativeTestBinaries)' != '1' and '$(__GenerateLayoutOnly)' != '1' and '$(__SkipManaged)' != '1' and '$(__BuildTimeReadyToRun)' == 'true' and !$(MonoAot) and !$(MonoFullAot)">
+      Condition="'$(__CopyNativeTestBinaries)' != '1' and '$(__GenerateLayoutOnly)' != '1' and '$(__SkipManaged)' != '1' and '$(_BuildTimeStagingActiveTopLevel)' == 'true' and !$(MonoAot) and !$(MonoFullAot)">
 
-    <Message Importance="High" Text="[$([System.DateTime]::Now.ToString('HH:mm:ss.ff'))] $(MsgPrefix)Discovering merged test runners for build-time ReadyToRun compile..." />
+    <Message Importance="High" Text="[$([System.DateTime]::Now.ToString('HH:mm:ss.ff'))] $(MsgPrefix)Discovering merged test runners for build-time ReadyToRun / overlay construction..." />
 
     <ItemGroup>
       <_AllTestCsproj Include="$(MSBuildThisFileDirectory)**\*.csproj" />
@@ -347,7 +358,7 @@
           Condition="$([System.Text.RegularExpressions.Regex]::IsMatch($([System.IO.File]::ReadAllText('%(_AllTestCsproj.FullPath)')), '&lt;Import[^&gt;]*MergedTestRunner\.targets'))" />
     </ItemGroup>
 
-    <Message Importance="High" Text="$(MsgPrefix)Compiling @(_MergedRunnerProject->Count()) merged test runner(s) with crossgen2 (mode: '$(__BuildTimeReadyToRunMode)')..." />
+    <Message Importance="High" Text="$(MsgPrefix)Processing @(_MergedRunnerProject->Count()) merged test runner(s): r2r=$(__BuildTimeReadyToRun), mode='$(__BuildTimeReadyToRunMode)', overlay='$(__BuildTimeOutputSubdir)'..." />
 
     <!--
       Forward the build-time R2R properties explicitly. They are exported as env
@@ -359,23 +370,26 @@
       <_BuildTimeCrossgenProps>__BuildTimeReadyToRun=$(__BuildTimeReadyToRun)</_BuildTimeCrossgenProps>
       <_BuildTimeCrossgenProps>$(_BuildTimeCrossgenProps);__BuildTimeIlOutputSubdir=$(__BuildTimeIlOutputSubdir)</_BuildTimeCrossgenProps>
       <_BuildTimeCrossgenProps>$(_BuildTimeCrossgenProps);__BuildTimeReadyToRunOutputSubdir=$(__BuildTimeReadyToRunOutputSubdir)</_BuildTimeCrossgenProps>
+      <_BuildTimeCrossgenProps>$(_BuildTimeCrossgenProps);__BuildTimeOutputSubdir=$(__BuildTimeOutputSubdir)</_BuildTimeCrossgenProps>
       <_BuildTimeCrossgenProps>$(_BuildTimeCrossgenProps);__BuildTimeReadyToRunMode=$(__BuildTimeReadyToRunMode)</_BuildTimeCrossgenProps>
       <_BuildTimeCrossgenProps>$(_BuildTimeCrossgenProps);CORE_ROOT=$(CORE_ROOT)</_BuildTimeCrossgenProps>
     </PropertyGroup>
 
     <!--
-      SkipNonexistentTargets guards against a csproj that matched the regex heuristic
-      but happens not to import the build-time crossgen targets transitively.
+      Invoke _ConstructBuildTimeOverlay (not _RunBuildTimeCrossgen2 directly);
+      overlay depends on crossgen via DependsOnTargets, so R2R still runs when
+      __BuildTimeReadyToRun=true. SkipNonexistentTargets guards against a csproj
+      that matched the regex heuristic but does not import mergedrunner.targets.
     -->
     <MSBuild Projects="@(_MergedRunnerProject)"
-             Targets="_RunBuildTimeCrossgen2"
+             Targets="_ConstructBuildTimeOverlay"
              Properties="$(_BuildTimeCrossgenProps)"
              BuildInParallel="true"
              SkipNonexistentTargets="true"
              ContinueOnError="ErrorAndContinue" />
 
     <Error Condition="'$(MSBuildLastTaskResult)' == 'false'"
-           Text="One or more merged test runners failed to compile to ReadyToRun." />
+           Text="One or more merged test runners failed build-time R2R / overlay construction." />
   </Target>
 
   <Target Name="BuildMonoAot"
