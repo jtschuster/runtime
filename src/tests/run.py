@@ -115,6 +115,8 @@ parser.add_argument("--run_in_context", dest="run_in_context", action="store_tru
 parser.add_argument("--tiering_test", dest="tiering_test", action="store_true", default=False)
 parser.add_argument("--run_nativeaot_tests", dest="run_nativeaot_tests", action="store_true", default=False)
 parser.add_argument("--tree", dest="tree", default=None, help="Only run tests under the specified subtree (e.g. JIT/Regression).")
+parser.add_argument("--subdir", dest="variant_subdir", default=None, help="Launch merged-runner tests from <mergedrunner>/<subdir>/ instead of the base dir. The subdir is populated at build time via 'src/tests/build.sh --r2r -o=<subdir>'. Missing overlays are skipped with a warning. Use '.' or omit to launch from the base dir (today's default).")
+parser.add_argument("--no_r2r", "--no-r2r", dest="no_r2r", action="store_true", default=False, help="Set DOTNET_ReadyToRun=0 in the launched test process. Composable with --subdir.")
 
 ################################################################################
 # Globals
@@ -579,6 +581,9 @@ def call_msbuild(args):
     if args.tree:
         command += ["/p:TestSubtree=%s" % args.tree]
 
+    if args.variant_subdir is not None and args.variant_subdir != "" and args.variant_subdir != ".":
+        command += ["/p:TestVariantSubdir=%s" % args.variant_subdir]
+
     print(" ".join(command))
 
     sys.stdout.flush() # flush output before creating sub-process
@@ -830,9 +835,21 @@ def run_tests(args,
         os.environ["RunningIlasmRoundTrip"] = "1"
 
     if args.run_crossgen2_tests:
+        print("Warning: --runcrossgen2tests is deprecated. Build with 'src/tests/build.sh --r2r -o=<name>' and run with 'src/tests/run.sh --subdir=<name>' instead.")
         print("Running tests R2R (Crossgen2)")
         print("Setting RunCrossGen2=1")
         os.environ["RunCrossGen2"] = "1"
+
+    if args.variant_subdir is not None and args.variant_subdir != "":
+        if args.variant_subdir == ".":
+            print("Launching tests from base dir (--subdir=.)")
+        else:
+            print("Launching tests from overlay subdir '%s'" % args.variant_subdir)
+            os.environ["CLRTEST_VARIANT_SUBDIR"] = args.variant_subdir
+
+    if args.no_r2r:
+        print("Disabling R2R at runtime (DOTNET_ReadyToRun=0)")
+        os.environ["DOTNET_ReadyToRun"] = "0"
 
     if args.large_version_bubble:
         print("Large Version Bubble enabled")
@@ -987,6 +1004,16 @@ def setup_args(args):
                               "run_crossgen2_tests",
                               lambda unused: True,
                               "Error setting run_crossgen2_tests")
+
+    coreclr_setup_args.verify(args,
+                              "variant_subdir",
+                              lambda arg: arg is None or arg != "",
+                              "--subdir cannot be empty; pass a name or '.' (the default).")
+
+    coreclr_setup_args.verify(args,
+                              "no_r2r",
+                              lambda arg: True,
+                              "Error setting no_r2r")
 
     coreclr_setup_args.verify(args,
                               "synthesize_pgo",

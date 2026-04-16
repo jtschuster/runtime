@@ -64,7 +64,7 @@ if /i "%1" == "jitforcerelocs"                          (set DOTNET_ForceRelocs=
 
 if /i "%1" == "printlastresultsonly"                    (set __PrintLastResultsOnly=1&shift&goto Arg_Loop)
 if /i "%1" == "logsdir"                                 (set LogsDirArg=%2&shift&shift&goto Arg_Loop)
-if /i "%1" == "runcrossgen2tests"                       (set RunCrossGen2=1&shift&goto Arg_Loop)
+if /i "%1" == "runcrossgen2tests"                       (echo Warning: 'runcrossgen2tests' is deprecated. Build with 'src\tests\build.cmd -r2r -o=^<name^>' and run with 'src\tests\run.cmd subdir ^<name^>' instead.&set RunCrossGen2=1&shift&goto Arg_Loop)
 REM This test feature is currently intentionally undocumented
 if /i "%1" == "runlargeversionbubblecrossgen2tests"     (set RunCrossGen2=1&set CrossgenLargeVersionBubble=1&shift&goto Arg_Loop)
 if /i "%1" == "synthesizepgo"                           (set CrossGen2SynthesizePgo=1&shift&goto Arg_Loop)
@@ -79,6 +79,9 @@ if /i "%1" == "tieringtest"                             (set TieringTest=1&shift
 if /i "%1" == "runnativeaottests"                       (set RunNativeAot=1&shift&goto Arg_Loop)
 if /i "%1" == "interpreter"                             (set RunInterpreter=1&shift&goto Arg_Loop)
 if /i "%1" == "node"                                    (set RunWithNodeJS=1&shift&goto Arg_Loop)
+if /i "%1" == "subdir"                                  (set __VariantSubdir=%~2&shift&shift&goto Arg_Loop)
+if /i "%1" == "no-r2r"                                  (set __NoR2R=1&shift&goto Arg_Loop)
+if /i "%1" == "nor2r"                                   (set __NoR2R=1&shift&goto Arg_Loop)
 @REM For tree, support '/', '-', and '--' prefixes like build.cmd
 set __treeArg=%~1
 set __treeArg=%__treeArg:/=%
@@ -204,6 +207,14 @@ if defined __TreeSubtree (
     set __RuntestPyArgs=%__RuntestPyArgs% --tree "%__TreeSubtree%"
 )
 
+if defined __VariantSubdir (
+    set __RuntestPyArgs=%__RuntestPyArgs% --subdir "%__VariantSubdir%"
+)
+
+if defined __NoR2R (
+    set __RuntestPyArgs=%__RuntestPyArgs% --no_r2r
+)
+
 REM Find python and set it to the variable PYTHON
 set _C=-c "import sys; sys.stdout.write(sys.executable)"
 (py -3 %_C% || py -2 %_C% || python3 %_C% || python2 %_C% || python %_C%) > %TEMP%\pythonlocation.txt 2> NUL
@@ -243,8 +254,10 @@ echo ^<build_type^>              - Specifies build type: Debug, Release, or Chec
 echo TestEnv ^<test_env_script^> - Run a custom script before every test to set custom test environment settings.
 echo sequential                - Run tests sequentially ^(no parallelism^).
 echo parallel ^<type^>           - Run tests with given level of parallelism: none, collections, assemblies, all. Default: collections.
-echo RunCrossgen2Tests         - Runs ReadytoRun tests compiled with Crossgen2
+echo RunCrossgen2Tests         - ^(Deprecated^) Use 'subdir ^<name^>' on a build produced by 'src\tests\build.cmd -r2r -o=^<name^>' instead.
 echo synthesizepgo             - Enabled synthesizing PGO data in CrossGen2
+echo subdir ^<name^>             - Launch merged-runner tests from ^<mergedrunner^>\^<name^>\ ^(built via 'src\tests\build.cmd -r2r -o=^<name^>'^). Missing overlays are skipped with a warning.
+echo no-r2r                    - Set DOTNET_ReadyToRun=0 in launched test processes. Composable with 'subdir'.
 echo jitstress ^<n^>             - Runs the tests with DOTNET_JitStress=n
 echo jitstressregs ^<n^>         - Runs the tests with DOTNET_JitStressRegs=n
 echo jitminopts                - Runs the tests with DOTNET_JITMinOpts=1

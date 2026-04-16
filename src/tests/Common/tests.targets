@@ -26,9 +26,21 @@
   </Target>
 
   <Target Name="FindMergedTestDirectories">
+    <PropertyGroup>
+      <!-- TestVariantSubdir is set by run.sh/run.cmd/run.py via '-p:TestVariantSubdir=name'
+           in response to the subdir flag. Empty or '.' means "launch from base dir",
+           which matches today's behavior. A non-dot value reroutes each merged-runner script
+           path from (mergedrunner)/(name).sh to (mergedrunner)/(TestVariantSubdir)/(name).sh.
+           The overlay dir is produced by build-time _ConstructBuildTimeOverlay; marker files
+           (*.MergedTestAssembly) are deliberately absent from overlays to prevent double
+           enumeration. -->
+      <_MergedTestWrapperSubdirPrefix Condition="'$(TestVariantSubdir)' != '' and '$(TestVariantSubdir)' != '.'">$(TestVariantSubdir)\</_MergedTestWrapperSubdirPrefix>
+    </PropertyGroup>
     <ItemGroup>
       <_MergedTestAssemblyMarkers Include="$(_TestSearchRoot)\*.MergedTestAssembly" />
-      <MergedTestWrapperScripts Include="$([System.IO.Path]::ChangeExtension('%(_MergedTestAssemblyMarkers.Identity)', '.$(TestScriptExtension)'))" />
+      <MergedTestWrapperScripts Include="$([System.IO.Path]::GetDirectoryName('%(_MergedTestAssemblyMarkers.Identity)'))\$(_MergedTestWrapperSubdirPrefix)$([System.IO.Path]::GetFileNameWithoutExtension('%(_MergedTestAssemblyMarkers.Identity)')).$(TestScriptExtension)" />
+      <_MergedTestWrapperMissing Include="@(MergedTestWrapperScripts)" Condition="'$(_MergedTestWrapperSubdirPrefix)' != '' and !Exists('%(MergedTestWrapperScripts.Identity)')" />
+      <MergedTestWrapperScripts Remove="@(_MergedTestWrapperMissing)" />
       <MergedTestWrapperScripts Update="@(MergedTestWrapperScripts)">
         <RedirectOutputToFile>$([System.IO.Path]::ChangeExtension('%(MergedTestWrapperScripts.Identity)', '.log'))</RedirectOutputToFile>
         <TestResultsXmlFile>$([System.IO.Path]::ChangeExtension('%(MergedTestWrapperScripts.Identity)', '.testResults.xml'))</TestResultsXmlFile>
@@ -38,6 +50,9 @@
         <TestResultsCopyTo>$(__LogsDir)\$([MSBuild]::ValueOrDefault('%(MergedTestWrapperScripts.RelativeResultsPath)', '').Replace('/', '.').Replace('\', '.')).testRun.xml</TestResultsCopyTo>
       </MergedTestWrapperScripts>
     </ItemGroup>
+    <Warning
+        Text="[FindMergedTestDirectories] --subdir=$(TestVariantSubdir) missing in %(_MergedTestWrapperMissing.Identity); this merged runner will be skipped. (Build the overlay with 'src/tests/build.sh --r2r -o=$(TestVariantSubdir)' or drop --subdir to fall back to the base dir.)"
+        Condition="'@(_MergedTestWrapperMissing)' != ''" />
   </Target>
 
   <Target Name="PrepareTestsToRun"

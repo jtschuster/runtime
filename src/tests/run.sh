@@ -20,8 +20,10 @@ function print_usage {
     echo '  --coreRootDir=<path>             : Directory to the CORE_ROOT location.'
     echo '  --enableEventLogging             : Enable event logging through LTTNG.'
     echo '  --sequential                     : Run tests sequentially (default is to run in parallel).'
-    echo '  --runcrossgen2tests              : Runs the ReadyToRun tests compiled with Crossgen2'
+    echo '  --runcrossgen2tests              : (Deprecated) Use --subdir=<name> on a build produced by "src/tests/build.sh --r2r -o=<name>" instead.'
     echo '  --synthesizepgo                  : Runs the tests allowing crossgen2 to synthesize PGO data'
+    echo '  --subdir=<name|.>                : Launch merged-runner tests from <mergedrunner>/<name>/ (built via "src/tests/build.sh --r2r -o=<name>"). Missing overlays are skipped with a warning. Use "." or omit to launch from the base dir.'
+    echo '  --no-r2r                         : Set DOTNET_ReadyToRun=0 in launched test processes. Composable with --subdir.'
     echo '  --jitstress=<n>                  : Runs the tests with DOTNET_JitStress=n'
     echo '  --jitstressregs=<n>              : Runs the tests with DOTNET_JitStressRegs=n'
     echo '  --jitminopts                     : Runs the tests with DOTNET_JITMinOpts=1'
@@ -159,6 +161,7 @@ do
             export DOTNET_EnableEventLog=1
             ;;
         --runcrossgen2tests)
+            echo "Warning: --runcrossgen2tests is deprecated. Build with 'src/tests/build.sh --r2r -o=<name>' and run with 'src/tests/run.sh --subdir=<name>' instead." >&2
             export RunCrossGen2=1
             ;;
         --synthesizepgo)
@@ -205,6 +208,15 @@ do
             ;;
         --tree|-tree)
             __nextTreeArg=1
+            ;;
+        --subdir=*)
+            variantSubdir=${i#*=}
+            ;;
+        --subdir:*)
+            variantSubdir=${i#*:}
+            ;;
+        --no-r2r|--norr2r)
+            noR2R=1
             ;;
         --interpreter)
             export RunInterpreter=1
@@ -336,6 +348,20 @@ fi
 if [[ -n "$treeSubtree" ]]; then
     echo "Running tests under subtree   : ${treeSubtree}"
     runtestPyArguments+=("--tree" "$treeSubtree")
+fi
+
+if [[ -n "$variantSubdir" ]]; then
+    if [[ "$variantSubdir" == "" ]]; then
+        echo "Error: --subdir cannot be empty. Pass a name or '.' (the default)." >&2
+        exit $EXIT_CODE_EXCEPTION
+    fi
+    echo "Launching tests from overlay : ${variantSubdir}"
+    runtestPyArguments+=("--subdir" "$variantSubdir")
+fi
+
+if [[ -n "$noR2R" ]]; then
+    echo "Disabling R2R at runtime      : DOTNET_ReadyToRun=0"
+    runtestPyArguments+=("--no_r2r")
 fi
 
 # Default to python3 if it is installed
