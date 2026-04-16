@@ -101,6 +101,11 @@ build_Tests()
     export __CompositeBuildMode
     export __GenerateLayoutOnly
     export __TestBuildMode
+    export __BuildTimeReadyToRun
+    export __BuildTimeIlOutputSubdir
+    export __BuildTimeReadyToRunOutputSubdir
+    export __BuildTimeOutputSubdir
+    export __BuildTimeReadyToRunMode
     export __MonoAot
     export __MonoFullAot
     export __MonoBinDir
@@ -147,6 +152,11 @@ usage_list+=("-generatelayoutonly - Only generate the Core_Root layout without b
 usage_list+=("")
 usage_list+=("-crossgen2 - Precompiles the framework managed assemblies in coreroot using the Crossgen2 compiler.")
 usage_list+=("-composite - Use Crossgen2 composite mode (all framework gets compiled into a single native R2R library).")
+usage_list+=("-readytorun, -r2r - Also compile each merged-runner's test assemblies with Crossgen2 at build time.")
+usage_list+=("-il-output-subdir:<name|.>, -il-o:<name|.> - Subdir (relative to each merged-runner output dir) where IL build intermediates are staged. Default: IL. Use '.' for no subdir (not recommended when also producing an overlay).")
+usage_list+=("-readytorun-output-subdir:<name|.>, -r2r-o:<name|.> - Subdir where R2R build intermediates are written. Default: R2R. Only meaningful with -readytorun.")
+usage_list+=("-output-subdir:<name|.>, -o:<name|.> - Subdir where the runnable test overlay is assembled. Default: '.' (the base merged-runner output dir). Used at -run.sh -subdir to pick a variant.")
+usage_list+=("-readytorun-mode:<token[;token...]> - Crossgen2 mode modifiers for -readytorun builds. Accepted tokens: composite, inputbubble, hotcoldsplitting, synthesizepgo. Use ; or , as separator. Per-file is the implicit default when 'composite' is omitted.")
 usage_list+=("-nativeaot - Builds the tests for Native AOT compilation.")
 usage_list+=("-priority1 - Include priority=1 tests in the build.")
 usage_list+=("-perfmap - Emit perfmap symbol files when compiling the framework assemblies using Crossgen2.")
@@ -168,6 +178,86 @@ usage_list+=("Any unrecognized arguments will be passed directly to MSBuild.")
 __ProjectRoot="$(cd "$(dirname "$0")"; pwd -P)"
 __RepoRootDir="$(cd "$__ProjectRoot"/../..; pwd -P)"
 __TargetArch=
+
+# Parses a --flag[:value] or --flag value argument into __CLRTESTS_FLAG_VALUE.
+# When value comes from $2, sets __ShiftArgs=1 so the outer arg loop skips it.
+# Rejects empty string (use '.' for "no subdir").
+clrtests_parse_subdir_flag() {
+    local arg="$1"
+    local nextarg="$2"
+    local val=
+    if [[ "$arg" == *:* ]]; then
+        val="${arg#*:}"
+    elif [[ "$arg" == *=* ]]; then
+        val="${arg#*=}"
+    else
+        val="$nextarg"
+        __ShiftArgs=1
+    fi
+    if [[ -z "$val" ]]; then
+        echo "${__ErrMsgPrefix}${__MsgPrefix}Error: '$arg' requires a non-empty value (use '.' for no subdir)." 1>&2
+        exit 1
+    fi
+    __CLRTESTS_FLAG_VALUE="$val"
+}
+
+# Parses --readytorun-mode:tok1[;tok2...] (or ',' as alias for ';'), validates tokens,
+# dedups with warning, rejects empty and 'perfile', returns normalized ';'-joined list
+# in __CLRTESTS_FLAG_VALUE.
+clrtests_parse_readytorun_mode() {
+    local arg="$1"
+    local nextarg="$2"
+    local val=
+    if [[ "$arg" == *:* ]]; then
+        val="${arg#*:}"
+    elif [[ "$arg" == *=* ]]; then
+        val="${arg#*=}"
+    else
+        val="$nextarg"
+        __ShiftArgs=1
+    fi
+    if [[ -z "$val" ]]; then
+        echo "${__ErrMsgPrefix}${__MsgPrefix}Error: '$arg' requires a non-empty token list. Accepted: composite, inputbubble, hotcoldsplitting, synthesizepgo." 1>&2
+        exit 1
+    fi
+    local norm
+    norm="$(echo "${val//,/;}" | tr '[:upper:]' '[:lower:]')"
+    local old_ifs="$IFS"
+    IFS=';'
+    local tokens=($norm)
+    IFS="$old_ifs"
+    local seen=";"
+    local out=""
+    local t
+    for t in "${tokens[@]}"; do
+        if [[ -z "$t" ]]; then
+            continue
+        fi
+        case "$t" in
+            composite|inputbubble|hotcoldsplitting|synthesizepgo)
+                if [[ "$seen" == *";${t};"* ]]; then
+                    echo "${__MsgPrefix}warning: -readytorun-mode: duplicate token '$t' ignored." 1>&2
+                else
+                    seen="${seen}${t};"
+                    if [[ -z "$out" ]]; then
+                        out="$t"
+                    else
+                        out="${out};${t}"
+                    fi
+                fi
+                ;;
+            perfile)
+                echo "${__ErrMsgPrefix}${__MsgPrefix}Error: -readytorun-mode: 'perfile' is not accepted; per-file is the implicit default (omit 'composite')." 1>&2
+                exit 1
+                ;;
+            *)
+                echo "${__ErrMsgPrefix}${__MsgPrefix}Error: -readytorun-mode: unknown token '$t'. Accepted: composite, inputbubble, hotcoldsplitting, synthesizepgo." 1>&2
+                exit 1
+                ;;
+        esac
+    done
+    __CLRTESTS_FLAG_VALUE="$out"
+}
 
 handle_arguments_local() {
     opt="$(echo "${1/#--/-}" | tr "[:upper:]" "[:lower:]")"
@@ -196,6 +286,30 @@ handle_arguments_local() {
         composite|-composite)
             __CompositeBuildMode=1
             __TestBuildMode=crossgen2
+            ;;
+
+        readytorun|-readytorun|r2r|-r2r)
+            __BuildTimeReadyToRun=true
+            ;;
+
+        il-output-subdir*|-il-output-subdir*|il-o*|-il-o*)
+            clrtests_parse_subdir_flag "$1" "$2"
+            __BuildTimeIlOutputSubdir="$__CLRTESTS_FLAG_VALUE"
+            ;;
+
+        readytorun-output-subdir*|-readytorun-output-subdir*|r2r-o*|-r2r-o*)
+            clrtests_parse_subdir_flag "$1" "$2"
+            __BuildTimeReadyToRunOutputSubdir="$__CLRTESTS_FLAG_VALUE"
+            ;;
+
+        output-subdir*|-output-subdir*|o|-o|o:*|-o:*|o=*|-o=*)
+            clrtests_parse_subdir_flag "$1" "$2"
+            __BuildTimeOutputSubdir="$__CLRTESTS_FLAG_VALUE"
+            ;;
+
+        readytorun-mode*|-readytorun-mode*)
+            clrtests_parse_readytorun_mode "$1" "$2"
+            __BuildTimeReadyToRunMode="$__CLRTESTS_FLAG_VALUE"
             ;;
 
         nativeaot|-nativeaot)
@@ -352,6 +466,12 @@ __Mono=0
 __MonoAot=0
 __MonoFullAot=0
 __BuildLogRootName="TestBuild"
+__BuildTimeReadyToRun=false
+__BuildTimeIlOutputSubdir="IL"
+__BuildTimeReadyToRunOutputSubdir="R2R"
+__BuildTimeOutputSubdir="."
+__BuildTimeReadyToRunMode=""
+__CLRTESTS_FLAG_VALUE=""
 CORE_ROOT=
 EnableNativeSanitizers=
 

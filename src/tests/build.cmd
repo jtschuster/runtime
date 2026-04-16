@@ -44,6 +44,11 @@ set __SkipManaged=
 set __SkipNative=
 set __CompositeBuildMode=
 set __TestBuildMode=
+set __BuildTimeReadyToRun=false
+set __BuildTimeIlOutputSubdir=IL
+set __BuildTimeReadyToRunOutputSubdir=R2R
+set __BuildTimeOutputSubdir=.
+set __BuildTimeReadyToRunMode=
 set __CreatePdb=
 set __CreatePerfmap=
 set __CopyNativeTestBinaries=0
@@ -109,6 +114,8 @@ if /i "%arg%" == "composite"             (set __CompositeBuildMode=1&set __TestB
 if /i "%arg%" == "pdb"                   (set __CreatePdb=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 if /i "%arg%" == "NativeAOT"             (set __TestBuildMode=nativeaot&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 if /i "%arg%" == "Perfmap"               (set __CreatePerfmap=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%arg%" == "ReadyToRun"             (set __BuildTimeReadyToRun=true&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%arg%" == "r2r"                    (set __BuildTimeReadyToRun=true&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 if /i "%arg%" == "AllTargets"            (set "__BuildNeedTargetArg=/p:CLRTestBuildAllTargets=allTargets"&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 if /i "%arg%" == "ExcludeMonoFailures"   (set __Mono=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 if /i "%arg%" == "Mono"                  (set __Mono=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
@@ -121,6 +128,13 @@ if /i "%arg%" == "tree"                  (set __BuildTestTree=!__BuildTestTree!%
 if /i "%arg%" == "log"                   (set __BuildLogRootName=%2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
 if /i "%arg%" == "priority"              (set __Priority=%2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop)
 if /i "%arg%" == "fsanitize"             (set __CMakeArgs=%__CMakeArgs% "-DCLR_CMAKE_ENABLE_SANITIZERS=%2"&set __EnableNativeSanitizers=%2&set processedArgs=!processedArgs! %1=%2&shift&shift&goto Arg_Loop)
+if /i "%arg%" == "ilo"                   (if "%~2"=="" (echo %__ErrMsgPrefix%error: '%~1' requires a non-empty value ^(use '.' for no subdir^).&exit /b 1) else (set __BuildTimeIlOutputSubdir=%~2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop))
+if /i "%arg%" == "iloutputsubdir"        (if "%~2"=="" (echo %__ErrMsgPrefix%error: '%~1' requires a non-empty value ^(use '.' for no subdir^).&exit /b 1) else (set __BuildTimeIlOutputSubdir=%~2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop))
+if /i "%arg%" == "r2ro"                  (if "%~2"=="" (echo %__ErrMsgPrefix%error: '%~1' requires a non-empty value ^(use '.' for no subdir^).&exit /b 1) else (set __BuildTimeReadyToRunOutputSubdir=%~2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop))
+if /i "%arg%" == "readytorunoutputsubdir" (if "%~2"=="" (echo %__ErrMsgPrefix%error: '%~1' requires a non-empty value ^(use '.' for no subdir^).&exit /b 1) else (set __BuildTimeReadyToRunOutputSubdir=%~2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop))
+if /i "%arg%" == "o"                     (if "%~2"=="" (echo %__ErrMsgPrefix%error: '%~1' requires a non-empty value ^(use '.' for no subdir^).&exit /b 1) else (set __BuildTimeOutputSubdir=%~2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop))
+if /i "%arg%" == "outputsubdir"          (if "%~2"=="" (echo %__ErrMsgPrefix%error: '%~1' requires a non-empty value ^(use '.' for no subdir^).&exit /b 1) else (set __BuildTimeOutputSubdir=%~2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop))
+if /i "%arg%" == "readytorunmode"        (if "%~2"=="" (echo %__ErrMsgPrefix%error: '%~1' requires a non-empty token list.&exit /b 1) else (set __BuildTimeReadyToRunMode=%~2&set processedArgs=!processedArgs! %1 %2&shift&shift&goto Arg_Loop))
 
 @REM The following arguments also consume two subsequent arguments
 if /i "%arg%" == "CMakeArgs"             (set __CMakeArgs="%2=%3" %__CMakeArgs%&set "processedArgs=!processedArgs! %1 %2 %3"&shift&shift&shift&goto Arg_Loop)
@@ -163,6 +177,11 @@ if defined __TestArgParsing (
     echo.__SkipNative=%__SkipNative%
     echo.__CompositeBuildMode=%__CompositeBuildMode%
     echo.__TestBuildMode=%__TestBuildMode%
+    echo.__BuildTimeReadyToRun=%__BuildTimeReadyToRun%
+    echo.__BuildTimeIlOutputSubdir=%__BuildTimeIlOutputSubdir%
+    echo.__BuildTimeReadyToRunOutputSubdir=%__BuildTimeReadyToRunOutputSubdir%
+    echo.__BuildTimeOutputSubdir=%__BuildTimeOutputSubdir%
+    echo.__BuildTimeReadyToRunMode=%__BuildTimeReadyToRunMode%
     echo.__CreatePdb=%__CreatePdb%
     echo.__CreatePerfmap=%__CreatePerfmap%
     echo.__CopyNativeTestBinaries=%__CopyNativeTestBinaries%
@@ -369,6 +388,11 @@ echo -GenerateLayoutOnly: Only generate the Core_Root layout without building ma
 echo -MSBuild: Use MSBuild instead of Ninja.
 echo -Crossgen2: Precompiles the framework managed assemblies in coreroot using the Crossgen2 compiler.
 echo -Composite: Use Crossgen2 composite mode (all framework gets compiled into a single native R2R library).
+echo -ReadyToRun, -r2r: Also compile each merged-runner's test assemblies with Crossgen2 at build time.
+echo -ILOutputSubdir ^<name^|.^>, -ILO ^<name^|.^>: Subdir (relative to each merged-runner output dir) where IL build intermediates are staged. Default: IL.
+echo -ReadyToRunOutputSubdir ^<name^|.^>, -R2RO ^<name^|.^>: Subdir where R2R build intermediates are written. Default: R2R. Only meaningful with -ReadyToRun.
+echo -OutputSubdir ^<name^|.^>, -O ^<name^|.^>: Subdir where the runnable test overlay is assembled. Default: '.'.
+echo -ReadyToRunMode ^<token;token;...^>: Crossgen2 mode modifiers. Accepted: composite, inputbubble, hotcoldsplitting, synthesizepgo. Use ; or , as separator.
 echo -PDB: Create PDB files when precompiling the framework managed assemblies.
 echo -NativeAOT: Builds the tests for Native AOT compilation.
 echo -Perfmap: Emit perfmap symbol files when compiling the framework assemblies using Crossgen2.
