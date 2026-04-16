@@ -150,8 +150,8 @@ usage_list+=("")
 usage_list+=("-copynativeonly - Only copy the native test binaries to the managed output. Do not build the native or managed tests.")
 usage_list+=("-generatelayoutonly - Only generate the Core_Root layout without building managed or native test components.")
 usage_list+=("")
-usage_list+=("-crossgen2 - Precompiles the framework managed assemblies in coreroot using the Crossgen2 compiler.")
-usage_list+=("-composite - Use Crossgen2 composite mode (all framework gets compiled into a single native R2R library).")
+usage_list+=("-readytorun-framework, -r2r-framework, -crossgen2 - Precompiles the framework managed assemblies in coreroot using the Crossgen2 compiler.")
+usage_list+=("-composite-framework, -composite - Use Crossgen2 composite mode (all framework gets compiled into a single native R2R library).")
 usage_list+=("-readytorun, -r2r - Also compile each merged-runner's test assemblies with Crossgen2 at build time.")
 usage_list+=("-il-output-subdir:<name|.>, -il-o:<name|.> - Subdir (relative to each merged-runner output dir) where IL build intermediates are staged. Default: IL. Use '.' for no subdir (not recommended when also producing an overlay).")
 usage_list+=("-readytorun-output-subdir:<name|.>, -r2r-o:<name|.> - Subdir where R2R build intermediates are written. Default: R2R. Only meaningful with -readytorun.")
@@ -279,11 +279,11 @@ handle_arguments_local() {
             __SkipGenerateLayout=1
             ;;
 
-        crossgen2|-crossgen2)
+        crossgen2|-crossgen2|readytorun-framework|-readytorun-framework|r2r-framework|-r2r-framework)
             __TestBuildMode=crossgen2
             ;;
 
-        composite|-composite)
+        composite|-composite|composite-framework|-composite-framework)
             __CompositeBuildMode=1
             __TestBuildMode=crossgen2
             ;;

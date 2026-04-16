@@ -110,7 +110,10 @@ if /i "%arg%" == "CopyNativeOnly"        (set __CopyNativeTestBinaries=1&set __S
 if /i "%arg%" == "GenerateLayoutOnly"    (set __GenerateLayoutOnly=1&set __SkipManaged=1&set __SkipNative=1&set __CopyNativeProjectsAfterCombinedTestBuild=false&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 if /i "%arg%" == "MSBuild"               (set __Ninja=0&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 if /i "%arg%" == "crossgen2"             (set __TestBuildMode=crossgen2&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%arg%" == "readytorunframework"   (set __TestBuildMode=crossgen2&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%arg%" == "r2rframework"          (set __TestBuildMode=crossgen2&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 if /i "%arg%" == "composite"             (set __CompositeBuildMode=1&set __TestBuildMode=crossgen2&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
+if /i "%arg%" == "compositeframework"    (set __CompositeBuildMode=1&set __TestBuildMode=crossgen2&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 if /i "%arg%" == "pdb"                   (set __CreatePdb=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 if /i "%arg%" == "NativeAOT"             (set __TestBuildMode=nativeaot&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
 if /i "%arg%" == "Perfmap"               (set __CreatePerfmap=1&set processedArgs=!processedArgs! %1&shift&goto Arg_Loop)
@@ -386,8 +389,8 @@ echo.
 echo -CopyNativeOnly: Only copy the native test binaries to the managed output. Do not build the native or managed tests.
 echo -GenerateLayoutOnly: Only generate the Core_Root layout without building managed or native test components.
 echo -MSBuild: Use MSBuild instead of Ninja.
-echo -Crossgen2: Precompiles the framework managed assemblies in coreroot using the Crossgen2 compiler.
-echo -Composite: Use Crossgen2 composite mode (all framework gets compiled into a single native R2R library).
+echo -ReadyToRunFramework, -r2rFramework, -Crossgen2: Precompiles the framework managed assemblies in coreroot using the Crossgen2 compiler.
+echo -CompositeFramework, -Composite: Use Crossgen2 composite mode (all framework gets compiled into a single native R2R library).
 echo -ReadyToRun, -r2r: Also compile each merged-runner's test assemblies with Crossgen2 at build time.
 echo -ILOutputSubdir ^<name^|.^>, -ILO ^<name^|.^>: Subdir (relative to each merged-runner output dir) where IL build intermediates are staged. Default: IL.
 echo -ReadyToRunOutputSubdir ^<name^|.^>, -R2RO ^<name^|.^>: Subdir where R2R build intermediates are written. Default: R2R. Only meaningful with -ReadyToRun.
