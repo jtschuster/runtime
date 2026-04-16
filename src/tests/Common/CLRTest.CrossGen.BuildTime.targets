@@ -65,4 +65,122 @@
           Condition="'@(_ILStagingSource)' != ''" />
   </Target>
 
+  <!--
+    Compile the merged runner's staged IL assemblies to ReadyToRun images.
+
+    This target is NOT auto-invoked via Before/AfterTargets because it depends
+    on Core_Root being fully populated (crossgen2 binary, framework refs).
+    The top-level src/tests/build.proj:CrossgenTestAssemblies target invokes
+    this explicitly after GenerateLayout completes.
+
+    Inputs:  $(OutDir)/$(__BuildTimeIlOutputSubdir)/*.dll    (staged managed IL)
+    Outputs: $(OutDir)/$(__BuildTimeReadyToRunOutputSubdir)/ (R2R DLLs + response file + stamp)
+               composite-r2r.dll           when readytorun-mode includes 'composite'
+               <original-name>.dll (each)  per-file mode (mode token omitted)
+
+    The stamp file is rewritten on every successful compile; MSBuild's
+    Inputs/Outputs attribute on the invoking target handles incrementality.
+  -->
+  <Target Name="_RunBuildTimeCrossgen2"
+          Condition="'$(IsMergedTestRunnerAssembly)' == 'true' and '$(__BuildTimeReadyToRun)' == 'true'">
+
+    <PropertyGroup>
+      <_BuildTimeIlDir>$([MSBuild]::NormalizeDirectory('$(OutDir)', '$(__BuildTimeIlOutputSubdir)'))</_BuildTimeIlDir>
+      <_BuildTimeR2RDir>$([MSBuild]::NormalizeDirectory('$(OutDir)', '$(__BuildTimeReadyToRunOutputSubdir)'))</_BuildTimeR2RDir>
+      <_BuildTimeR2RStamp>$(_BuildTimeR2RDir)crossgen2.stamp</_BuildTimeR2RStamp>
+      <_BuildTimeCrossgen2Path>$([MSBuild]::NormalizePath('$(CORE_ROOT)', 'crossgen2', 'crossgen2$(ExeSuffix)'))</_BuildTimeCrossgen2Path>
+      <_BuildTimeCompositeMode Condition="$(__BuildTimeReadyToRunMode.ToLowerInvariant().Contains('composite'))">true</_BuildTimeCompositeMode>
+    </PropertyGroup>
+
+    <Error Condition="!Exists('$(_BuildTimeIlDir)')"
+           Text="[R2R-compile] $(MSBuildProjectName): staged IL directory '$(_BuildTimeIlDir)' does not exist. _StageBuildTimeIL must run first." />
+    <Error Condition="!Exists('$(_BuildTimeCrossgen2Path)')"
+           Text="[R2R-compile] $(MSBuildProjectName): crossgen2 binary '$(_BuildTimeCrossgen2Path)' does not exist. GenerateLayout must run first." />
+
+    <MakeDir Directories="$(_BuildTimeR2RDir)" />
+
+    <!--
+      Clear stale outputs from prior builds so per-file mode never leaves a
+      DLL behind when the input set shrinks, and composite mode never races
+      against an older composite-r2r.dll. The stamp file itself is also
+      cleared; it is re-created only after crossgen2 succeeds.
+    -->
+    <ItemGroup>
+      <_BuildTimeR2RStaleOutputs Include="$(_BuildTimeR2RDir)*.dll" />
+      <_BuildTimeR2RStaleOutputs Include="$(_BuildTimeR2RDir)*.pdb" />
+      <_BuildTimeR2RStaleOutputs Include="$(_BuildTimeR2RDir)*.rsp" />
+      <_BuildTimeR2RStaleOutputs Include="$(_BuildTimeR2RStamp)" />
+    </ItemGroup>
+    <Delete Files="@(_BuildTimeR2RStaleOutputs)" />
+
+    <!-- Args shared by composite and per-file invocations. -->
+    <ItemGroup>
+      <_Crossgen2CommonArg Include="-O" />
+      <_Crossgen2CommonArg Include="--targetarch:$(TargetArchitecture)" />
+      <_Crossgen2CommonArg Include="--targetos:$(TargetOS)" />
+      <_Crossgen2CommonArg Include="--verify-type-and-field-layout" />
+      <_Crossgen2CommonArg Include="--method-layout:random" />
+      <_Crossgen2CommonArg Include="-r:$(CORE_ROOT)\System.*.dll" />
+      <_Crossgen2CommonArg Include="-r:$(CORE_ROOT)\Microsoft.*.dll" />
+      <_Crossgen2CommonArg Include="-r:$(CORE_ROOT)\xunit.*.dll" />
+      <_Crossgen2CommonArg Include="-r:$(CORE_ROOT)\mscorlib.dll" />
+      <_Crossgen2CommonArg Include="-r:$(CORE_ROOT)\netstandard.dll" />
+    </ItemGroup>
+
+    <!-- ======== Composite mode: one crossgen2 invocation, one output DLL. ======== -->
+    <PropertyGroup Condition="'$(_BuildTimeCompositeMode)' == 'true'">
+      <_CompositeOutputFile>$(_BuildTimeR2RDir)composite-r2r.dll</_CompositeOutputFile>
+      <_CompositeResponseFile>$(_BuildTimeR2RDir)composite-r2r.rsp</_CompositeResponseFile>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(_BuildTimeCompositeMode)' == 'true'">
+      <_CompositeRspLine Include="@(_Crossgen2CommonArg)" />
+      <_CompositeRspLine Include="--composite" />
+      <_CompositeRspLine Include="-o:$(_CompositeOutputFile)" />
+      <_CompositeRspLine Include="$(_BuildTimeIlDir)*.dll" />
+    </ItemGroup>
+
+    <WriteLinesToFile File="$(_CompositeResponseFile)"
+                      Lines="@(_CompositeRspLine)"
+                      Overwrite="true"
+                      Condition="'$(_BuildTimeCompositeMode)' == 'true'" />
+
+    <Message Importance="High"
+             Text="[R2R-compile] $(MSBuildProjectName): composite mode -> $(_CompositeOutputFile)"
+             Condition="'$(_BuildTimeCompositeMode)' == 'true'" />
+
+    <Exec Command="&quot;$(_BuildTimeCrossgen2Path)&quot; @&quot;$(_CompositeResponseFile)&quot;"
+          Condition="'$(_BuildTimeCompositeMode)' == 'true'" />
+
+    <!-- ======== Per-file mode: one crossgen2 invocation per input DLL. ======== -->
+    <ItemGroup Condition="'$(_BuildTimeCompositeMode)' != 'true'">
+      <_PerFileInput Include="$(_BuildTimeIlDir)*.dll" />
+      <_PerFileRspLine Include="@(_Crossgen2CommonArg)" />
+      <_PerFileRspLine Include="-r:$(_BuildTimeIlDir)*.dll" />
+    </ItemGroup>
+
+    <PropertyGroup Condition="'$(_BuildTimeCompositeMode)' != 'true'">
+      <_PerFileResponseFile>$(_BuildTimeR2RDir)perfile-common.rsp</_PerFileResponseFile>
+    </PropertyGroup>
+
+    <WriteLinesToFile File="$(_PerFileResponseFile)"
+                      Lines="@(_PerFileRspLine)"
+                      Overwrite="true"
+                      Condition="'$(_BuildTimeCompositeMode)' != 'true' and '@(_PerFileInput)' != ''" />
+
+    <Message Importance="High"
+             Text="[R2R-compile] $(MSBuildProjectName): per-file -> %(_PerFileInput.Filename)%(_PerFileInput.Extension)"
+             Condition="'$(_BuildTimeCompositeMode)' != 'true'" />
+
+    <!--
+      Batched Exec: MSBuild runs this task once per _PerFileInput item because
+      the command references %(_PerFileInput.*) metadata. This mirrors the
+      run-time prologue's per-file loop in CLRTest.CrossGen.targets.
+    -->
+    <Exec Command="&quot;$(_BuildTimeCrossgen2Path)&quot; @&quot;$(_PerFileResponseFile)&quot; -o:&quot;$(_BuildTimeR2RDir)%(_PerFileInput.Filename)%(_PerFileInput.Extension)&quot; &quot;%(_PerFileInput.FullPath)&quot;"
+          Condition="'$(_BuildTimeCompositeMode)' != 'true' and '@(_PerFileInput)' != ''" />
+
+    <Touch Files="$(_BuildTimeR2RStamp)" AlwaysCreate="true" />
+  </Target>
+
 </Project>
