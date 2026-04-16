@@ -1,0 +1,68 @@
+<!--
+  Build-time IL staging and R2R compile for CoreCLR test merged runners.
+
+  Imported by Common/mergedrunner.targets (once per merged-runner project).
+  Runs inline with the merged runner's own build so it benefits from MSBuild's
+  parallel project execution and incremental up-to-date checking.
+
+  Properties consumed (default when unset; normally set by build.sh / build.cmd):
+    __BuildTimeReadyToRun              - "true" when -readytorun / -r2r was passed.
+    __BuildTimeIlOutputSubdir          - Staging subdir for pristine IL (default IL).
+    __BuildTimeReadyToRunOutputSubdir  - Staging subdir for crossgen2 outputs (default R2R).
+    __BuildTimeOutputSubdir            - Overlay subdir to run from (default '.'; the base).
+    __BuildTimeReadyToRunMode          - Semicolon-separated crossgen2 mode tokens.
+
+  This file is concerned only with IL staging; the R2R compile and overlay
+  construction targets are added in later phases.
+-->
+<Project>
+
+  <PropertyGroup>
+    <__BuildTimeReadyToRun Condition="'$(__BuildTimeReadyToRun)' == ''">false</__BuildTimeReadyToRun>
+    <__BuildTimeIlOutputSubdir Condition="'$(__BuildTimeIlOutputSubdir)' == ''">IL</__BuildTimeIlOutputSubdir>
+    <__BuildTimeReadyToRunOutputSubdir Condition="'$(__BuildTimeReadyToRunOutputSubdir)' == ''">R2R</__BuildTimeReadyToRunOutputSubdir>
+    <__BuildTimeOutputSubdir Condition="'$(__BuildTimeOutputSubdir)' == ''">.</__BuildTimeOutputSubdir>
+
+    <!--
+      IL staging is active whenever downstream work (R2R compile or non-'.' overlay)
+      needs a pristine-IL reference copy. When R2R is off and the overlay target is
+      the base dir, staging would be a pure copy-and-copy-back and is skipped.
+    -->
+    <_BuildTimeStagingActive Condition="'$(__BuildTimeReadyToRun)' == 'true' or ('$(__BuildTimeOutputSubdir)' != '.' and '$(__BuildTimeOutputSubdir)' != '')">true</_BuildTimeStagingActive>
+  </PropertyGroup>
+
+  <!--
+    Stage the merged-runner's managed DLLs (and PDBs, if present) into the IL subdir.
+    Matches the legacy run-time prologue's 'cp ./*.dll IL-CG2/' behavior so crossgen2
+    sees the same input set; the downstream R2R compile target will read from here.
+
+    Runs after Build (normal case) or CopyAllNativeProjectReferenceBinaries (split-pipeline
+    lab case where -copynativeonly replaces Build). MSBuild target idempotency ensures it
+    fires exactly once per project build regardless of which predecessor completed first.
+  -->
+  <Target Name="_StageBuildTimeIL"
+          AfterTargets="Build;CopyAllNativeProjectReferenceBinaries"
+          Condition="'$(IsMergedTestRunnerAssembly)' == 'true' and '$(_BuildTimeStagingActive)' == 'true' and '$(__BuildTimeIlOutputSubdir)' != '.' and '$(__BuildTimeIlOutputSubdir)' != ''">
+
+    <PropertyGroup>
+      <_ILStagingDir>$([MSBuild]::NormalizeDirectory('$(OutDir)', '$(__BuildTimeIlOutputSubdir)'))</_ILStagingDir>
+    </PropertyGroup>
+
+    <MakeDir Directories="$(_ILStagingDir)" />
+
+    <ItemGroup>
+      <_ILStagingSource Include="$(OutDir)*.dll" />
+      <_ILStagingSource Include="$(OutDir)*.pdb" />
+    </ItemGroup>
+
+    <Message Importance="Low"
+             Text="[IL-stage] $(MSBuildProjectName): staging managed DLLs from $(OutDir) into $(_ILStagingDir)" />
+
+    <Copy SourceFiles="@(_ILStagingSource)"
+          DestinationFolder="$(_ILStagingDir)"
+          SkipUnchangedFiles="true"
+          Retries="2"
+          Condition="'@(_ILStagingSource)' != ''" />
+  </Target>
+
+</Project>

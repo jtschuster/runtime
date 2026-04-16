@@ -19,4 +19,5 @@
   </Target>
 
   <Import Project="$(RepoRoot)/src/tests/Common/mergedrunnermobile.targets" Condition="'$(TargetsMobile)' == 'true' and '$(CLRTestKind)' != 'SharedLibrary'  and ('$(TargetArchitecture)' != 'wasm' or '$(RuntimeFlavor)' != 'CoreCLR')" />
+  <Import Project="$(MSBuildThisFileDirectory)CLRTest.CrossGen.BuildTime.targets" />
 </Project>
