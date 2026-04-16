@@ -11,6 +11,12 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
     /// A NativeHashtable of inlining entries. Each entry maps an inlinee
     /// (identified by RID and optional module index) to a list of inliners.
     /// No method name resolution is performed.
+    ///
+    /// Scope: this section lives in the per-component R2R header. In a
+    /// non-composite image there is a single component header (the image header)
+    /// so the table is image-wide. In a composite image each component assembly
+    /// has its own InliningInfo2 table; module index 0 within an entry refers
+    /// to that component assembly (the "owner"), not the image.
     /// </summary>
     public sealed class InliningInfo2Table
     {

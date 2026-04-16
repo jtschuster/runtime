@@ -381,16 +381,22 @@ static void DumpInliningInfo(
 static void DumpInliningInfo2(
     ReadyToRunSectionHandle section,
     StructuralReader reader,
-    DiskAssemblyResolver resolver)
+    DiskAssemblyResolver resolver,
+    MetadataReader ownerMdReader = null,
+    string headerPrefix = "")
 {
     InliningInfo2Table table = reader.GetInliningInfo2Table(section);
-    Console.WriteLine($"=== InliningInfo2 ({table.Entries.Count}) ===");
+    string prefix = string.IsNullOrEmpty(headerPrefix) ? "" : headerPrefix + " ";
+    Console.WriteLine($"=== {prefix}InliningInfo2 ({table.Entries.Count}) ===");
+    // In composite mode, module index 0 means "this component assembly"; in non-composite
+    // it means the single image-owner module. ownerMdReader supplies the correct resolver.
+    MetadataReader defaultOwner = ownerMdReader ?? resolver.GetMetadataReader(0);
     int idx = 0;
     foreach (InliningInfo2Entry entry in table.Entries)
     {
         MetadataReader inlineeMd = entry.InlineeHasModule
             ? resolver.GetMetadataReader((int)entry.InlineeModuleIndex)
-            : resolver.GetMetadataReader(0);
+            : defaultOwner;
         string inlineeName = SafeFormatMethodDef(inlineeMd, entry.InlineeRid);
         string inlineeModule = entry.InlineeHasModule ? $" Module={entry.InlineeModuleIndex}" : "";
         Console.WriteLine($"  [{idx}] Inlinee RID={entry.InlineeRid}{inlineeModule} {inlineeName}");
@@ -398,7 +404,7 @@ static void DumpInliningInfo2(
         {
             MetadataReader inlinerMd = inliner.HasModule
                 ? resolver.GetMetadataReader((int)inliner.ModuleIndex)
-                : resolver.GetMetadataReader(0);
+                : defaultOwner;
             string inlinerName = SafeFormatMethodDef(inlinerMd, inliner.Rid);
             string inlinerModule = inliner.HasModule ? $" Module={inliner.ModuleIndex}" : "";
             Console.WriteLine($"         <- RID={inliner.Rid}{inlinerModule} {inlinerName}");
@@ -523,6 +529,9 @@ static void DumpPerComponentSections(
                         break;
                     case ReadyToRunSectionType.TypeGenericInfoMap:
                         DumpTypeGenericInfoMap(section, reader, resolver, componentMdReader, headerPrefix);
+                        break;
+                    case ReadyToRunSectionType.InliningInfo2:
+                        DumpInliningInfo2(section, reader, resolver, componentMdReader, headerPrefix);
                         break;
                     default:
                         Console.WriteLine($"=== {headerPrefix} {section.Type} (RVA=0x{(int)section.RelativeVirtualAddress:X}, Size={section.Size}) ===");
