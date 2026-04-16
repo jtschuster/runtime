@@ -29,6 +29,7 @@
     <TestBuildSteps Include="ManagedBuild" />
     <TestBuildSteps Include="GenerateLayout" />
     <TestBuildSteps Include="CrossgenFramework" />
+    <TestBuildSteps Include="CrossgenTestAssemblies" />
     <TestBuildSteps Include="BuildMonoAot" />
   </ItemGroup>
 
@@ -313,6 +314,68 @@
     </ItemGroup>
 
     <Move SourceFiles="@(CrossgenOutputFiles)" DestinationFolder="$(CORE_ROOT)" />
+  </Target>
+
+  <!--
+    Compile each merged test runner's staged IL assemblies to ReadyToRun.
+
+    Delegates to _RunBuildTimeCrossgen2 (from Common/CLRTest.CrossGen.BuildTime.targets),
+    which is only imported by projects that pull in mergedrunner.targets. Merged-runner
+    csproj files are identified by their import of MergedTestRunner.targets; the same
+    File.ReadAllText + regex pattern used by Common/dirs.proj's Pri1Projects filter is
+    reused here to avoid loading every test csproj into MSBuild just to ask whether it
+    is a merged runner.
+
+    Runs AfterTargets=GenerateLayout so crossgen2 and framework refs in Core_Root are
+    populated before any child MSBuild call. Gated on __BuildTimeReadyToRun so it is
+    a no-op when the user did not request build-time R2R on build.sh / build.cmd.
+  -->
+  <Target Name="CrossgenTestAssemblies"
+      DependsOnTargets="GenerateLayout"
+      Condition="'$(__CopyNativeTestBinaries)' != '1' and '$(__GenerateLayoutOnly)' != '1' and '$(__SkipManaged)' != '1' and '$(__BuildTimeReadyToRun)' == 'true' and !$(MonoAot) and !$(MonoFullAot)">
+
+    <Message Importance="High" Text="[$([System.DateTime]::Now.ToString('HH:mm:ss.ff'))] $(MsgPrefix)Discovering merged test runners for build-time ReadyToRun compile..." />
+
+    <ItemGroup>
+      <_AllTestCsproj Include="$(MSBuildThisFileDirectory)**\*.csproj" />
+      <!--
+        Match "<Import ... MergedTestRunner.targets" to avoid false positives on
+        csproj files that merely mention MergedTestRunner.targets in a comment or
+        documentation string.
+      -->
+      <_MergedRunnerProject Include="@(_AllTestCsproj)"
+          Condition="$([System.Text.RegularExpressions.Regex]::IsMatch($([System.IO.File]::ReadAllText('%(_AllTestCsproj.FullPath)')), '&lt;Import[^&gt;]*MergedTestRunner\.targets'))" />
+    </ItemGroup>
+
+    <Message Importance="High" Text="$(MsgPrefix)Compiling @(_MergedRunnerProject->Count()) merged test runner(s) with crossgen2 (mode: '$(__BuildTimeReadyToRunMode)')..." />
+
+    <!--
+      Forward the build-time R2R properties explicitly. They are exported as env
+      vars by build.sh / build.cmd, but each child MSBuild call here runs in the
+      same process so explicit /p: flow-through is cheaper and more reliable than
+      relying on env-var inheritance across potential out-of-proc invocations.
+    -->
+    <PropertyGroup>
+      <_BuildTimeCrossgenProps>__BuildTimeReadyToRun=$(__BuildTimeReadyToRun)</_BuildTimeCrossgenProps>
+      <_BuildTimeCrossgenProps>$(_BuildTimeCrossgenProps);__BuildTimeIlOutputSubdir=$(__BuildTimeIlOutputSubdir)</_BuildTimeCrossgenProps>
+      <_BuildTimeCrossgenProps>$(_BuildTimeCrossgenProps);__BuildTimeReadyToRunOutputSubdir=$(__BuildTimeReadyToRunOutputSubdir)</_BuildTimeCrossgenProps>
+      <_BuildTimeCrossgenProps>$(_BuildTimeCrossgenProps);__BuildTimeReadyToRunMode=$(__BuildTimeReadyToRunMode)</_BuildTimeCrossgenProps>
+      <_BuildTimeCrossgenProps>$(_BuildTimeCrossgenProps);CORE_ROOT=$(CORE_ROOT)</_BuildTimeCrossgenProps>
+    </PropertyGroup>
+
+    <!--
+      SkipNonexistentTargets guards against a csproj that matched the regex heuristic
+      but happens not to import the build-time crossgen targets transitively.
+    -->
+    <MSBuild Projects="@(_MergedRunnerProject)"
+             Targets="_RunBuildTimeCrossgen2"
+             Properties="$(_BuildTimeCrossgenProps)"
+             BuildInParallel="true"
+             SkipNonexistentTargets="true"
+             ContinueOnError="ErrorAndContinue" />
+
+    <Error Condition="'$(MSBuildLastTaskResult)' == 'false'"
+           Text="One or more merged test runners failed to compile to ReadyToRun." />
   </Target>
 
   <Target Name="BuildMonoAot"
