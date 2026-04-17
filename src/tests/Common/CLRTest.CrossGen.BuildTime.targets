@@ -315,7 +315,7 @@
       deliberately NOT copied into named overlays. FindMergedTestDirectories
       in tests.targets globs them to locate merged runners; duplicating the
       marker in both base and overlay would cause the test to run twice.
-      run.sh --subdir=X instead rewrites wrapper script paths into the
+      run.sh subdir X instead rewrites wrapper script paths into the
       overlay dir at run time.
     -->
     <ItemGroup Condition="'$(_OverlayRun)' == 'true' and '$(_OverlayIsDistinctDir)' == 'true'">
