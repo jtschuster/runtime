@@ -56,9 +56,6 @@
     <Compile Include="..\ILCompiler.Reflection.ReadyToRun\x86\CallPattern.cs" Link="x86\CallPattern.cs" />
     <Compile Include="..\ILCompiler.Reflection.ReadyToRun\MachO\BinaryFormat\NList64.cs" Link="MachO\BinaryFormat\NList64.cs" />
 
-    <!-- Exclude Parsed layer until structural handle conversion is complete -->
-    <Compile Remove="Parsed\**" />
-    <!-- R2RSignatureDecoder depends on OpenReferenceAssembly which moved to the Parsed layer -->
   </ItemGroup>
 
 </Project>
