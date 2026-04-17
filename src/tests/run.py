@@ -117,6 +117,7 @@ parser.add_argument("--run_nativeaot_tests", dest="run_nativeaot_tests", action=
 parser.add_argument("--tree", dest="tree", default=None, help="Only run tests under the specified subtree (e.g. JIT/Regression).")
 parser.add_argument("--subdir", dest="variant_subdir", default=None, help="Launch merged-runner tests from <mergedrunner>/<subdir>/ instead of the base dir. The subdir is populated at build time via 'src/tests/build.sh --r2r -o=<subdir>'. Missing overlays are skipped with a warning. Use '.' or omit to launch from the base dir (today's default).")
 parser.add_argument("--no_r2r", "--no-r2r", dest="no_r2r", action="store_true", default=False, help="Set DOTNET_ReadyToRun=0 in the launched test process. Composable with --subdir.")
+parser.add_argument("--list_variants", "--list-variants", dest="list_variants", action="store_true", default=False, help="Enumerate runnable overlay subdirs (built via '-o=<name>') beneath each merged test runner and exit without running tests.")
 
 ################################################################################
 # Globals
@@ -1016,6 +1017,11 @@ def setup_args(args):
                               "Error setting no_r2r")
 
     coreclr_setup_args.verify(args,
+                              "list_variants",
+                              lambda arg: True,
+                              "Error setting list_variants")
+
+    coreclr_setup_args.verify(args,
                               "synthesize_pgo",
                               lambda arg: True,
                               "Error setting synthesize_pgo")
@@ -1532,12 +1538,72 @@ def create_repro(args, env, tests):
 # Main
 ################################################################################
 
+def list_merged_test_variants(test_location, host_os):
+    """Enumerate runnable overlay subdirs beneath each merged test runner directory.
+
+    A "merged test runner directory" is any directory containing a file named
+    <name>.MergedTestAssembly. A "runnable overlay" is a sibling subdir of that
+    directory that contains a launch script named <name>.sh (or .cmd on Windows).
+
+    Returns 0 on success, 1 if test_location is missing or unusable.
+    """
+    if test_location is None or not os.path.isdir(test_location):
+        print("Error: test_location '%s' does not exist." % test_location)
+        return 1
+
+    script_ext = ".cmd" if host_os == "windows" else ".sh"
+    runners = []
+    for dir_path, _dir_names, file_names in os.walk(test_location):
+        for f in file_names:
+            if f.endswith(".MergedTestAssembly"):
+                runners.append((dir_path, f[:-len(".MergedTestAssembly")]))
+
+    runners.sort()
+    if not runners:
+        print("No merged test runners found under %s" % test_location)
+        return 0
+
+    print("Merged test runners and their runnable overlay variants under:")
+    print("  %s" % test_location)
+    print("")
+    print("(base = launches from the runner directory itself)")
+    print("")
+
+    total_variants = 0
+    for runner_dir, runner_name in runners:
+        rel = os.path.relpath(runner_dir, test_location)
+        variants = []
+        try:
+            for entry in sorted(os.listdir(runner_dir)):
+                candidate = os.path.join(runner_dir, entry, runner_name + script_ext)
+                if os.path.isfile(candidate):
+                    variants.append(entry)
+        except OSError:
+            pass
+        base_script = os.path.join(runner_dir, runner_name + script_ext)
+        has_base = os.path.isfile(base_script)
+        pieces = []
+        if has_base:
+            pieces.append("base")
+        pieces.extend(variants)
+        if not pieces:
+            pieces.append("(no launch scripts found)")
+        print("  %s/%s: %s" % (rel, runner_name, ", ".join(pieces)))
+        total_variants += len(variants)
+
+    print("")
+    print("Found %d merged test runner(s), %d non-base variant overlay(s)." % (len(runners), total_variants))
+    return 0
+
 def main(args):
     global g_verbose
     g_verbose = args.verbose
     ret_code = 0
 
     args = setup_args(args)
+
+    if args.list_variants:
+        return list_merged_test_variants(args.test_location, args.host_os)
 
     env = get_environment(test_env=args.test_env)
     if not args.analyze_results_only:

@@ -24,6 +24,7 @@ function print_usage {
     echo '  --synthesizepgo                  : Runs the tests allowing crossgen2 to synthesize PGO data'
     echo '  --subdir=<name|.>                : Launch merged-runner tests from <mergedrunner>/<name>/ (built via "src/tests/build.sh --r2r -o=<name>"). Missing overlays are skipped with a warning. Use "." or omit to launch from the base dir.'
     echo '  --no-r2r                         : Set DOTNET_ReadyToRun=0 in launched test processes. Composable with --subdir.'
+    echo '  --list-variants                  : Enumerate merged-runner overlay subdirs (built via "-o=<name>") and exit without running tests.'
     echo '  --jitstress=<n>                  : Runs the tests with DOTNET_JitStress=n'
     echo '  --jitstressregs=<n>              : Runs the tests with DOTNET_JitStressRegs=n'
     echo '  --jitminopts                     : Runs the tests with DOTNET_JITMinOpts=1'
@@ -215,8 +216,11 @@ do
         --subdir:*)
             variantSubdir=${i#*:}
             ;;
-        --no-r2r|--norr2r)
+        --no-r2r|--nor2r)
             noR2R=1
+            ;;
+        --list-variants|--list_variants)
+            listVariants=1
             ;;
         --interpreter)
             export RunInterpreter=1
@@ -362,6 +366,10 @@ fi
 if [[ -n "$noR2R" ]]; then
     echo "Disabling R2R at runtime      : DOTNET_ReadyToRun=0"
     runtestPyArguments+=("--no_r2r")
+fi
+
+if [[ -n "$listVariants" ]]; then
+    runtestPyArguments+=("--list_variants")
 fi
 
 # Default to python3 if it is installed

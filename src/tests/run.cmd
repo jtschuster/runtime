@@ -82,6 +82,8 @@ if /i "%1" == "node"                                    (set RunWithNodeJS=1&shi
 if /i "%1" == "subdir"                                  (set __VariantSubdir=%~2&shift&shift&goto Arg_Loop)
 if /i "%1" == "no-r2r"                                  (set __NoR2R=1&shift&goto Arg_Loop)
 if /i "%1" == "nor2r"                                   (set __NoR2R=1&shift&goto Arg_Loop)
+if /i "%1" == "list-variants"                           (set __ListVariants=1&shift&goto Arg_Loop)
+if /i "%1" == "listvariants"                            (set __ListVariants=1&shift&goto Arg_Loop)
 @REM For tree, support '/', '-', and '--' prefixes like build.cmd
 set __treeArg=%~1
 set __treeArg=%__treeArg:/=%
@@ -215,6 +217,10 @@ if defined __NoR2R (
     set __RuntestPyArgs=%__RuntestPyArgs% --no_r2r
 )
 
+if defined __ListVariants (
+    set __RuntestPyArgs=%__RuntestPyArgs% --list_variants
+)
+
 REM Find python and set it to the variable PYTHON
 set _C=-c "import sys; sys.stdout.write(sys.executable)"
 (py -3 %_C% || py -2 %_C% || python3 %_C% || python2 %_C% || python %_C%) > %TEMP%\pythonlocation.txt 2> NUL
@@ -258,6 +264,7 @@ echo RunCrossgen2Tests         - ^(Deprecated^) Use 'subdir ^<name^>' on a build
 echo synthesizepgo             - Enabled synthesizing PGO data in CrossGen2
 echo subdir ^<name^>             - Launch merged-runner tests from ^<mergedrunner^>\^<name^>\ ^(built via 'src\tests\build.cmd -r2r -o=^<name^>'^). Missing overlays are skipped with a warning.
 echo no-r2r                    - Set DOTNET_ReadyToRun=0 in launched test processes. Composable with 'subdir'.
+echo list-variants             - Enumerate merged-runner overlay subdirs ^(built via '-o=^<name^>'^) and exit without running tests.
 echo jitstress ^<n^>             - Runs the tests with DOTNET_JitStress=n
 echo jitstressregs ^<n^>         - Runs the tests with DOTNET_JitStressRegs=n
 echo jitminopts                - Runs the tests with DOTNET_JITMinOpts=1
