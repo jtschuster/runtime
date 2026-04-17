@@ -49,10 +49,11 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasManifestRef(reader, "InlineableLib");
-            R2RAssert.HasCrossModuleInlinedMethod(reader, "TestGetValue", "GetValue");
-            R2RAssert.HasCrossModuleInlinedMethod(reader, "TestGetString", "GetString");
-            R2RAssert.HasCrossModuleInliningInfo(reader);
+            string reason;
+            Assert.True(reader.HasManifestRef("InlineableLib", out reason), reason);
+            Assert.True(reader.HasCrossModuleInlinedMethod("TestGetValue", "GetValue", out reason), reason);
+            Assert.True(reader.HasCrossModuleInlinedMethod("TestGetString", "GetString", out reason), reason);
+            Assert.True(reader.HasCrossModuleInliningInfo(out reason), reason);
             // Sanity: predicates return false for absent items.
             Assert.False(reader.HasManifestRef("NotAReferencedAssembly", out _));
             Assert.False(reader.HasCrossModuleInlinedMethod("TestGetValue", "NotInlinedMethod", out _));
@@ -93,9 +94,10 @@ public class R2RTestSuites
                 {
                     Validate = reader =>
                     {
-                        R2RAssert.HasManifestRef(reader, "InlineableLibTransitive");
-                        R2RAssert.HasManifestRef(reader, "ExternalLib");
-                        R2RAssert.HasCrossModuleInlinedMethod(reader, "TestTransitiveValue", "GetExternalValue");
+                        string reason;
+                        Assert.True(reader.HasManifestRef("InlineableLibTransitive", out reason), reason);
+                        Assert.True(reader.HasManifestRef("ExternalLib", out reason), reason);
+                        Assert.True(reader.HasCrossModuleInlinedMethod("TestTransitiveValue", "GetExternalValue", out reason), reason);
                     },
                 },
             ]));
@@ -135,8 +137,9 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasManifestRef(reader, "AsyncInlineableLib");
-            R2RAssert.HasCrossModuleInlinedMethod(reader, "TestAsyncInline", "GetValueAsync");
+            string reason;
+            Assert.True(reader.HasManifestRef("AsyncInlineableLib", out reason), reason);
+            Assert.True(reader.HasCrossModuleInlinedMethod("TestAsyncInline", "GetValueAsync", out reason), reason);
         }
     }
 
@@ -171,7 +174,8 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasManifestRef(reader, "CompositeLib");
+            string reason;
+            Assert.True(reader.HasManifestRef("CompositeLib", out reason), reason);
         }
     }
 
@@ -200,9 +204,10 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasAsyncVariant(reader, "SimpleAsyncMethod");
-            R2RAssert.HasAsyncVariant(reader, "AsyncVoidReturn");
-            R2RAssert.HasAsyncVariant(reader, "ValueTaskMethod");
+            string reason;
+            Assert.True(reader.HasAsyncVariant("SimpleAsyncMethod", out reason), reason);
+            Assert.True(reader.HasAsyncVariant("AsyncVoidReturn", out reason), reason);
+            Assert.True(reader.HasAsyncVariant("ValueTaskMethod", out reason), reason);
             Assert.False(reader.HasAsyncVariant("NotAnAsyncMethodInThisAssembly", out _));
         }
     }
@@ -237,11 +242,12 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasAsyncVariant(reader, "CaptureObjectAcrossAwait");
-            R2RAssert.HasAsyncVariant(reader, "CaptureMultipleRefsAcrossAwait");
-            R2RAssert.HasContinuationLayout(reader, "CaptureObjectAcrossAwait");
-            R2RAssert.HasContinuationLayout(reader, "CaptureMultipleRefsAcrossAwait");
-            R2RAssert.HasResumptionStubFixup(reader, "CaptureObjectAcrossAwait");
+            string reason;
+            Assert.True(reader.HasAsyncVariant("CaptureObjectAcrossAwait", out reason), reason);
+            Assert.True(reader.HasAsyncVariant("CaptureMultipleRefsAcrossAwait", out reason), reason);
+            Assert.True(reader.HasContinuationLayout("CaptureObjectAcrossAwait", out reason), reason);
+            Assert.True(reader.HasContinuationLayout("CaptureMultipleRefsAcrossAwait", out reason), reason);
+            Assert.True(reader.HasResumptionStubFixup("CaptureObjectAcrossAwait", out reason), reason);
             Assert.False(reader.HasContinuationLayout("NoSuchMethod", out _));
             Assert.False(reader.HasResumptionStubFixup("NoSuchMethod", out _));
         }
@@ -276,7 +282,8 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasAsyncVariant(reader, "GetValueAsync");
+            string reason;
+            Assert.True(reader.HasAsyncVariant("GetValueAsync", out reason), reason);
         }
     }
 
@@ -309,8 +316,9 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasAsyncVariant(reader, "AsyncButNoAwait");
-            R2RAssert.HasAsyncVariant(reader, "AsyncWithConditionalAwait");
+            string reason;
+            Assert.True(reader.HasAsyncVariant("AsyncButNoAwait", out reason), reason);
+            Assert.True(reader.HasAsyncVariant("AsyncWithConditionalAwait", out reason), reason);
         }
     }
 
@@ -362,8 +370,9 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasManifestRef(reader, "AsyncDepLib");
-            R2RAssert.HasAsyncVariant(reader, "CallCrossModuleAsync");
+            string reason;
+            Assert.True(reader.HasManifestRef("AsyncDepLib", out reason), reason);
+            Assert.True(reader.HasAsyncVariant("CallCrossModuleAsync", out reason), reason);
         }
     }
 
@@ -407,8 +416,9 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasManifestRef(reader, "InlineableLib");
-            R2RAssert.HasInlinedMethod(reader, "TestGetValue", "GetValue");
+            string reason;
+            Assert.True(reader.HasManifestRef("InlineableLib", out reason), reason);
+            Assert.True(reader.HasInlinedMethod("TestGetValue", "GetValue", out reason), reason);
             Assert.False(reader.HasInlinedMethod("TestGetValue", "NotInlinedMethod", out _));
         }
     }
@@ -451,9 +461,10 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasManifestRef(reader, "AsyncCompositeLib");
-            R2RAssert.HasAsyncVariant(reader, "CallCompositeAsync");
-            R2RAssert.HasAsyncVariant(reader, "GetValueAsync");
+            string reason;
+            Assert.True(reader.HasManifestRef("AsyncCompositeLib", out reason), reason);
+            Assert.True(reader.HasAsyncVariant("CallCompositeAsync", out reason), reason);
+            Assert.True(reader.HasAsyncVariant("GetValueAsync", out reason), reason);
         }
     }
 
@@ -497,10 +508,11 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasManifestRef(reader, "AsyncCompositeLib");
-            R2RAssert.HasAsyncVariant(reader, "CallCompositeAsync");
-            R2RAssert.HasInlinedMethod(reader, "CallCompositeAsync", "GetValueAsync");
-            R2RAssert.HasContinuationLayout(reader, "CallCompositeAsync");
+            string reason;
+            Assert.True(reader.HasManifestRef("AsyncCompositeLib", out reason), reason);
+            Assert.True(reader.HasAsyncVariant("CallCompositeAsync", out reason), reason);
+            Assert.True(reader.HasInlinedMethod("CallCompositeAsync", "GetValueAsync", out reason), reason);
+            Assert.True(reader.HasContinuationLayout("CallCompositeAsync", out reason), reason);
         }
     }
 
@@ -553,9 +565,10 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasManifestRef(reader, "AsyncDepLibContinuation");
-            R2RAssert.HasAsyncVariant(reader, "CallCrossModuleCaptureRef");
-            R2RAssert.HasAsyncVariant(reader, "CallCrossModuleCaptureArray");
+            string reason;
+            Assert.True(reader.HasManifestRef("AsyncDepLibContinuation", out reason), reason);
+            Assert.True(reader.HasAsyncVariant("CallCrossModuleCaptureRef", out reason), reason);
+            Assert.True(reader.HasAsyncVariant("CallCrossModuleCaptureArray", out reason), reason);
         }
     }
 
@@ -596,7 +609,8 @@ public class R2RTestSuites
                     Options = [Crossgen2Option.Composite, Crossgen2Option.Optimize],
                     Validate = reader =>
                     {
-                        R2RAssert.HasManifestRef(reader, "MultiStepLibA");
+                        string reason;
+                        Assert.True(reader.HasManifestRef("MultiStepLibA", out reason), reason);
                     },
                 },
                 new("NonCompositeStep",
@@ -611,8 +625,9 @@ public class R2RTestSuites
                 {
                     Validate = reader =>
                     {
-                        R2RAssert.HasManifestRef(reader, "MultiStepLibA");
-                        R2RAssert.HasCrossModuleInlinedMethod(reader, "GetValueFromLibA", "GetValue");
+                        string reason;
+                        Assert.True(reader.HasManifestRef("MultiStepLibA", out reason), reason);
+                        Assert.True(reader.HasCrossModuleInlinedMethod("GetValueFromLibA", "GetValue", out reason), reason);
                     },
                 },
             ]));
@@ -664,8 +679,9 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasManifestRef(reader, "AsyncInterfaceLib");
-            R2RAssert.HasAsyncVariant(reader, "CallOnSealed");
+            string reason;
+            Assert.True(reader.HasManifestRef("AsyncInterfaceLib", out reason), reason);
+            Assert.True(reader.HasAsyncVariant("CallOnSealed", out reason), reason);
         }
     }
 
@@ -711,8 +727,9 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasManifestRef(reader, "InlineableLibTransitive");
-            R2RAssert.HasManifestRef(reader, "ExternalLib");
+            string reason;
+            Assert.True(reader.HasManifestRef("InlineableLibTransitive", out reason), reason);
+            Assert.True(reader.HasManifestRef("ExternalLib", out reason), reason);
         }
     }
 
@@ -771,8 +788,9 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasManifestRef(reader, "AsyncTransitiveLib");
-            R2RAssert.HasAsyncVariant(reader, "CallTransitiveValueAsync");
+            string reason;
+            Assert.True(reader.HasManifestRef("AsyncTransitiveLib", out reason), reason);
+            Assert.True(reader.HasAsyncVariant("CallTransitiveValueAsync", out reason), reason);
         }
     }
 
@@ -829,8 +847,9 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasManifestRef(reader, "AsyncTransitiveLib");
-            R2RAssert.HasAsyncVariant(reader, "CallTransitiveValueAsync");
+            string reason;
+            Assert.True(reader.HasManifestRef("AsyncTransitiveLib", out reason), reason);
+            Assert.True(reader.HasAsyncVariant("CallTransitiveValueAsync", out reason), reason);
         }
     }
 
@@ -880,8 +899,9 @@ public class R2RTestSuites
                     Options = [Crossgen2Option.Composite, Crossgen2Option.Optimize],
                     Validate = reader =>
                     {
-                        R2RAssert.HasManifestRef(reader, "AsyncCompositeLib");
-                        R2RAssert.HasAsyncVariant(reader, "CallCompositeAsync");
+                        string reason;
+                        Assert.True(reader.HasManifestRef("AsyncCompositeLib", out reason), reason);
+                        Assert.True(reader.HasAsyncVariant("CallCompositeAsync", out reason), reason);
                     },
                 },
                 new("NonCompositeAsyncStep",
@@ -896,8 +916,9 @@ public class R2RTestSuites
                 {
                     Validate = reader =>
                     {
-                        R2RAssert.HasManifestRef(reader, "AsyncCompositeLib");
-                        R2RAssert.HasAsyncVariant(reader, "CallCrossModuleCaptureRef");
+                        string reason;
+                        Assert.True(reader.HasManifestRef("AsyncCompositeLib", out reason), reason);
+                        Assert.True(reader.HasAsyncVariant("CallCrossModuleCaptureRef", out reason), reason);
                     },
                 },
             ]));
@@ -944,14 +965,15 @@ public class R2RTestSuites
 
         static void Validate(R2RAssertions reader)
         {
-            R2RAssert.HasManifestRef(reader, "CrossModuleGenericLib");
-            R2RAssert.HasCrossModuleInliningInfo(reader);
+            string reason;
+            Assert.True(reader.HasManifestRef("CrossModuleGenericLib", out reason), reason);
+            Assert.True(reader.HasCrossModuleInliningInfo(out reason), reason);
 
             // Verify that GetValue has cross-module inliners from both GenericWrapperA and GenericWrapperB.
             // This exercises the cross-module inliner parsing path where indices
             // must be read as absolute values, not delta-accumulated, and validates
             // that the resolved method names match the expected inliners.
-            R2RAssert.HasCrossModuleInliners(reader, "GetValue", "GenericWrapperA", "GenericWrapperB");
+            Assert.True(reader.HasCrossModuleInliners("GetValue", ["GenericWrapperA", "GenericWrapperB"], out reason), reason);
             // Negative: a method that's not inlined cross-module should not report inliners.
             Assert.False(reader.HasCrossModuleInliners("NotInlinedMethod", ["GenericWrapperA"], out _));
         }
