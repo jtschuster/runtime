@@ -4,7 +4,7 @@
 using Internal.Runtime;
 
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural
+namespace ILCompiler.Reflection.ReadyToRun
 {
     /// <summary>
     /// Represents the raw location and size of an R2R section whose internal

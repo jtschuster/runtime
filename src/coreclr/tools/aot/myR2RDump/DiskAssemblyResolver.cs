@@ -8,10 +8,10 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 
-using ILCompiler.Reflection.ReadyToRun.Structural;
+using ILCompiler.Reflection.ReadyToRun;
 using Internal.Runtime;
 
-using StructuralReader = ILCompiler.Reflection.ReadyToRun.Structural.ReadyToRunReader;
+using StructuralReader = ILCompiler.Reflection.ReadyToRun.ReadyToRunReader;
 
 /// <summary>
 /// Resolves assembly references by probing for DLLs on disk next to the R2R image.

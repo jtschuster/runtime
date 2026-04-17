@@ -8,7 +8,7 @@ using System.Text;
 using Internal.ReadyToRunConstants;
 using Internal.Runtime;
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural
+namespace ILCompiler.Reflection.ReadyToRun
 {
     /// <summary>
     /// Fields common to the global R2R header and per-assembly headers in composite R2R images.

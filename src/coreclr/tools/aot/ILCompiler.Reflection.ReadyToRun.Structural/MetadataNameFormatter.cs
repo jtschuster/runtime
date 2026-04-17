@@ -7,7 +7,7 @@ using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Text;
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural;
+namespace ILCompiler.Reflection.ReadyToRun;
 
 public class MetadataNameFormatter : DisassemblingTypeProvider
 {

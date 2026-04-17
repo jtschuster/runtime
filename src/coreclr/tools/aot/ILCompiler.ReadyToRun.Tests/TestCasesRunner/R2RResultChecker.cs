@@ -3,7 +3,7 @@
 
 using System;
 
-using ILCompiler.Reflection.ReadyToRun.Structural.Assertions;
+using ILCompiler.Reflection.ReadyToRun.Assertions;
 
 using Internal.ReadyToRunConstants;
 

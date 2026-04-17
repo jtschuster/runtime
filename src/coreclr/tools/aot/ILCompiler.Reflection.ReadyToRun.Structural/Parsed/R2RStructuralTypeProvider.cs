@@ -6,11 +6,11 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
-using ILCompiler.Reflection.ReadyToRun.Structural;
+using ILCompiler.Reflection.ReadyToRun;
 using Internal.ReadyToRunConstants;
 
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural.Parsed;
+namespace ILCompiler.Reflection.ReadyToRun.Parsed;
 
 /// <summary>
 /// Context for the structural signature decoder. Tracks the mapping from

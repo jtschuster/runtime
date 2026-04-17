@@ -9,9 +9,9 @@ using System.Reflection.Metadata.Ecma335;
 using Internal.ReadyToRunConstants;
 using Internal.Runtime;
 
-using StructuralReader = ILCompiler.Reflection.ReadyToRun.Structural.ReadyToRunReader;
+using StructuralReader = ILCompiler.Reflection.ReadyToRun.ReadyToRunReader;
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural.Assertions;
+namespace ILCompiler.Reflection.ReadyToRun.Assertions;
 
 /// <summary>
 /// An inventory of all methods compiled into an R2R image. Built lazily from the

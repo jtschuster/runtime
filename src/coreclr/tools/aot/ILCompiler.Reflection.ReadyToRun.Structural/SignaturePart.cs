@@ -4,7 +4,7 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural;
+namespace ILCompiler.Reflection.ReadyToRun;
 
 /// <summary>
 /// Discriminator for a <see cref="SignaturePart"/>. Each value corresponds to one raw

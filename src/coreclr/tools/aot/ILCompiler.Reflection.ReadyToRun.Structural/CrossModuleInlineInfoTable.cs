@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using Internal.ReadyToRunConstants;
 
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural
+namespace ILCompiler.Reflection.ReadyToRun
 {
     /// <summary>
     /// Structural projection of the CrossModuleInlineInfo section (section 119, v6.3+).

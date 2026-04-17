@@ -9,12 +9,12 @@ using System.Reflection.Metadata.Ecma335;
 using System.Reflection.PortableExecutable;
 
 using ILCompiler.Reflection.ReadyToRun.MachO;
-using ILCompiler.Reflection.ReadyToRun.Structural;
+using ILCompiler.Reflection.ReadyToRun;
 using Internal.CorConstants;
 using Internal.ReadyToRunConstants;
 using Internal.Runtime;
 
-using StructuralReader = ILCompiler.Reflection.ReadyToRun.Structural.ReadyToRunReader;
+using StructuralReader = ILCompiler.Reflection.ReadyToRun.ReadyToRunReader;
 
 if (args.Length < 1)
 {

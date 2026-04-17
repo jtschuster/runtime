@@ -8,7 +8,7 @@ using System.IO;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural
+namespace ILCompiler.Reflection.ReadyToRun
 {
     /// <summary>
     /// Interface for abstracting binary image reading across different formats (PE, MachO).

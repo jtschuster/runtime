@@ -8,7 +8,7 @@ using System.Collections.Immutable;
 using Internal.CorConstants;
 using Internal.ReadyToRunConstants;
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural;
+namespace ILCompiler.Reflection.ReadyToRun;
 
 /// <summary>
 /// Pure-structural R2R signature decoder that emits a flat stream of <see cref="SignaturePart"/>

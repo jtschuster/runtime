@@ -3,7 +3,7 @@
 
 using System.Collections.Generic;
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural;
+namespace ILCompiler.Reflection.ReadyToRun;
 
 /// <summary>
 /// A decoded signature indirection table: a flat array of <see cref="SignatureHandle"/> values,

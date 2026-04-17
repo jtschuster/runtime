@@ -7,7 +7,7 @@ using System.Reflection.Metadata.Ecma335;
 using System.Text;
 
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural;
+namespace ILCompiler.Reflection.ReadyToRun;
 
 /// <summary>
 /// Structural representation of a type signature in an R2R image.

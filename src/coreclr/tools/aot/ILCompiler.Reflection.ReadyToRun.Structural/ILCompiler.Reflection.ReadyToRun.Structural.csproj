@@ -27,6 +27,32 @@
          namespace (see BaseInfoTypes.cs). -->
     <Compile Include="..\ILCompiler.Reflection.ReadyToRun\DebugInfoTypes.cs" Link="DebugInfoTypes.cs" />
     <Compile Include="..\ILCompiler.Reflection.ReadyToRun\PEReaderExtensions.cs" Link="PEReaderExtensions.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\NativeArray.cs" Link="NativeArray.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\NativeHashtable.cs" Link="NativeHashtable.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\NibbleReader.cs" Link="NibbleReader.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\DisassemblingTypeProvider.cs" Link="DisassemblingTypeProvider.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\GCInfoTypes.cs" Link="GCInfoTypes.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\Amd64\UnwindInfo.cs" Link="Amd64\UnwindInfo.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\Amd64\GcInfo.cs" Link="Amd64\GcInfo.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\Amd64\GcSlotTable.cs" Link="Amd64\GcSlotTable.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\Amd64\GcTransition.cs" Link="Amd64\GcTransition.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\Amd64\Registers.cs" Link="Amd64\Registers.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\Arm\UnwindInfo.cs" Link="Arm\UnwindInfo.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\Arm\Registers.cs" Link="Arm\Registers.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\Arm64\UnwindInfo.cs" Link="Arm64\UnwindInfo.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\Arm64\Registers.cs" Link="Arm64\Registers.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\LoongArch64\UnwindInfo.cs" Link="LoongArch64\UnwindInfo.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\LoongArch64\Registers.cs" Link="LoongArch64\Registers.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\RiscV64\UnwindInfo.cs" Link="RiscV64\UnwindInfo.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\RiscV64\Registers.cs" Link="RiscV64\Registers.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\x86\UnwindInfo.cs" Link="x86\UnwindInfo.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\x86\GcInfo.cs" Link="x86\GcInfo.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\x86\GcSlotTable.cs" Link="x86\GcSlotTable.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\x86\GcTransition.cs" Link="x86\GcTransition.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\x86\InfoHdr.cs" Link="x86\InfoHdr.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\x86\NoGcRegionTable.cs" Link="x86\NoGcRegionTable.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\x86\Registers.cs" Link="x86\Registers.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\x86\CallPattern.cs" Link="x86\CallPattern.cs" />
     <Compile Include="..\ILCompiler.Reflection.ReadyToRun\MachO\BinaryFormat\NList64.cs" Link="MachO\BinaryFormat\NList64.cs" />
 
     <!-- Exclude Parsed layer until structural handle conversion is complete -->

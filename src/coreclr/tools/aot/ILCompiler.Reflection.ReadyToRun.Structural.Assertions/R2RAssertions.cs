@@ -10,9 +10,9 @@ using System.Reflection.PortableExecutable;
 using Internal.ReadyToRunConstants;
 using Internal.Runtime;
 
-using StructuralReader = ILCompiler.Reflection.ReadyToRun.Structural.ReadyToRunReader;
+using StructuralReader = ILCompiler.Reflection.ReadyToRun.ReadyToRunReader;
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural.Assertions
+namespace ILCompiler.Reflection.ReadyToRun.Assertions
 {
     /// <summary>
     /// Test-helper library that exposes predicate-style <c>HasX(..., out string reason)</c>

@@ -4,11 +4,11 @@
 using System;
 using System.Collections.Immutable;
 using System.Reflection.Metadata;
-using ILCompiler.Reflection.ReadyToRun.Structural;
+using ILCompiler.Reflection.ReadyToRun;
 using Internal.ReadyToRunConstants;
 
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural.Parsed;
+namespace ILCompiler.Reflection.ReadyToRun.Parsed;
 
 /// <summary>
 /// A signature decoder that produces structural AST nodes (<see cref="R2RTypeNode"/>,

@@ -8,7 +8,7 @@ using System.Reflection.Metadata;
 using Internal.CorConstants;
 using Internal.ReadyToRunConstants;
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural;
+namespace ILCompiler.Reflection.ReadyToRun;
 
 /// <summary>
 /// Factory methods that build AST nodes (<see cref="MethodSignature"/>, <see cref="R2RTypeNode"/>,

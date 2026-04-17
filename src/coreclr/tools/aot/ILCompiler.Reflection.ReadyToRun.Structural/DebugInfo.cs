@@ -7,7 +7,7 @@ using System.Diagnostics;
 using System.Reflection.PortableExecutable;
 
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural;
+namespace ILCompiler.Reflection.ReadyToRun;
 
 /// <summary>
 /// Debug information for a single runtime function, parsed without depending on the

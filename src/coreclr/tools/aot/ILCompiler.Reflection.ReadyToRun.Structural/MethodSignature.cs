@@ -7,7 +7,7 @@ using System.Text;
 using Internal.ReadyToRunConstants;
 
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural;
+namespace ILCompiler.Reflection.ReadyToRun;
 
 /// <summary>
 /// Structural representation of a method reference in an R2R signature.

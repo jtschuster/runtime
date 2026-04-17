@@ -6,11 +6,11 @@ using System.Collections.Immutable;
 using System.Reflection.Metadata;
 using System.Reflection.Metadata.Ecma335;
 using System.Text;
-using ILCompiler.Reflection.ReadyToRun.Structural;
+using ILCompiler.Reflection.ReadyToRun;
 using Internal.ReadyToRunConstants;
 
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural.Parsed;
+namespace ILCompiler.Reflection.ReadyToRun.Parsed;
 
 /// <summary>
 /// Resolves structural AST tokens (<see cref="R2RTypeNode"/>, <see cref="R2RMethodRef"/>,

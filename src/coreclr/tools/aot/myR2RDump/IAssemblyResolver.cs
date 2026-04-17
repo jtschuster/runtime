@@ -4,7 +4,7 @@
 using System;
 using System.Reflection.Metadata;
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural
+namespace ILCompiler.Reflection.ReadyToRun
 {
     public interface IAssemblyResolver : IDisposable
     {

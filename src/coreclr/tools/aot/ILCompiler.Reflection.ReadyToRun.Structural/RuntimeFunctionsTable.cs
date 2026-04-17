@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.Reflection.PortableExecutable;
 
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural
+namespace ILCompiler.Reflection.ReadyToRun
 {
     /// <summary>
     /// Structural projection of the RuntimeFunctions section.

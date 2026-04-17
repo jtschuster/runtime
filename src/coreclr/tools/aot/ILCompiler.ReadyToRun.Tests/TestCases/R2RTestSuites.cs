@@ -3,7 +3,7 @@
 
 using System.Collections.Generic;
 using ILCompiler.ReadyToRun.Tests.TestCasesRunner;
-using ILCompiler.Reflection.ReadyToRun.Structural.Assertions;
+using ILCompiler.Reflection.ReadyToRun.Assertions;
 using Microsoft.DotNet.XUnitExtensions;
 using Xunit;
 using Xunit.Abstractions;

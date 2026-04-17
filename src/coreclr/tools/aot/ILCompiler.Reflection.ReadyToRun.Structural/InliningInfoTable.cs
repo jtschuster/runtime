@@ -4,7 +4,7 @@
 using System.Collections.Generic;
 
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural
+namespace ILCompiler.Reflection.ReadyToRun
 {
     /// <summary>
     /// Structural projection of the InliningInfo section (v1, section 110, deprecated in 4.1).

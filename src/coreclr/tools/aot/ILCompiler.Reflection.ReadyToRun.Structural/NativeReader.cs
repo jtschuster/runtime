@@ -5,7 +5,7 @@ using System;
 using System.Buffers.Binary;
 using System.IO;
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural
+namespace ILCompiler.Reflection.ReadyToRun
 {
     public class NativeReader(Stream backingStream, bool littleEndian = true, bool leaveOpen = false) : IDisposable
     {

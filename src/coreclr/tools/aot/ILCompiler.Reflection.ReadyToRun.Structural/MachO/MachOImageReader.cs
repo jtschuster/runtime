@@ -9,7 +9,7 @@ using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using ILCompiler.Reflection.ReadyToRun.Structural;
+using ILCompiler.Reflection.ReadyToRun;
 
 namespace ILCompiler.Reflection.ReadyToRun.MachO
 {
@@ -24,7 +24,7 @@ namespace ILCompiler.Reflection.ReadyToRun.MachO
         private readonly GCHandle _pinnedArray;
 
         public Machine Machine { get; }
-        public Structural.OperatingSystem OperatingSystem => Structural.OperatingSystem.Apple;
+        public OperatingSystem OperatingSystem => OperatingSystem.Apple;
         public ulong ImageBase => 0;
 
         public MachOImageReader(byte[] image)

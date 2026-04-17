@@ -5,11 +5,11 @@ using System;
 using System.Collections.Generic;
 using System.Reflection.PortableExecutable;
 
-using ILCompiler.Reflection.ReadyToRun.Structural;
+using ILCompiler.Reflection.ReadyToRun;
 using Internal.ReadyToRunConstants;
 
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural.Parsed;
+namespace ILCompiler.Reflection.ReadyToRun.Parsed;
 
 /// <summary>
 /// Cross-references R2R section data from a <see cref="ReadyToRunReader"/> (Format) to produce

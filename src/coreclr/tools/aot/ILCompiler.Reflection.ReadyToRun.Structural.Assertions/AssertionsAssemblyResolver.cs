@@ -10,9 +10,9 @@ using System.Reflection.PortableExecutable;
 
 using Internal.Runtime;
 
-using StructuralReader = ILCompiler.Reflection.ReadyToRun.Structural.ReadyToRunReader;
+using StructuralReader = ILCompiler.Reflection.ReadyToRun.ReadyToRunReader;
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural.Assertions
+namespace ILCompiler.Reflection.ReadyToRun.Assertions
 {
     /// <summary>
     /// Resolves assembly references for <see cref="R2RAssertions"/>. Probes the

@@ -11,7 +11,7 @@ using Internal.ReadyToRunConstants;
 using Internal.Runtime;
 
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural
+namespace ILCompiler.Reflection.ReadyToRun
 {
     /// <summary>
     /// A low-level, structural reader for Ready-to-Run images. Parses headers and sections

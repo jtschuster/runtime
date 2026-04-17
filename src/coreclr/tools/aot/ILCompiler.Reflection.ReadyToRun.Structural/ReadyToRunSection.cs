@@ -5,7 +5,7 @@ using System;
 
 using Internal.Runtime;
 
-namespace ILCompiler.Reflection.ReadyToRun.Structural
+namespace ILCompiler.Reflection.ReadyToRun
 {
     public struct ReadyToRunSectionHandle
     {
