@@ -1060,6 +1060,9 @@ static bool SigMatchesMethodDesc(MethodDesc* pMD, SigPointer &sig, ModuleBase * 
     bool sigIsAsync = (methodFlags & ENCODE_METHOD_SIG_AsyncVariant) != 0;
     if (sigIsAsync != pMD->IsAsyncVariantMethod())
         return false;
+    bool sigIsReturnDroppingAsyncThunk = (methodFlags & ENCODE_METHOD_SIG_ReturnDroppingAsyncThunk) != 0;
+    if (sigIsReturnDroppingAsyncThunk != pMD->IsReturnDroppingThunk())
+        return false;
 
     _ASSERTE((methodFlags & ENCODE_METHOD_SIG_SlotInsteadOfToken) == 0);
     _ASSERTE(((methodFlags & (ENCODE_METHOD_SIG_MemberRefToken | ENCODE_METHOD_SIG_UpdateContext)) == 0) ||

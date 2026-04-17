@@ -891,6 +891,9 @@ Dictionary::PopulateEntry(
                 isUnboxingStub = ((methodFlags & ENCODE_METHOD_SIG_UnboxingStub) != 0);
                 fMethodNeedsInstantiation = ((methodFlags & ENCODE_METHOD_SIG_MethodInstantiation) != 0);
                 isAsyncVariant = ((methodFlags & ENCODE_METHOD_SIG_AsyncVariant) != 0);
+                // We don't have a way to retrieve the return dropping thunk with FindOrCreateAssociatedMethodDesc
+                // ENCODE_METHOD_SIG_ReturnDroppingAsyncThunk is only used to match a signature to a MethodDesc we already have
+                _ASSERTE((methodFlags & ENCODE_METHOD_SIG_ReturnDroppingAsyncThunk) == 0);
 
                 if (methodFlags & ENCODE_METHOD_SIG_OwnerType)
                 {
@@ -980,6 +983,9 @@ Dictionary::PopulateEntry(
                 isUnboxingStub = ((methodFlags & ENCODE_METHOD_SIG_UnboxingStub) != 0);
                 fMethodNeedsInstantiation = ((methodFlags & ENCODE_METHOD_SIG_MethodInstantiation) != 0);
                 isAsyncVariant = ((methodFlags & ENCODE_METHOD_SIG_AsyncVariant) != 0);
+                // We don't have a way to retrieve the return dropping thunk with FindOrCreateAssociatedMethodDesc
+                // ENCODE_METHOD_SIG_ReturnDroppingAsyncThunk is only used to match a signature to a MethodDesc we already have
+                _ASSERTE((methodFlags & ENCODE_METHOD_SIG_ReturnDroppingAsyncThunk) == 0);
 
                 if ((methodFlags & ENCODE_METHOD_SIG_SlotInsteadOfToken) != 0)
                 {

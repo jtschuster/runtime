@@ -23,7 +23,6 @@ namespace Internal.IL
     /// </summary>
     public interface IMethodTokensAreUseableInCompilation { }
 
-
     public sealed class ReadyToRunILProvider : ILProvider
     {
         private CompilationModuleGroup _compilationModuleGroup;
@@ -330,6 +329,10 @@ namespace Internal.IL
                 if (_manifestModuleWrappedMethods.TryGetValue(ars, out var methodil))
                     return methodil;
                 return ars.EmitIL();
+            }
+            else if (method is ReturnDroppingAsyncThunk returnDroppingVariant)
+            {
+                return AsyncThunkILEmitter.EmitReturnDroppingThunk(returnDroppingVariant, returnDroppingVariant.AsyncVariantTarget);
             }
             else
             {

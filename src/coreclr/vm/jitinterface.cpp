@@ -3260,6 +3260,10 @@ NoSpecialCase:
             {
                 methodFlags |= ENCODE_METHOD_SIG_AsyncVariant;
             }
+            if (pTemplateMD->IsReturnDroppingThunk())
+            {
+                methodFlags |= ENCODE_METHOD_SIG_ReturnDroppingAsyncThunk;
+            }
 
             sigBuilder.AppendData(methodFlags);
 

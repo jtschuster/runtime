@@ -445,6 +445,10 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             {
                 flags |= (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_AsyncVariant;
             }
+            if (method.Method.IsReturnDroppingAsyncThunk())
+            {
+                flags |= (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_ReturnDroppingAsyncThunk;
+            }
 
             EmitMethodSpecificationSignature(method, flags, enforceDefEncoding, enforceOwningType, context);
 

@@ -922,6 +922,9 @@ MethodDesc *ZapSig::DecodeMethod(ModuleBase *pInfoModule,
     BOOL isInstantiatingStub = (methodFlags & ENCODE_METHOD_SIG_InstantiatingStub);
     BOOL isUnboxingStub = (methodFlags & ENCODE_METHOD_SIG_UnboxingStub);
     bool isAsyncVariant = (methodFlags & ENCODE_METHOD_SIG_AsyncVariant) != 0;
+    // We don't have a way to retrieve the return dropping thunk with FindOrCreateAssociatedMethodDesc
+    // ENCODE_METHOD_SIG_ReturnDroppingAsyncThunk is only used to match a signature to a MethodDesc we already have
+    _ASSERTE((methodFlags & ENCODE_METHOD_SIG_ReturnDroppingAsyncThunk) == 0);
 
     pMethod = MethodDesc::FindOrCreateAssociatedMethodDesc(pMethod, thOwner.GetMethodTable(),
                                                             isUnboxingStub,
@@ -1226,6 +1229,8 @@ BOOL ZapSig::EncodeMethod(
         methodFlags |= ENCODE_METHOD_SIG_MethodInstantiation;
     if (pMethod->IsAsyncVariantMethod())
         methodFlags |= ENCODE_METHOD_SIG_AsyncVariant;
+    if (pMethod->IsReturnDroppingThunk())
+        methodFlags |= ENCODE_METHOD_SIG_ReturnDroppingAsyncThunk;
 
     // Assume that the owner type is going to be needed
     methodFlags |= ENCODE_METHOD_SIG_OwnerType;
