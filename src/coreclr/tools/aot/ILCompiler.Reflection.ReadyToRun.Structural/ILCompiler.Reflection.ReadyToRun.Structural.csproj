@@ -18,6 +18,17 @@
     <Compile Include="..\..\Common\Pgo\PgoFormat.cs" Link="Common\PgoFormat.cs" />
     <Compile Include="..\..\Common\MachO\**\*.cs" Link="MachO\%(RecursiveDir)%(Filename)%(Extension)" />
 
+    <!-- Files identical (modulo namespace) to the legacy ILCompiler.Reflection.ReadyToRun project.
+         Linked from the legacy source tree to avoid duplication. They live in the
+         ILCompiler.Reflection.ReadyToRun namespace within this assembly; consumers add
+         `using ILCompiler.Reflection.ReadyToRun;` to reach them.
+         Architecture-specific files are NOT shared because they derive from the
+         BaseUnwindInfo/BaseGcSlot/etc. hierarchy that Structural redeclares in its own
+         namespace (see BaseInfoTypes.cs). -->
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\DebugInfoTypes.cs" Link="DebugInfoTypes.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\PEReaderExtensions.cs" Link="PEReaderExtensions.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\MachO\BinaryFormat\NList64.cs" Link="MachO\BinaryFormat\NList64.cs" />
+
     <!-- Exclude Parsed layer until structural handle conversion is complete -->
     <Compile Remove="Parsed\**" />
     <!-- R2RSignatureDecoder depends on OpenReferenceAssembly which moved to the Parsed layer -->
