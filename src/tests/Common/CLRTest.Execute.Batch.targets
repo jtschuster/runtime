@@ -455,6 +455,9 @@ setlocal ENABLEDELAYEDEXPANSION
 set "lockFolder=%~dp0\lock"
 pushd %~dp0
 set "scriptPath=%~dp0"
+IF NOT "%CLRTEST_VARIANT_SUBDIR%"=="" (
+    ECHO CLRTEST_VARIANT_SUBDIR=%CLRTEST_VARIANT_SUBDIR% ^(launched from %CD%^)
+)
 set /A _RunWithWatcher=0
 set /A _WatcherTimeoutMins=10
 

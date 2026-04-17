@@ -580,6 +580,9 @@ ReleaseLock()
     fi
 }
 cd "$%28dirname "${BASH_SOURCE[0]}")"
+if [ -n "$CLRTEST_VARIANT_SUBDIR" ]%3B then
+    echo "CLRTEST_VARIANT_SUBDIR=$CLRTEST_VARIANT_SUBDIR (launched from $%28pwd))"
+fi
 LockFile="lock"
 _RunWithWatcher=0
 _WatcherTimeoutMins=10
