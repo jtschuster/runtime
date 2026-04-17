@@ -29,6 +29,11 @@ internal sealed class TestPaths
             ?? throw new InvalidOperationException($"Missing RuntimeHostConfigurationOption '{key}'. Was the project built with the correct properties?");
     }
 
+    private static string? GetOptionalConfig(string key)
+    {
+        return AppContext.GetData(key) as string;
+    }
+
     /// <summary>
     /// Tries to find an existing directory by swapping the build configuration path segment
     /// (Debug, Release, Checked) in the path. Returns the first match, or the original
@@ -130,6 +135,23 @@ internal sealed class TestPaths
         {
             string dir = GetRequiredConfig("R2RTest.RuntimePackNativeDir");
             return ProbeConfigFallback(dir);
+        }
+    }
+
+    /// <summary>
+    /// Path to the directory of R2R-compiled framework managed assemblies produced by the
+    /// 'packs.product' subset (artifacts/obj/coreclr-pack/&lt;Config&gt;/&lt;tfm&gt;/&lt;rid&gt;/R2R/).
+    /// Returns null if the directory does not exist (i.e. the runtime pack was not built or
+    /// not crossgenned).
+    /// </summary>
+    public string? RuntimePackR2RDir
+    {
+        get
+        {
+            string? dir = GetOptionalConfig("R2RTest.RuntimePackR2RDir");
+            if (string.IsNullOrEmpty(dir))
+                return null;
+            return Directory.Exists(dir) ? dir : null;
         }
     }
 

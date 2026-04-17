@@ -57,6 +57,11 @@ public class RuntimePackParityTests
             yield return new object[] { dll };
         foreach (string dll in EnumerateR2RDlls(paths.RuntimePackNativeDir))
             yield return new object[] { dll };
+        if (paths.RuntimePackR2RDir is string r2rDir)
+        {
+            foreach (string dll in EnumerateR2RDlls(r2rDir))
+                yield return new object[] { dll };
+        }
     }
 
     private static IEnumerable<string> EnumerateR2RDlls(string dir)

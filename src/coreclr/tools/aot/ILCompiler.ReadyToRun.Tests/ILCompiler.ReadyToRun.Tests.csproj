@@ -44,6 +44,11 @@
     <RuntimeHostConfigurationOption Include="R2RTest.RuntimePackNativeDir">
       <Value>$(MicrosoftNetCoreAppRuntimePackNativeDir)</Value>
     </RuntimeHostConfigurationOption>
+    <!-- Optional: directory of R2R-compiled framework DLLs produced by 'packs.product'.
+         Empty if the runtime pack hasn't been crossgenned. -->
+    <RuntimeHostConfigurationOption Include="R2RTest.RuntimePackR2RDir">
+      <Value>$([MSBuild]::NormalizeDirectory('$(ArtifactsObjDir)', 'coreclr-pack', '$(LibrariesConfiguration)', '$(NetCoreAppCurrent)', '$(TargetOS)-$(TargetArchitecture)', 'R2R'))</Value>
+    </RuntimeHostConfigurationOption>
     <RuntimeHostConfigurationOption Include="R2RTest.RefPackDir">
       <Value>$(MicrosoftNetCoreAppRefPackRefDir)</Value>
     </RuntimeHostConfigurationOption>
