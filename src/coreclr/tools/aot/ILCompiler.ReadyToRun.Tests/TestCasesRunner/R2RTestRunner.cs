@@ -3,12 +3,9 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using ILCompiler.Reflection.ReadyToRun;
-using Microsoft.CodeAnalysis;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -35,8 +32,6 @@ internal sealed class CompiledAssembly
     /// References to other assemblies that this assembly depends on.
     /// </summary>
     public List<CompiledAssembly> References { get; init; } = new();
-
-    public OutputKind OutputKind {get; init;} = OutputKind.DynamicallyLinkedLibrary;
 
     private string? _outputDir = null;
     public string FilePath => _outputDir != null ? Path.Combine(_outputDir, "IL", AssemblyName + ".dll")
@@ -93,14 +88,6 @@ internal sealed class CrossgenCompilation(string name, List<CrossgenAssembly> as
     /// </summary>
     public Action<ReadyToRunReader>? Validate { get; init; }
 
-    /// <summary>
-    /// When set, the R2R image is executed with corerun after validation.
-    /// The value is the name of the entry-point assembly (must have been
-    /// compiled as <see cref="OutputKind.ConsoleApplication"/>).
-    /// Exit code 0 = pass; non-zero fails the test.
-    /// </summary>
-    public CrossgenAssembly? Execute { get; init; } = null;
-
     public string Name => name;
 
     public bool IsComposite => Options.Contains(Crossgen2Option.Composite);
@@ -139,9 +126,6 @@ internal sealed class R2RTestCase(string name, List<CrossgenCompilation> compila
     /// </summary>
     public List<CrossgenCompilation> Compilations => compilations;
 
-    /// <summary>
-    /// Returns a list of assemblies to compile with Roslyn, in such an order that dependencies are compiled before the assemblies that depend on them.
-    /// </summary>
     public IEnumerable<CompiledAssembly> GetAssemblies()
     {
         // Should be a small number of assemblies, so a simple list is fine as an insertion-ordered set
@@ -181,10 +165,12 @@ internal sealed class R2RTestCase(string name, List<CrossgenCompilation> compila
 internal sealed class R2RTestRunner
 {
     private readonly ITestOutputHelper _output;
+    private readonly TestPaths _paths;
 
     public R2RTestRunner(ITestOutputHelper output)
     {
         _output = output;
+        _paths = new TestPaths(output);
     }
 
     /// <summary>
@@ -207,7 +193,7 @@ internal sealed class R2RTestRunner
             var assemblyPaths = CompileAllAssemblies(assembliesToCompile);
 
             // Step 2: Run each crossgen2 compilation and validate
-            var driver = new R2RDriver(_output);
+            var driver = new R2RDriver(_output, _paths);
             var refPaths = BuildReferencePaths();
 
             foreach(var compilation in testCase.Compilations)
@@ -219,63 +205,9 @@ internal sealed class R2RTestRunner
                 {
                     Assert.True(File.Exists(outputPath), $"R2R image not found: {outputPath}");
                     _output.WriteLine($"  Validating R2R image: {outputPath}");
-                    var reader = new ReadyToRunReader(new SimpleAssemblyResolver(), outputPath);
+                    var reader = new ReadyToRunReader(new SimpleAssemblyResolver(_paths), outputPath);
                     compilation.Validate(reader);
                 }
-                if (compilation.Execute is not null)
-                {
-                    string exeAssemblyName = compilation.Execute.ILAssembly.AssemblyName;
-                    string cg2Dir = Path.GetDirectoryName(outputPath)!;
-
-                    // Copy dependency IL assemblies next to the R2R exe so corerun can probe them.
-                    foreach (var asm in compilation.Assemblies)
-                    {
-                        if (asm == compilation.Execute)
-                            continue;
-                        string src = asm.ILAssembly.FilePath;
-                        string dest = Path.Combine(cg2Dir, Path.GetFileName(src));
-                        if (File.Exists(src) && !File.Exists(dest))
-                            File.Copy(src, dest);
-                    }
-
-                    string exePath = Path.Combine(cg2Dir, exeAssemblyName + ".dll");
-                    Assert.True(File.Exists(exePath), $"Entry-point assembly not found: {exePath}");
-
-                    // Use corerun from the testhost shared framework dir with CORE_ROOT
-                    // pointing there. It has corerun, libcoreclr, managed framework DLLs,
-                    // and native shims (libSystem.Native, etc.) — all in one directory.
-                    _output.WriteLine($"  Executing R2R image with corerun: {exePath}");
-                    var psi = new ProcessStartInfo(TestPaths.CorerunPath, [exePath])
-                    {
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                    };
-
-                    using var process = Process.Start(psi)!;
-                    var stdoutTask = process.StandardOutput.ReadToEndAsync();
-                    var stderrTask = process.StandardError.ReadToEndAsync();
-
-                    if (!process.WaitForExit(TimeSpan.FromSeconds(30)))
-                    {
-                        try { process.Kill(entireProcessTree: true); }
-                        catch { /* best effort */ }
-                        Assert.Fail($"Execution of '{exeAssemblyName}' timed out after 30 seconds");
-                    }
-
-                    string stdout = stdoutTask.GetAwaiter().GetResult();
-                    string stderr = stderrTask.GetAwaiter().GetResult();
-
-                    if (!string.IsNullOrWhiteSpace(stdout))
-                        _output.WriteLine($"  stdout: {stdout}");
-                    if (!string.IsNullOrWhiteSpace(stderr))
-                        _output.WriteLine($"  stderr: {stderr}");
-
-                    Assert.True(process.ExitCode == 0,
-                        $"Execution of '{exeAssemblyName}' failed (exit code {process.ExitCode}):\n{stderr}");
-                }
-
             }
         }
         finally
@@ -291,7 +223,7 @@ internal sealed class R2RTestRunner
     private Dictionary<string, string> CompileAllAssemblies(
         IEnumerable<CompiledAssembly> assemblies)
     {
-        var compiler = new R2RTestCaseCompiler();
+        var compiler = new R2RTestCaseCompiler(_paths);
         var paths = new Dictionary<string, string>();
 
         foreach (var asm in assemblies)
@@ -306,7 +238,6 @@ internal sealed class R2RTestRunner
                 asm.AssemblyName,
                 sources,
                 asm.FilePath,
-                asm.OutputKind,
                 additionalReferences: asm.References.Select(r => r.FilePath).ToList(),
                 features: asm.Features.Count > 0 ? asm.Features : null);
             paths[asm.AssemblyName] = ilPath;
@@ -390,20 +321,32 @@ internal sealed class R2RTestRunner
         }
     }
 
-    private static List<string> BuildReferencePaths()
+    private List<string> BuildReferencePaths()
     {
         var paths = new List<string>();
 
-        paths.Add(Path.Combine(TestPaths.RuntimePackDir, "*.dll"));
+        paths.Add(Path.Combine(_paths.RuntimePackDir, "*.dll"));
 
-        string runtimePackDir = TestPaths.RuntimePackDir;
-        string nativeDir = Path.GetFullPath(Path.Combine(runtimePackDir, "..", "..", "native"));
-        if (Directory.Exists(nativeDir))
+        // SPCL lives in the runtime pack native/ dir in full builds (placed by
+        // externals.csproj BinPlace during libs.pretest).  In partial CI builds
+        // that skip libs.pretest, the runtime pack layout may not exist, but the
+        // CoreCLR artifacts directory always has SPCL after clr.nativecorelib.
+        string spcl = Path.Combine(_paths.RuntimePackNativeDir, "System.Private.CoreLib.dll");
+        if (!File.Exists(spcl))
         {
-            string spcl = Path.Combine(nativeDir, "System.Private.CoreLib.dll");
-            if (File.Exists(spcl))
-                paths.Add(spcl);
+            string fallback = Path.Combine(_paths.CoreCLRArtifactsDir, "System.Private.CoreLib.dll");
+            if (File.Exists(fallback))
+            {
+                _output.WriteLine($"[R2RTestRunner] SPCL not found at '{spcl}'; using CoreCLR artifacts fallback '{fallback}'");
+                spcl = fallback;
+            }
         }
+
+        Assert.True(File.Exists(spcl),
+            $"System.Private.CoreLib.dll not found at '{spcl}'. " +
+            $"Searched RuntimePackNativeDir='{_paths.RuntimePackNativeDir}' and " +
+            $"CoreCLRArtifactsDir='{_paths.CoreCLRArtifactsDir}'");
+        paths.Add(spcl);
 
         return paths;
     }

@@ -90,24 +90,6 @@ internal static class R2RAssert
     }
 
     /// <summary>
-    /// Asserts that the specified method has an entry in the import sections with a fixup for this method that has a ModuleOverride to the mutable module,
-    /// and method signature that resolves to the specified resolvedEntity
-    /// </summary>
-    public static void MethodHasMutableModuleFixupToken(ReadyToRunReader reader, string methodName, string resolvedEntity)
-    {
-        foreach(var section in reader.ImportSections)
-        {
-            foreach(var entry in section.Entries)
-            {
-            }
-        }
-
-        Assert.Fail($"Method '{methodName}' with mutable module fixup token '{resolvedEntity}' not found.");
-
-    }
-
-
-    /// <summary>
     /// Asserts that the CrossModuleInlineInfo section has an entry for an inlinee matching
     /// <paramref name="inlineeMethodName"/> with cross-module inliners whose resolved names
     /// contain each of the <paramref name="expectedInlinerNames"/>. This validates that
@@ -226,14 +208,18 @@ internal static class R2RAssert
         // In composite images, InliningInfo2 is per-assembly
         if (reader.ReadyToRunAssemblyHeaders is not null)
         {
-            foreach (var asmHeader in reader.ReadyToRunAssemblyHeaders)
+            for (int asmIndex = 0; asmIndex < reader.ReadyToRunAssemblyHeaders.Count; asmIndex++)
             {
+                var asmHeader = reader.ReadyToRunAssemblyHeaders[asmIndex];
                 if (asmHeader.Sections.TryGetValue(
                         ReadyToRunSectionType.InliningInfo2, out ReadyToRunSection asmSection))
                 {
                     int offset = reader.GetOffset(asmSection.RelativeVirtualAddress);
                     int endOffset = offset + asmSection.Size;
-                    yield return new InliningInfoSection2(reader, offset, endOffset);
+                    uint ownerModuleIndex = reader.Composite
+                        ? (uint)(asmIndex + reader.ComponentAssemblyIndexOffset)
+                        : 0;
+                    yield return new InliningInfoSection2(reader, offset, endOffset, ownerModuleIndex);
                 }
             }
         }
@@ -388,6 +374,13 @@ internal static class R2RAssert
 /// </summary>
 internal sealed class SimpleAssemblyResolver : IAssemblyResolver
 {
+    private readonly TestPaths _paths;
+
+    public SimpleAssemblyResolver(TestPaths paths)
+    {
+        _paths = paths;
+    }
+
     public IAssemblyMetadata? FindAssembly(MetadataReader metadataReader, AssemblyReferenceHandle assemblyReferenceHandle, string parentFile)
     {
         var assemblyRef = metadataReader.GetAssemblyReference(assemblyReferenceHandle);
@@ -404,7 +397,7 @@ internal sealed class SimpleAssemblyResolver : IAssemblyResolver
 
         string candidate = Path.Combine(dir, simpleName + ".dll");
         if (!File.Exists(candidate))
-            candidate = Path.Combine(TestPaths.RuntimePackDir, simpleName + ".dll");
+            candidate = Path.Combine(_paths.RuntimePackDir, simpleName + ".dll");
 
         if (!File.Exists(candidate))
             return null;

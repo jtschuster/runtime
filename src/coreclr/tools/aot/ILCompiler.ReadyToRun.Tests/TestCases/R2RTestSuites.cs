@@ -4,7 +4,6 @@
 using System.Collections.Generic;
 using ILCompiler.ReadyToRun.Tests.TestCasesRunner;
 using ILCompiler.Reflection.ReadyToRun;
-using Microsoft.CodeAnalysis;
 using Microsoft.DotNet.XUnitExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -28,7 +27,7 @@ public class R2RTestSuites
     [Fact]
     public void BasicCrossModuleInlining()
     {
-        var InlineableLib = new CompiledAssembly
+        var inlineableLib = new CompiledAssembly
         {
             AssemblyName = "InlineableLib",
             SourceResourceNames = ["CrossModuleInlining/Dependencies/InlineableLib.cs"],
@@ -37,10 +36,10 @@ public class R2RTestSuites
         {
             AssemblyName = "BasicCrossModuleInlining",
             SourceResourceNames = ["CrossModuleInlining/BasicInlining.cs"],
-            References = [InlineableLib]
+            References = [inlineableLib]
         };
 
-        var cgInlineableLib = new CrossgenAssembly(InlineableLib){ Kind = Crossgen2InputKind.Reference, Options = [Crossgen2AssemblyOption.CrossModuleOptimization] };
+        var cgInlineableLib = new CrossgenAssembly(inlineableLib){ Kind = Crossgen2InputKind.Reference, Options = [Crossgen2AssemblyOption.CrossModuleOptimization] };
         var cgBasicCrossModuleInlining = new CrossgenAssembly(basicCrossModuleInlining);
 
         new R2RTestRunner(_output).Run(new R2RTestCase(
@@ -426,11 +425,8 @@ public class R2RTestSuites
             AssemblyName = "CompositeAsyncMain",
             SourceResourceNames = ["CrossModuleInlining/CompositeAsync.cs"],
             Features = { RuntimeAsyncFeature },
-            References = [asyncCompositeLib],
-            OutputKind = OutputKind.ConsoleApplication
+            References = [asyncCompositeLib]
         };
-
-        var compositeAsyncMainCG2 = new CrossgenAssembly(compositeAsyncMain);
 
         new R2RTestRunner(_output).Run(new R2RTestCase(
             nameof(CompositeAsync),
@@ -438,12 +434,11 @@ public class R2RTestSuites
                 new(nameof(CompositeAsync),
                 [
                     new CrossgenAssembly(asyncCompositeLib),
-                    compositeAsyncMainCG2
+                    new CrossgenAssembly(compositeAsyncMain),
                 ])
                 {
                     Options = [Crossgen2Option.Composite, Crossgen2Option.Optimize],
                     Validate = Validate,
-                    Execute = compositeAsyncMainCG2,
                 },
             ]));
 

@@ -5,7 +5,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using Xunit.Abstractions;
 
 namespace ILCompiler.ReadyToRun.Tests.TestCasesRunner;
@@ -86,21 +85,29 @@ internal sealed class R2RDriver
 {
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromMinutes(2);
     private readonly ITestOutputHelper _output;
+    private readonly TestPaths _paths;
 
-    public R2RDriver(ITestOutputHelper output)
+    public R2RDriver(ITestOutputHelper output, TestPaths paths)
     {
         _output = output;
+        _paths = paths;
 
-        if (!File.Exists(TestPaths.Crossgen2Exe))
-            throw new FileNotFoundException($"crossgen2 executable not found at {TestPaths.Crossgen2Exe}");
+        if (!File.Exists(_paths.Crossgen2Exe))
+            throw new FileNotFoundException($"crossgen2 executable not found at {_paths.Crossgen2Exe}");
     }
 
     /// <summary>
     /// Runs crossgen2 with the given arguments.
     /// </summary>
-    public R2RCompilationResult Compile(List<string> crossgen2Args)
+    public R2RCompilationResult Compile(List<string> args)
     {
-        var psi = new ProcessStartInfo(TestPaths.Crossgen2Exe, crossgen2Args)
+        var fullArgs = new List<string>(args);
+        return RunCrossgen2(fullArgs);
+    }
+
+    private R2RCompilationResult RunCrossgen2(List<string> crossgen2Args)
+    {
+        var psi = new ProcessStartInfo(_paths.Crossgen2Exe, crossgen2Args)
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
@@ -113,6 +120,9 @@ internal sealed class R2RDriver
         {
             psi.Environment[envVar] = null;
         }
+
+        string commandLine = $"{_paths.Crossgen2Exe} {string.Join(" ", crossgen2Args)}";
+        _output.WriteLine($"  crossgen2 command: {commandLine}");
 
         using var process = Process.Start(psi)!;
 

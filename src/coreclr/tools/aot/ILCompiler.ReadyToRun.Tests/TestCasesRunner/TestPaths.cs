@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using Xunit.Abstractions;
 
 namespace ILCompiler.ReadyToRun.Tests.TestCasesRunner;
 
@@ -13,8 +14,15 @@ namespace ILCompiler.ReadyToRun.Tests.TestCasesRunner;
 /// Provides paths to build artifacts needed by the test infrastructure.
 /// All paths come from RuntimeHostConfigurationOption items in the csproj.
 /// </summary>
-internal static class TestPaths
+internal sealed class TestPaths
 {
+    private readonly ITestOutputHelper _output;
+
+    public TestPaths(ITestOutputHelper output)
+    {
+        _output = output;
+    }
+
     private static string GetRequiredConfig(string key)
     {
         return AppContext.GetData(key) as string
@@ -22,86 +30,120 @@ internal static class TestPaths
     }
 
     /// <summary>
-    /// Path to the crossgen2 output directory (contains crossgen2.dll and clrjit).
-    /// e.g. artifacts/bin/coreclr/linux.x64.Checked/crossgen2/
-    /// Falls back to Checked or Release if Debug path doesn't exist.
+    /// Tries to find an existing directory by swapping the build configuration path segment
+    /// (Debug, Release, Checked) in the path. Returns the first match, or the original
+    /// path if no fallback exists.
     /// </summary>
-    public static string Crossgen2Dir
+    private string ProbeConfigFallback(string dir)
+    {
+        if (Directory.Exists(dir))
+            return dir;
+
+        foreach (string fallbackConfig in new[] { "Release", "Checked", "Debug" })
+        {
+            string fallback = Regex.Replace(
+                dir, @"(?<=[/\\])(Debug|Release|Checked)(?=[/\\])", fallbackConfig);
+            if (fallback != dir && Directory.Exists(fallback))
+            {
+                _output.WriteLine($"[TestPaths] '{dir}' not found; falling back to '{fallback}'");
+                return fallback;
+            }
+        }
+
+        return dir;
+    }
+
+    /// <summary>
+    /// Like <see cref="ProbeConfigFallback"/> but for paths where the configuration name
+    /// is embedded in a dot-delimited segment (e.g. <c>linux.x64.Checked</c>).
+    /// </summary>
+    private string ProbeDottedConfigFallback(string dir)
+    {
+        if (Directory.Exists(dir))
+            return dir;
+
+        foreach (string fallbackConfig in new[] { "Checked", "Release", "Debug" })
+        {
+            string fallback = Regex.Replace(
+                dir, @"\.(Debug|Release|Checked)([/\\])", $".{fallbackConfig}$2");
+            if (fallback != dir && Directory.Exists(fallback))
+            {
+                _output.WriteLine($"[TestPaths] '{dir}' not found; falling back to '{fallback}'");
+                return fallback;
+            }
+        }
+
+        return dir;
+    }
+
+    /// <summary>
+    /// Path to the crossgen2 output directory (contains the self-contained crossgen2 executable and clrjit).
+    /// e.g. artifacts/bin/coreclr/linux.x64.Checked/x64/crossgen2/
+    /// Falls back to Checked or Release if the configured path doesn't exist.
+    /// </summary>
+    public string Crossgen2Dir
     {
         get
         {
             string dir = GetRequiredConfig("R2RTest.Crossgen2Dir");
-            if (!File.Exists(Path.Combine(dir, "crossgen2.dll")))
+            if (!File.Exists(Path.Combine(dir, Crossgen2ExeName)))
             {
-                // Try Checked and Release fallbacks since crossgen2 may be built in a different config
-                foreach (string fallbackConfig in new[] { "Checked", "Release", "Debug" })
-                {
-                    string fallback = Regex.Replace(
-                        dir, @"\.(Debug|Release|Checked)[/\\]", $".{fallbackConfig}/");
-                    if (File.Exists(Path.Combine(fallback, "crossgen2.dll")))
-                        return fallback;
-                }
+                string fallback = ProbeDottedConfigFallback(dir);
+                if (File.Exists(Path.Combine(fallback, Crossgen2ExeName)))
+                    return fallback;
             }
 
             return dir;
         }
     }
 
+    private static string Crossgen2ExeName =>
+        RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "crossgen2.exe" : "crossgen2";
+
     /// <summary>
-    /// Path to the native crossgen2 executable (apphost).
+    /// Path to the self-contained crossgen2 executable (from crossgen2_inbuild).
     /// </summary>
-    public static string Crossgen2Exe
-    {
-        get
-        {
-            string exe = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "crossgen2.exe" : "crossgen2";
-            return Path.Combine(Crossgen2Dir, exe);
-        }
-    }
+    public string Crossgen2Exe => Path.Combine(Crossgen2Dir, Crossgen2ExeName);
 
     /// <summary>
     /// Path to the runtime pack managed assemblies directory.
     /// e.g. artifacts/bin/microsoft.netcore.app.runtime.linux-x64/Release/runtimes/linux-x64/lib/net11.0/
-    /// Falls back to Release if Debug path doesn't exist (libs are typically built Release).
+    /// Falls back to a different build configuration if the path doesn't exist.
     /// </summary>
-    public static string RuntimePackDir
+    public string RuntimePackDir
     {
         get
         {
             string dir = GetRequiredConfig("R2RTest.RuntimePackDir");
-            if (!Directory.Exists(dir) && dir.Contains("Debug"))
-            {
-                string releaseFallback = dir.Replace("Debug", "Release");
-                if (Directory.Exists(releaseFallback))
-                    return releaseFallback;
-            }
+            return ProbeConfigFallback(dir);
+        }
+    }
 
-            return dir;
+    /// <summary>
+    /// Path to the runtime pack native directory (contains System.Private.CoreLib.dll and native runtime).
+    /// e.g. artifacts/bin/microsoft.netcore.app.runtime.linux-x64/Release/runtimes/linux-x64/native/
+    /// Falls back to a different build configuration if the path doesn't exist.
+    /// </summary>
+    public string RuntimePackNativeDir
+    {
+        get
+        {
+            string dir = GetRequiredConfig("R2RTest.RuntimePackNativeDir");
+            return ProbeConfigFallback(dir);
         }
     }
 
     /// <summary>
     /// Path to the CoreCLR artifacts directory (contains native bits like corerun).
     /// e.g. artifacts/bin/coreclr/linux.x64.Checked/
-    /// Falls back to Checked or Release if Debug path doesn't exist.
+    /// Falls back to Checked or Release if the configured path doesn't exist.
     /// </summary>
-    public static string CoreCLRArtifactsDir
+    public string CoreCLRArtifactsDir
     {
         get
         {
             string dir = GetRequiredConfig("R2RTest.CoreCLRArtifactsDir");
-            if (!Directory.Exists(dir))
-            {
-                foreach (string fallbackConfig in new[] { "Checked", "Release", "Debug" })
-                {
-                    string fallback = Regex.Replace(
-                        dir, @"\.(Debug|Release|Checked)(/|\\|$)", $".{fallbackConfig}$2");
-                    if (Directory.Exists(fallback))
-                        return fallback;
-                }
-            }
-
-            return dir;
+            return ProbeDottedConfigFallback(dir);
         }
     }
 
@@ -113,7 +155,7 @@ internal static class TestPaths
     /// Path to the reference assembly pack (for Roslyn compilation).
     /// e.g. artifacts/bin/microsoft.netcore.app.ref/ref/net11.0/
     /// </summary>
-    public static string RefPackDir
+    public string RefPackDir
     {
         get
         {
@@ -128,7 +170,10 @@ internal static class TestPaths
                     foreach (string subDir in Directory.GetDirectories(refDir, "net*"))
                     {
                         if (File.Exists(Path.Combine(subDir, "System.Runtime.dll")))
+                        {
+                            _output.WriteLine($"[TestPaths] '{dir}' not found; falling back to '{subDir}'");
                             return subDir;
+                        }
                     }
                 }
             }
@@ -143,46 +188,9 @@ internal static class TestPaths
     public static string TargetTriple => $"{TargetOS.ToLowerInvariant()}-{TargetArchitecture.ToLowerInvariant()}";
 
     /// <summary>
-    /// Path to the testhost shared framework directory containing corerun,
-    /// libcoreclr, all managed framework DLLs, and native shims.
-    /// e.g. artifacts/bin/testhost/net11.0-linux-Release-x64/shared/Microsoft.NETCore.App/11.0.0/
-    /// </summary>
-    public static string TestHostSharedFrameworkDir
-    {
-        get
-        {
-            string dir = GetRequiredConfig("R2RTest.TestHostSharedFrameworkDir");
-            if (!Directory.Exists(dir))
-            {
-                foreach (string fallbackConfig in new[] { "Release", "Debug", "Checked" })
-                {
-                    string fallback = Regex.Replace(
-                        dir, @"-(Debug|Release|Checked)-", $"-{fallbackConfig}-");
-                    if (Directory.Exists(fallback))
-                        return fallback;
-                }
-            }
-
-            return dir;
-        }
-    }
-
-    /// <summary>
-    /// Path to the corerun executable inside the testhost shared framework.
-    /// </summary>
-    public static string CorerunPath
-    {
-        get
-        {
-            string exe = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "corerun.exe" : "corerun";
-            return Path.Combine(TestHostSharedFrameworkDir, exe);
-        }
-    }
-
-    /// <summary>
     /// Returns all framework reference assembly paths (*.dll in the runtime pack).
     /// </summary>
-    public static IEnumerable<string> GetFrameworkReferencePaths()
+    public IEnumerable<string> GetFrameworkReferencePaths()
     {
         if (!Directory.Exists(RuntimePackDir))
             throw new DirectoryNotFoundException($"Runtime pack directory not found: {RuntimePackDir}");
