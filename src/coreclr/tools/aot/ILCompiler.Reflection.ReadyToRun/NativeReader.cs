@@ -9,7 +9,7 @@ using System.Text;
 
 namespace ILCompiler.Reflection.ReadyToRun
 {
-    public class NativeReader(Stream backingStream, bool littleEndian = true)
+    public class NativeReader(Stream backingStream, bool littleEndian = true, bool leaveOpen = true) : IDisposable
     {
         private const int BITS_PER_BYTE = 8;
         private const int BITS_PER_SIZE_T = 32;
@@ -380,6 +380,14 @@ namespace ILCompiler.Reflection.ReadyToRun
         {
             uint delta = DecodeUnsignedGc(ref start);
             return lastValue + delta;
+        }
+
+        public void Dispose()
+        {
+            if (!leaveOpen)
+            {
+                _backingStream.Dispose();
+            }
         }
     }
 }

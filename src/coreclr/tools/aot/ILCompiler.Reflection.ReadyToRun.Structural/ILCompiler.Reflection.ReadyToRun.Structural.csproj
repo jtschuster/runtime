@@ -29,6 +29,7 @@
     <Compile Include="..\ILCompiler.Reflection.ReadyToRun\PEReaderExtensions.cs" Link="PEReaderExtensions.cs" />
     <Compile Include="..\ILCompiler.Reflection.ReadyToRun\NativeArray.cs" Link="NativeArray.cs" />
     <Compile Include="..\ILCompiler.Reflection.ReadyToRun\NativeHashtable.cs" Link="NativeHashtable.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\NativeReader.cs" Link="NativeReader.cs" />
     <Compile Include="..\ILCompiler.Reflection.ReadyToRun\NibbleReader.cs" Link="NibbleReader.cs" />
     <Compile Include="..\ILCompiler.Reflection.ReadyToRun\DisassemblingTypeProvider.cs" Link="DisassemblingTypeProvider.cs" />
     <Compile Include="..\ILCompiler.Reflection.ReadyToRun\GCInfoTypes.cs" Link="GCInfoTypes.cs" />

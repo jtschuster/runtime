@@ -38,7 +38,7 @@ else
     imageReader = new PEImageReader(peReader);
 }
 
-using NativeReader nativeReader = new NativeReader(new MemoryStream(imageBytes));
+using NativeReader nativeReader = new NativeReader(new MemoryStream(imageBytes), leaveOpen: false);
 using StructuralReader reader = new StructuralReader(imageReader, nativeReader, filename);
 using DiskAssemblyResolver resolver = new DiskAssemblyResolver(reader, imageReader, filename);
 
