@@ -12,7 +12,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural;
 /// Structural representation of a decoded fixup signature in an R2R image.
 /// The payload is a discriminated union keyed by the fixup kind.
 /// </summary>
-public sealed class R2RFixupSignature
+public sealed partial class R2RFixupSignature
 {
     /// <summary>
     /// The fixup kind (e.g., TypeHandle, MethodEntry, FieldAddress).
@@ -91,9 +91,9 @@ public sealed class R2RTypeFixupPayload : R2RFixupPayload
 /// </summary>
 public sealed class R2RMethodFixupPayload : R2RFixupPayload
 {
-    public R2RMethodRef Method { get; }
+    public MethodSignature Method { get; }
 
-    public R2RMethodFixupPayload(R2RMethodRef method) => Method = method;
+    public R2RMethodFixupPayload(MethodSignature method) => Method = method;
 
     public override void AppendTo(StringBuilder sb) => Method.AppendTo(sb);
 }
@@ -263,17 +263,17 @@ public sealed class R2RFieldOffsetFixupPayload : R2RFixupPayload
 public sealed class R2RVirtualOverrideFixupPayload : R2RFixupPayload
 {
     public uint OverrideFlags { get; }
-    public R2RMethodRef Declaration { get; }
+    public MethodSignature Declaration { get; }
     public R2RTypeNode ImplementationType { get; }
     public R2RTypeNode DeclaringTypeHandle { get; }
-    public R2RMethodRef ImplementationMethod { get; }
+    public MethodSignature ImplementationMethod { get; }
 
     public R2RVirtualOverrideFixupPayload(
         uint overrideFlags,
-        R2RMethodRef declaration,
+        MethodSignature declaration,
         R2RTypeNode implementationType,
         R2RTypeNode declaringTypeHandle,
-        R2RMethodRef implementationMethod)
+        MethodSignature implementationMethod)
     {
         OverrideFlags = overrideFlags;
         Declaration = declaration;
@@ -337,11 +337,11 @@ public sealed class R2RInstructionSetFixupPayload : R2RFixupPayload
 /// </summary>
 public sealed class R2RILBodyFixupPayload : R2RFixupPayload
 {
-    public R2RMethodRef Method { get; }
+    public MethodSignature Method { get; }
     public ImmutableArray<byte> ILBytes { get; }
     public ImmutableArray<R2RTypeNode> TokenTypes { get; }
 
-    public R2RILBodyFixupPayload(R2RMethodRef method, ImmutableArray<byte> ilBytes, ImmutableArray<R2RTypeNode> tokenTypes)
+    public R2RILBodyFixupPayload(MethodSignature method, ImmutableArray<byte> ilBytes, ImmutableArray<R2RTypeNode> tokenTypes)
     {
         Method = method;
         ILBytes = ilBytes;
@@ -361,10 +361,10 @@ public sealed class R2RILBodyFixupPayload : R2RFixupPayload
 /// </summary>
 public sealed class R2RDelegateCtorFixupPayload : R2RFixupPayload
 {
-    public R2RMethodRef TargetMethod { get; }
+    public MethodSignature TargetMethod { get; }
     public R2RTypeNode DelegateType { get; }
 
-    public R2RDelegateCtorFixupPayload(R2RMethodRef targetMethod, R2RTypeNode delegateType)
+    public R2RDelegateCtorFixupPayload(MethodSignature targetMethod, R2RTypeNode delegateType)
     {
         TargetMethod = targetMethod;
         DelegateType = delegateType;

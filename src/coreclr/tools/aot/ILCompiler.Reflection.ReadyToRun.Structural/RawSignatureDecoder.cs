@@ -2,8 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Reflection.Metadata;
 
 using Internal.CorConstants;
 using Internal.ReadyToRunConstants;
@@ -11,559 +11,482 @@ using Internal.ReadyToRunConstants;
 namespace ILCompiler.Reflection.ReadyToRun.Structural;
 
 /// <summary>
-/// A pure-structural R2R signature decoder that parses signature bytes into AST nodes
-/// (<see cref="R2RTypeNode"/>, <see cref="R2RMethodRef"/>, <see cref="R2RFixupSignature"/>)
-/// without requiring <see cref="MetadataReader"/> or assembly resolution.
+/// Pure-structural R2R signature decoder that emits a flat stream of <see cref="SignaturePart"/>
+/// values, one per raw wire-level field. No AST is built and no metadata or assembly resolution
+/// is required. Consumers (e.g., <c>MethodSignature.FromParts</c>, <c>R2RTypeNode.FromParts</c>,
+/// <c>R2RFixupSignature.FromParts</c>) walk the same grammar tree as this decoder to reconstruct
+/// richer representations.
 ///
-/// <para>
-/// When the decoder encounters module-switching constructs (ModuleOverride, UpdateContext,
-/// MODULE_ZAPSIG), it records the raw module index on the AST node. Token references
-/// (TypeDef, TypeRef, TypeSpec, MethodDef, MemberRef) are stored as (HandleKind, RID) pairs.
-/// The resolution of these tokens to names and types is deferred to a higher-level layer
-/// that has access to MetadataReaders.
-/// </para>
+/// The stream is grammar-aware (no explicit begin/end markers); consumers must track their own
+/// module-context state by watching <see cref="SignaturePartKind.ModuleZapSigIndex"/>,
+/// <see cref="SignaturePartKind.MethodModuleOverride"/>, and
+/// <see cref="SignaturePartKind.FixupModuleOverride"/> parts.
 /// </summary>
-public sealed class RawSignatureDecoder
+public static class RawSignatureDecoder
 {
-    private readonly NativeReader _reader;
-    private int _offset;
-    private readonly int _targetPointerSize;
+    // ── Public entry points: materialize a full R2RSignature ─────────────
 
-    /// <summary>
-    /// The current module context. Starts at -1 (meaning the component's own module).
-    /// Updated by ModuleOverride prefix and UpdateContext flag.
-    /// </summary>
-    private int _currentModuleIndex;
+    public static R2RSignature DecodeMethodSignature(NativeReader reader, int offset, int targetPointerSize)
+        => Materialize(reader, offset, targetPointerSize, ctx => ctx.EmitMethod());
 
-    public int Offset => _offset;
+    public static R2RSignature DecodeTypeSignature(NativeReader reader, int offset, int targetPointerSize)
+        => Materialize(reader, offset, targetPointerSize, ctx => ctx.EmitType());
 
-    public RawSignatureDecoder(NativeReader reader, int offset, int targetPointerSize, int initialModuleIndex = -1)
+    public static R2RSignature DecodeFieldSignature(NativeReader reader, int offset, int targetPointerSize)
+        => Materialize(reader, offset, targetPointerSize, ctx => ctx.EmitField());
+
+    public static R2RSignature DecodeFixupSignature(NativeReader reader, int offset, int targetPointerSize)
+        => Materialize(reader, offset, targetPointerSize, ctx => ctx.EmitFixup());
+
+    // ── Public enumerators: lazy IEnumerable<SignaturePart> ──────────────
+
+    public static IEnumerable<SignaturePart> EnumerateMethodParts(NativeReader reader, int offset, int targetPointerSize)
+        => new Context(reader, offset, targetPointerSize).EmitMethod();
+
+    public static IEnumerable<SignaturePart> EnumerateTypeParts(NativeReader reader, int offset, int targetPointerSize)
+        => new Context(reader, offset, targetPointerSize).EmitType();
+
+    public static IEnumerable<SignaturePart> EnumerateFieldParts(NativeReader reader, int offset, int targetPointerSize)
+        => new Context(reader, offset, targetPointerSize).EmitField();
+
+    public static IEnumerable<SignaturePart> EnumerateFixupParts(NativeReader reader, int offset, int targetPointerSize)
+        => new Context(reader, offset, targetPointerSize).EmitFixup();
+
+    // ── Materialization helper ───────────────────────────────────────────
+
+    private static R2RSignature Materialize(NativeReader reader, int offset, int targetPointerSize, Func<Context, IEnumerable<SignaturePart>> emit)
     {
-        _reader = reader;
-        _offset = offset;
-        _targetPointerSize = targetPointerSize;
-        _currentModuleIndex = initialModuleIndex;
+        var ctx = new Context(reader, offset, targetPointerSize);
+        var builder = ImmutableArray.CreateBuilder<SignaturePart>();
+        foreach (var part in emit(ctx))
+            builder.Add(part);
+        return new R2RSignature(builder.ToImmutable(), offset, ctx.Offset);
     }
 
-    // ── Byte-reading primitives (delegate to NativeReader) ───────────────
+    // ── Stateful decode context (mutated during yield return execution) ──
 
-    private byte ReadByte() => _reader.ReadByte(ref _offset);
-
-    private void SkipBytes(int count)
+    private sealed class Context
     {
-        checked { _offset += count; }
-    }
+        private readonly NativeReader _reader;
+        private readonly int _targetPointerSize;
+        private int _offset;
 
-    /// <summary>
-    /// Read a compressed unsigned 32-bit integer (CorSigUncompressData format).
-    /// </summary>
-    private uint ReadUInt() => _reader.ReadCompressedData(ref _offset);
+        public int Offset => _offset;
 
-    /// <summary>
-    /// Read a compressed signed integer.
-    /// </summary>
-    private int ReadInt()
-    {
-        uint raw = ReadUInt();
-        int data = (int)(raw >> 1);
-        return (raw & 1) == 0 ? data : -data;
-    }
-
-    /// <summary>
-    /// Read an encoded type token. The low 2 bits encode the token table
-    /// (TypeDef=0, TypeRef=1, TypeSpec=2, BaseType=3) and the remaining bits are the RID.
-    /// </summary>
-    private (HandleKind kind, int rid) ReadTypeToken()
-    {
-        uint encoded = ReadUInt();
-        int rid = (int)(encoded >> 2);
-        HandleKind kind = (encoded & 3) switch
+        public Context(NativeReader reader, int offset, int targetPointerSize)
         {
-            0 => HandleKind.TypeDefinition,
-            1 => HandleKind.TypeReference,
-            2 => HandleKind.TypeSpecification,
-            3 => HandleKind.TypeDefinition, // BaseType maps to TypeDef row 0
-            _ => throw new BadImageFormatException()
-        };
-        return (kind, rid);
-    }
+            _reader = reader;
+            _offset = offset;
+            _targetPointerSize = targetPointerSize;
+        }
 
-    private CorElementType ReadElementType() => (CorElementType)(ReadByte() & 0x7F);
+        // ── Byte-reading primitives ──────────────────────────────────────
 
-    private CorElementType PeekElementType()
-    {
-        int peekOffset = _offset;
-        return (CorElementType)(_reader.ReadByte(ref peekOffset) & 0x7F);
-    }
+        private byte ReadByte() => _reader.ReadByte(ref _offset);
 
-    // ── Type parsing ─────────────────────────────────────────────────────
+        private uint ReadUInt() => _reader.ReadCompressedData(ref _offset);
 
-    /// <summary>
-    /// Parse a type signature from the current position.
-    /// </summary>
-    public R2RTypeNode ParseType()
-    {
-        CorElementType elemType = ReadElementType();
-        switch (elemType)
+        private int ReadInt()
         {
-            case CorElementType.ELEMENT_TYPE_VOID:
-            case CorElementType.ELEMENT_TYPE_BOOLEAN:
-            case CorElementType.ELEMENT_TYPE_CHAR:
-            case CorElementType.ELEMENT_TYPE_I1:
-            case CorElementType.ELEMENT_TYPE_U1:
-            case CorElementType.ELEMENT_TYPE_I2:
-            case CorElementType.ELEMENT_TYPE_U2:
-            case CorElementType.ELEMENT_TYPE_I4:
-            case CorElementType.ELEMENT_TYPE_U4:
-            case CorElementType.ELEMENT_TYPE_I8:
-            case CorElementType.ELEMENT_TYPE_U8:
-            case CorElementType.ELEMENT_TYPE_R4:
-            case CorElementType.ELEMENT_TYPE_R8:
-            case CorElementType.ELEMENT_TYPE_STRING:
-            case CorElementType.ELEMENT_TYPE_OBJECT:
-            case CorElementType.ELEMENT_TYPE_I:
-            case CorElementType.ELEMENT_TYPE_U:
-            case CorElementType.ELEMENT_TYPE_TYPEDBYREF:
-                return new R2RPrimitiveTypeNode((PrimitiveTypeCode)elemType);
+            uint raw = ReadUInt();
+            int data = (int)(raw >> 1);
+            return (raw & 1) == 0 ? data : -data;
+        }
 
-            case CorElementType.ELEMENT_TYPE_PTR:
-                return new R2RPointerTypeNode(ParseType());
+        private CorElementType ReadElementType() => (CorElementType)(ReadByte() & 0x7F);
 
-            case CorElementType.ELEMENT_TYPE_BYREF:
-                return new R2RByRefTypeNode(ParseType());
+        private CorElementType PeekElementType()
+        {
+            int peekOffset = _offset;
+            return (CorElementType)(_reader.ReadByte(ref peekOffset) & 0x7F);
+        }
 
-            case CorElementType.ELEMENT_TYPE_VALUETYPE:
-            case CorElementType.ELEMENT_TYPE_CLASS:
+        // ── Type signature ───────────────────────────────────────────────
+
+        public IEnumerable<SignaturePart> EmitType()
+        {
+            var elemType = ReadElementType();
+            yield return new SignaturePart(SignaturePartKind.ElementType, (long)elemType);
+
+            switch (elemType)
             {
-                bool isValueType = elemType == CorElementType.ELEMENT_TYPE_VALUETYPE;
-                var (kind, rid) = ReadTypeToken();
-                return new R2RTokenTypeNode(_currentModuleIndex, kind, rid, isValueType);
-            }
+                case CorElementType.ELEMENT_TYPE_VOID:
+                case CorElementType.ELEMENT_TYPE_BOOLEAN:
+                case CorElementType.ELEMENT_TYPE_CHAR:
+                case CorElementType.ELEMENT_TYPE_I1:
+                case CorElementType.ELEMENT_TYPE_U1:
+                case CorElementType.ELEMENT_TYPE_I2:
+                case CorElementType.ELEMENT_TYPE_U2:
+                case CorElementType.ELEMENT_TYPE_I4:
+                case CorElementType.ELEMENT_TYPE_U4:
+                case CorElementType.ELEMENT_TYPE_I8:
+                case CorElementType.ELEMENT_TYPE_U8:
+                case CorElementType.ELEMENT_TYPE_R4:
+                case CorElementType.ELEMENT_TYPE_R8:
+                case CorElementType.ELEMENT_TYPE_STRING:
+                case CorElementType.ELEMENT_TYPE_OBJECT:
+                case CorElementType.ELEMENT_TYPE_I:
+                case CorElementType.ELEMENT_TYPE_U:
+                case CorElementType.ELEMENT_TYPE_TYPEDBYREF:
+                case CorElementType.ELEMENT_TYPE_CANON_ZAPSIG:
+                    yield break;
 
-            case CorElementType.ELEMENT_TYPE_VAR:
-                return new R2RGenericTypeParamNode((int)ReadUInt());
+                case CorElementType.ELEMENT_TYPE_PTR:
+                case CorElementType.ELEMENT_TYPE_BYREF:
+                case CorElementType.ELEMENT_TYPE_SZARRAY:
+                case CorElementType.ELEMENT_TYPE_PINNED:
+                    foreach (var p in EmitType())
+                        yield return p;
+                    yield break;
 
-            case CorElementType.ELEMENT_TYPE_MVAR:
-                return new R2RGenericMethodParamNode((int)ReadUInt());
+                case CorElementType.ELEMENT_TYPE_VALUETYPE:
+                case CorElementType.ELEMENT_TYPE_CLASS:
+                    yield return new SignaturePart(SignaturePartKind.TypeToken, ReadUInt());
+                    yield break;
 
-            case CorElementType.ELEMENT_TYPE_ARRAY:
-            {
-                R2RTypeNode elementType = ParseType();
-                uint rank = ReadUInt();
-                if (rank == 0)
-                    return new R2RSzArrayTypeNode(elementType);
+                case CorElementType.ELEMENT_TYPE_VAR:
+                case CorElementType.ELEMENT_TYPE_MVAR:
+                    yield return new SignaturePart(SignaturePartKind.GenericParamIndex, ReadUInt());
+                    yield break;
 
-                uint sizeCount = ReadUInt();
-                int[] sizes = new int[sizeCount];
-                for (uint i = 0; i < sizeCount; i++)
-                    sizes[i] = (int)ReadUInt();
-
-                uint lowerBoundCount = ReadUInt();
-                int[] lowerBounds = new int[lowerBoundCount];
-                for (uint i = 0; i < lowerBoundCount; i++)
-                    lowerBounds[i] = ReadInt();
-
-                var shape = new ArrayShape((int)rank, sizes.ToImmutableArray(), lowerBounds.ToImmutableArray());
-                return new R2RArrayTypeNode(elementType, shape);
-            }
-
-            case CorElementType.ELEMENT_TYPE_SZARRAY:
-                return new R2RSzArrayTypeNode(ParseType());
-
-            case CorElementType.ELEMENT_TYPE_GENERICINST:
-            {
-                R2RTypeNode genericType = ParseType();
-                uint argCount = ReadUInt();
-                var args = ImmutableArray.CreateBuilder<R2RTypeNode>((int)argCount);
-                for (uint i = 0; i < argCount; i++)
-                    args.Add(ParseType());
-                return new R2RGenericInstTypeNode(genericType, args.MoveToImmutable());
-            }
-
-            case CorElementType.ELEMENT_TYPE_FNPTR:
-            {
-                var sigHeader = new SignatureHeader(ReadByte());
-                int genericParamCount = sigHeader.IsGeneric ? (int)ReadUInt() : 0;
-                int paramCount = (int)ReadUInt();
-                R2RTypeNode returnType = ParseType();
-                var paramTypes = ImmutableArray.CreateBuilder<R2RTypeNode>(paramCount);
-                int requiredParamCount = -1;
-                for (int i = 0; i < paramCount; i++)
+                case CorElementType.ELEMENT_TYPE_ARRAY:
                 {
-                    while (PeekElementType() == CorElementType.ELEMENT_TYPE_SENTINEL)
+                    foreach (var p in EmitType())
+                        yield return p;
+                    uint rank = ReadUInt();
+                    yield return new SignaturePart(SignaturePartKind.ArrayRank, rank);
+                    // Wire format: if rank == 0, no size/lower-bound data follows
+                    // (decoder treats rank 0 as SzArray shape).
+                    if (rank == 0)
+                        yield break;
+                    uint sizeCount = ReadUInt();
+                    yield return new SignaturePart(SignaturePartKind.ArraySizeCount, sizeCount);
+                    for (uint i = 0; i < sizeCount; i++)
+                        yield return new SignaturePart(SignaturePartKind.ArraySize, ReadUInt());
+                    uint lbCount = ReadUInt();
+                    yield return new SignaturePart(SignaturePartKind.ArrayLowerBoundCount, lbCount);
+                    for (uint i = 0; i < lbCount; i++)
+                        yield return new SignaturePart(SignaturePartKind.ArrayLowerBound, ReadInt());
+                    yield break;
+                }
+
+                case CorElementType.ELEMENT_TYPE_GENERICINST:
+                {
+                    foreach (var p in EmitType())
+                        yield return p;
+                    uint argCount = ReadUInt();
+                    yield return new SignaturePart(SignaturePartKind.GenericInstArgCount, argCount);
+                    for (uint i = 0; i < argCount; i++)
+                        foreach (var p in EmitType())
+                            yield return p;
+                    yield break;
+                }
+
+                case CorElementType.ELEMENT_TYPE_FNPTR:
+                {
+                    byte sigHeader = ReadByte();
+                    yield return new SignaturePart(SignaturePartKind.FnPtrSigHeader, sigHeader);
+
+                    var header = new System.Reflection.Metadata.SignatureHeader(sigHeader);
+                    if (header.IsGeneric)
+                        yield return new SignaturePart(SignaturePartKind.FnPtrGenericParamCount, ReadUInt());
+
+                    uint paramCount = ReadUInt();
+                    yield return new SignaturePart(SignaturePartKind.FnPtrParamCount, paramCount);
+
+                    // Return type
+                    foreach (var p in EmitType())
+                        yield return p;
+
+                    for (uint i = 0; i < paramCount; i++)
                     {
-                        requiredParamCount = i;
-                        ReadElementType();
+                        while (PeekElementType() == CorElementType.ELEMENT_TYPE_SENTINEL)
+                        {
+                            ReadElementType();
+                            yield return new SignaturePart(SignaturePartKind.FnPtrSentinel, 0);
+                        }
+                        foreach (var p in EmitType())
+                            yield return p;
                     }
-                    paramTypes.Add(ParseType());
+                    yield break;
                 }
-                if (requiredParamCount == -1)
-                    requiredParamCount = paramCount;
 
-                var methodSig = new MethodSignature<R2RTypeNode>(sigHeader, returnType, requiredParamCount, genericParamCount, paramTypes.MoveToImmutable());
-                return new R2RFunctionPointerTypeNode(methodSig);
-            }
+                case CorElementType.ELEMENT_TYPE_CMOD_REQD:
+                case CorElementType.ELEMENT_TYPE_CMOD_OPT:
+                    yield return new SignaturePart(SignaturePartKind.TypeToken, ReadUInt());
+                    foreach (var p in EmitType())
+                        yield return p;
+                    yield break;
 
-            case CorElementType.ELEMENT_TYPE_CMOD_REQD:
-            {
-                var (kind, rid) = ReadTypeToken();
-                R2RTypeNode modifier = new R2RTokenTypeNode(_currentModuleIndex, kind, rid, false);
-                return new R2RModifiedTypeNode(modifier, ParseType(), isRequired: true);
-            }
-
-            case CorElementType.ELEMENT_TYPE_CMOD_OPT:
-            {
-                var (kind, rid) = ReadTypeToken();
-                R2RTypeNode modifier = new R2RTokenTypeNode(_currentModuleIndex, kind, rid, false);
-                return new R2RModifiedTypeNode(modifier, ParseType(), isRequired: false);
-            }
-
-            case CorElementType.ELEMENT_TYPE_PINNED:
-                return new R2RPinnedTypeNode(ParseType());
-
-            case CorElementType.ELEMENT_TYPE_CANON_ZAPSIG:
-                return R2RCanonTypeNode.Instance;
-
-            case CorElementType.ELEMENT_TYPE_MODULE_ZAPSIG:
-            {
-                int moduleIndex = (int)ReadUInt();
-                int savedModule = _currentModuleIndex;
-                _currentModuleIndex = moduleIndex;
-                R2RTypeNode innerType = ParseType();
-                _currentModuleIndex = savedModule;
-                return new R2RModuleQualifiedTypeNode(moduleIndex, innerType);
-            }
-
-            case CorElementType.ELEMENT_TYPE_VAR_ZAPSIG:
-                throw new BadImageFormatException("ELEMENT_TYPE_VAR_ZAPSIG not supported in structural decoder");
-
-            case CorElementType.ELEMENT_TYPE_NATIVE_VALUETYPE_ZAPSIG:
-                throw new BadImageFormatException("ELEMENT_TYPE_NATIVE_VALUETYPE_ZAPSIG not supported in structural decoder");
-
-            default:
-                throw new BadImageFormatException($"Unexpected element type: 0x{(byte)elemType:X2}");
-        }
-    }
-
-    // ── Method parsing ───────────────────────────────────────────────────
-
-    /// <summary>
-    /// Parse a method reference from the current position.
-    /// </summary>
-    public R2RMethodRef ParseMethod()
-    {
-        uint methodFlags = ReadUInt();
-
-        int moduleIndex = _currentModuleIndex;
-        if ((methodFlags & (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_UpdateContext) != 0)
-        {
-            moduleIndex = (int)ReadUInt();
-        }
-
-        // Save/restore module context for tokens within this method
-        int savedModule = _currentModuleIndex;
-        _currentModuleIndex = moduleIndex;
-
-        R2RTypeNode ownerType = null;
-        if ((methodFlags & (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_OwnerType) != 0)
-        {
-            ownerType = ParseType();
-        }
-
-        bool isMemberRef = (methodFlags & (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_MemberRefToken) != 0;
-
-        if ((methodFlags & (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_SlotInsteadOfToken) != 0)
-        {
-            throw new NotImplementedException("SlotInsteadOfToken");
-        }
-
-        int rid = (int)ReadUInt();
-
-        ImmutableArray<R2RTypeNode> typeArgs = ImmutableArray<R2RTypeNode>.Empty;
-        if ((methodFlags & (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_MethodInstantiation) != 0)
-        {
-            uint argCount = ReadUInt();
-            var args = ImmutableArray.CreateBuilder<R2RTypeNode>((int)argCount);
-            for (uint i = 0; i < argCount; i++)
-                args.Add(ParseType());
-            typeArgs = args.MoveToImmutable();
-        }
-
-        R2RTypeNode constrainedType = null;
-        if ((methodFlags & (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_Constrained) != 0)
-        {
-            constrainedType = ParseType();
-        }
-
-        _currentModuleIndex = savedModule;
-
-        // Extract the "prefix" flags that go on the method ref (Unboxing, Instantiating, Async)
-        var prefixFlags = (ReadyToRunMethodSigFlags)(methodFlags & (uint)(
-            ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_UnboxingStub |
-            ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_InstantiatingStub |
-            ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_AsyncVariant));
-
-        return new R2RMethodRef(prefixFlags, moduleIndex, ownerType, isMemberRef, rid, typeArgs, constrainedType);
-    }
-
-    // ── Field parsing ────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Parse a field reference from the current position.
-    /// </summary>
-    public R2RFieldRef ParseFieldRef()
-    {
-        uint flags = ReadUInt();
-        R2RTypeNode ownerType = null;
-        if ((flags & (uint)ReadyToRunFieldSigFlags.READYTORUN_FIELD_SIG_OwnerType) != 0)
-        {
-            ownerType = ParseType();
-        }
-
-        bool isMemberRef = (flags & (uint)ReadyToRunFieldSigFlags.READYTORUN_FIELD_SIG_MemberRefToken) != 0;
-        int rid = (int)ReadUInt();
-
-        return new R2RFieldRef((ReadyToRunFieldSigFlags)flags, ownerType, isMemberRef, rid);
-    }
-
-    // ── Fixup signature parsing ──────────────────────────────────────────
-
-    /// <summary>
-    /// Parse a complete fixup signature from the current position.
-    /// Reads the fixup kind byte, optional module override, and the kind-specific payload.
-    /// </summary>
-    public R2RFixupSignature ParseFixupSignature()
-    {
-        byte fixupByte = ReadByte();
-        bool moduleOverride = (fixupByte & (byte)ReadyToRunFixupKind.ModuleOverride) != 0;
-        var fixupKind = (ReadyToRunFixupKind)(fixupByte & ~(byte)ReadyToRunFixupKind.ModuleOverride);
-
-        int moduleIndex = -1;
-        if (moduleOverride)
-        {
-            moduleIndex = (int)ReadUInt();
-        }
-
-        // Set module context for the payload
-        int savedModule = _currentModuleIndex;
-        if (moduleIndex >= 0)
-            _currentModuleIndex = moduleIndex;
-
-        R2RFixupPayload payload = ParseFixupPayload(fixupKind);
-
-        _currentModuleIndex = savedModule;
-        return new R2RFixupSignature(fixupKind, moduleIndex, payload);
-    }
-
-    private R2RFixupPayload ParseFixupPayload(ReadyToRunFixupKind fixupKind)
-    {
-        switch (fixupKind)
-        {
-            // Dictionary lookups: optional context type + recursive inner signature
-            case ReadyToRunFixupKind.ThisObjDictionaryLookup:
-            {
-                R2RTypeNode lookupType = ParseType();
-                R2RFixupSignature inner = ParseFixupSignature();
-                return new R2RDictionaryLookupFixupPayload(lookupType, inner);
-            }
-
-            case ReadyToRunFixupKind.TypeDictionaryLookup:
-            case ReadyToRunFixupKind.MethodDictionaryLookup:
-            {
-                R2RFixupSignature inner = ParseFixupSignature();
-                return new R2RDictionaryLookupFixupPayload(null, inner);
-            }
-
-            // Type-based fixups
-            case ReadyToRunFixupKind.TypeHandle:
-            case ReadyToRunFixupKind.NewObject:
-            case ReadyToRunFixupKind.NewArray:
-            case ReadyToRunFixupKind.IsInstanceOf:
-            case ReadyToRunFixupKind.ChkCast:
-            case ReadyToRunFixupKind.CctorTrigger:
-            case ReadyToRunFixupKind.StaticBaseNonGC:
-            case ReadyToRunFixupKind.StaticBaseGC:
-            case ReadyToRunFixupKind.ThreadStaticBaseNonGC:
-            case ReadyToRunFixupKind.ThreadStaticBaseGC:
-            case ReadyToRunFixupKind.FieldBaseOffset:
-            case ReadyToRunFixupKind.TypeDictionary:
-            case ReadyToRunFixupKind.DeclaringTypeHandle:
-                return new R2RTypeFixupPayload(ParseType());
-
-            // Method-based fixups
-            case ReadyToRunFixupKind.MethodHandle:
-            case ReadyToRunFixupKind.MethodEntry:
-            case ReadyToRunFixupKind.VirtualEntry:
-            case ReadyToRunFixupKind.MethodDictionary:
-            case ReadyToRunFixupKind.IndirectPInvokeTarget:
-            case ReadyToRunFixupKind.PInvokeTarget:
-                return new R2RMethodFixupPayload(ParseMethod());
-
-            // Field-based fixups
-            case ReadyToRunFixupKind.FieldHandle:
-            case ReadyToRunFixupKind.FieldAddress:
-                return new R2RFieldFixupPayload(ParseFieldRef());
-
-            case ReadyToRunFixupKind.FieldOffset:
-                return new R2RFieldOffsetValueFixupPayload(ParseFieldRef());
-
-            // Token-only fixups (MethodDef or MemberRef RID)
-            case ReadyToRunFixupKind.MethodEntry_DefToken:
-            case ReadyToRunFixupKind.VirtualEntry_DefToken:
-                return new R2RTokenFixupPayload(isMemberRef: false, (int)ReadUInt());
-
-            case ReadyToRunFixupKind.MethodEntry_RefToken:
-            case ReadyToRunFixupKind.VirtualEntry_RefToken:
-                return new R2RTokenFixupPayload(isMemberRef: true, (int)ReadUInt());
-
-            // Slot-based virtual entry
-            case ReadyToRunFixupKind.VirtualEntry_Slot:
-            {
-                int slot = (int)ReadUInt();
-                R2RTypeNode type = ParseType();
-                return new R2RSlotFixupPayload(slot, type);
-            }
-
-            // Helper
-            case ReadyToRunFixupKind.Helper:
-                return new R2RHelperFixupPayload((ReadyToRunHelper)ReadUInt());
-
-            // String handle
-            case ReadyToRunFixupKind.StringHandle:
-                return new R2RStringFixupPayload((int)ReadUInt());
-
-            // Type layout checks
-            case ReadyToRunFixupKind.Check_TypeLayout:
-            case ReadyToRunFixupKind.Verify_TypeLayout:
-            case ReadyToRunFixupKind.ContinuationLayout:
-            {
-                R2RTypeNode type = ParseType();
-                return ParseTypeLayoutPayload(type);
-            }
-
-            // Resumption stub entry point
-            case ReadyToRunFixupKind.ResumptionStubEntryPoint:
-            {
-                int stubRva = _reader.ReadInt32(ref _offset);
-                return new R2RStubEntryPointFixupPayload(stubRva);
-            }
-
-            // Virtual function override checks
-            case ReadyToRunFixupKind.Check_VirtualFunctionOverride:
-            case ReadyToRunFixupKind.Verify_VirtualFunctionOverride:
-            {
-                uint flags = ReadUInt();
-                R2RMethodRef declaration = ParseMethod();
-                R2RTypeNode implType = ParseType();
-
-                R2RMethodRef implMethod = null;
-                if (((ReadyToRunVirtualFunctionOverrideFlags)flags).HasFlag(
-                    ReadyToRunVirtualFunctionOverrideFlags.VirtualFunctionOverridden))
+                case CorElementType.ELEMENT_TYPE_MODULE_ZAPSIG:
                 {
-                    implMethod = ParseMethod();
+                    yield return new SignaturePart(SignaturePartKind.ModuleZapSigIndex, ReadUInt());
+                    foreach (var p in EmitType())
+                        yield return p;
+                    yield break;
                 }
 
-                return new R2RVirtualOverrideFixupPayload(flags, declaration, implType, declaringTypeHandle: null, implMethod);
+                case CorElementType.ELEMENT_TYPE_VAR_ZAPSIG:
+                    throw new BadImageFormatException("ELEMENT_TYPE_VAR_ZAPSIG not supported in structural decoder");
+
+                case CorElementType.ELEMENT_TYPE_NATIVE_VALUETYPE_ZAPSIG:
+                    throw new BadImageFormatException("ELEMENT_TYPE_NATIVE_VALUETYPE_ZAPSIG not supported in structural decoder");
+
+                default:
+                    throw new BadImageFormatException($"Unexpected element type: 0x{(byte)elemType:X2}");
+            }
+        }
+
+        // ── Method signature ─────────────────────────────────────────────
+
+        public IEnumerable<SignaturePart> EmitMethod()
+        {
+            uint flags = ReadUInt();
+            yield return new SignaturePart(SignaturePartKind.MethodFlags, flags);
+
+            if ((flags & (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_UpdateContext) != 0)
+                yield return new SignaturePart(SignaturePartKind.MethodModuleOverride, ReadUInt());
+
+            if ((flags & (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_OwnerType) != 0)
+                foreach (var p in EmitType())
+                    yield return p;
+
+            if ((flags & (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_SlotInsteadOfToken) != 0)
+                throw new NotImplementedException("SlotInsteadOfToken");
+
+            yield return new SignaturePart(SignaturePartKind.MethodRid, ReadUInt());
+
+            if ((flags & (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_MethodInstantiation) != 0)
+            {
+                uint argCount = ReadUInt();
+                yield return new SignaturePart(SignaturePartKind.MethodTypeArgCount, argCount);
+                for (uint i = 0; i < argCount; i++)
+                    foreach (var p in EmitType())
+                        yield return p;
             }
 
-            // Field offset checks
-            case ReadyToRunFixupKind.Check_FieldOffset:
-            {
-                uint expectedOffset = ReadUInt();
-                R2RFieldRef field = ParseFieldRef();
-                return new R2RFieldOffsetFixupPayload(expectedOffset, field);
-            }
+            if ((flags & (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_Constrained) != 0)
+                foreach (var p in EmitType())
+                    yield return p;
+        }
 
-            case ReadyToRunFixupKind.Verify_FieldOffset:
-            {
-                uint expectedOffset = ReadUInt();
-                ReadUInt(); // second value
-                R2RFieldRef field = ParseFieldRef();
-                return new R2RFieldOffsetFixupPayload(expectedOffset, field);
-            }
+        // ── Field signature ──────────────────────────────────────────────
 
-            // Instruction set support check
-            case ReadyToRunFixupKind.Check_InstructionSetSupport:
+        public IEnumerable<SignaturePart> EmitField()
+        {
+            uint flags = ReadUInt();
+            yield return new SignaturePart(SignaturePartKind.FieldFlags, flags);
+
+            if ((flags & (uint)ReadyToRunFieldSigFlags.READYTORUN_FIELD_SIG_OwnerType) != 0)
+                foreach (var p in EmitType())
+                    yield return p;
+
+            yield return new SignaturePart(SignaturePartKind.FieldRid, ReadUInt());
+        }
+
+        // ── Fixup signature ──────────────────────────────────────────────
+
+        public IEnumerable<SignaturePart> EmitFixup()
+        {
+            byte fixupByte = ReadByte();
+            yield return new SignaturePart(SignaturePartKind.FixupKindByte, fixupByte);
+
+            bool moduleOverride = (fixupByte & (byte)ReadyToRunFixupKind.ModuleOverride) != 0;
+            var fixupKind = (ReadyToRunFixupKind)(fixupByte & ~(byte)ReadyToRunFixupKind.ModuleOverride);
+
+            if (moduleOverride)
+                yield return new SignaturePart(SignaturePartKind.FixupModuleOverride, ReadUInt());
+
+            foreach (var p in EmitFixupPayload(fixupKind))
+                yield return p;
+        }
+
+        private IEnumerable<SignaturePart> EmitFixupPayload(ReadyToRunFixupKind fixupKind)
+        {
+            switch (fixupKind)
             {
-                uint count = ReadUInt();
-                var supported = ImmutableArray.CreateBuilder<ushort>();
-                var unsupported = ImmutableArray.CreateBuilder<ushort>();
-                for (uint i = 0; i < count; i++)
+                case ReadyToRunFixupKind.ThisObjDictionaryLookup:
+                    foreach (var p in EmitType())
+                        yield return p;
+                    foreach (var p in EmitFixup())
+                        yield return p;
+                    yield break;
+
+                case ReadyToRunFixupKind.TypeDictionaryLookup:
+                case ReadyToRunFixupKind.MethodDictionaryLookup:
+                    foreach (var p in EmitFixup())
+                        yield return p;
+                    yield break;
+
+                case ReadyToRunFixupKind.TypeHandle:
+                case ReadyToRunFixupKind.NewObject:
+                case ReadyToRunFixupKind.NewArray:
+                case ReadyToRunFixupKind.IsInstanceOf:
+                case ReadyToRunFixupKind.ChkCast:
+                case ReadyToRunFixupKind.CctorTrigger:
+                case ReadyToRunFixupKind.StaticBaseNonGC:
+                case ReadyToRunFixupKind.StaticBaseGC:
+                case ReadyToRunFixupKind.ThreadStaticBaseNonGC:
+                case ReadyToRunFixupKind.ThreadStaticBaseGC:
+                case ReadyToRunFixupKind.FieldBaseOffset:
+                case ReadyToRunFixupKind.TypeDictionary:
+                case ReadyToRunFixupKind.DeclaringTypeHandle:
+                    foreach (var p in EmitType())
+                        yield return p;
+                    yield break;
+
+                case ReadyToRunFixupKind.MethodHandle:
+                case ReadyToRunFixupKind.MethodEntry:
+                case ReadyToRunFixupKind.VirtualEntry:
+                case ReadyToRunFixupKind.MethodDictionary:
+                case ReadyToRunFixupKind.IndirectPInvokeTarget:
+                case ReadyToRunFixupKind.PInvokeTarget:
+                    foreach (var p in EmitMethod())
+                        yield return p;
+                    yield break;
+
+                case ReadyToRunFixupKind.FieldHandle:
+                case ReadyToRunFixupKind.FieldAddress:
+                case ReadyToRunFixupKind.FieldOffset:
+                    foreach (var p in EmitField())
+                        yield return p;
+                    yield break;
+
+                case ReadyToRunFixupKind.MethodEntry_DefToken:
+                case ReadyToRunFixupKind.VirtualEntry_DefToken:
+                case ReadyToRunFixupKind.MethodEntry_RefToken:
+                case ReadyToRunFixupKind.VirtualEntry_RefToken:
+                    yield return new SignaturePart(SignaturePartKind.MethodRid, ReadUInt());
+                    yield break;
+
+                case ReadyToRunFixupKind.VirtualEntry_Slot:
+                    yield return new SignaturePart(SignaturePartKind.VirtualSlotIndex, ReadUInt());
+                    foreach (var p in EmitType())
+                        yield return p;
+                    yield break;
+
+                case ReadyToRunFixupKind.Helper:
+                    yield return new SignaturePart(SignaturePartKind.HelperId, ReadUInt());
+                    yield break;
+
+                case ReadyToRunFixupKind.StringHandle:
+                    yield return new SignaturePart(SignaturePartKind.UserStringToken, ReadUInt());
+                    yield break;
+
+                case ReadyToRunFixupKind.Check_TypeLayout:
+                case ReadyToRunFixupKind.Verify_TypeLayout:
+                case ReadyToRunFixupKind.ContinuationLayout:
+                    foreach (var p in EmitType())
+                        yield return p;
+                    foreach (var p in EmitTypeLayoutPayload())
+                        yield return p;
+                    yield break;
+
+                case ReadyToRunFixupKind.ResumptionStubEntryPoint:
+                    yield return new SignaturePart(SignaturePartKind.ResumptionStubRva, _reader.ReadInt32(ref _offset));
+                    yield break;
+
+                case ReadyToRunFixupKind.Check_VirtualFunctionOverride:
+                case ReadyToRunFixupKind.Verify_VirtualFunctionOverride:
                 {
-                    uint encoded = ReadUInt();
-                    ushort instructionSet = (ushort)(encoded >> 1);
-                    if ((encoded & 1) == 1)
-                        supported.Add(instructionSet);
-                    else
-                        unsupported.Add(instructionSet);
+                    uint flags = ReadUInt();
+                    yield return new SignaturePart(SignaturePartKind.VirtualOverrideFlags, flags);
+                    foreach (var p in EmitMethod())
+                        yield return p;
+                    foreach (var p in EmitType())
+                        yield return p;
+                    if (((ReadyToRunVirtualFunctionOverrideFlags)flags)
+                        .HasFlag(ReadyToRunVirtualFunctionOverrideFlags.VirtualFunctionOverridden))
+                    {
+                        foreach (var p in EmitMethod())
+                            yield return p;
+                    }
+                    yield break;
                 }
-                return new R2RInstructionSetFixupPayload(supported.ToImmutable(), unsupported.ToImmutable());
+
+                case ReadyToRunFixupKind.Check_FieldOffset:
+                    yield return new SignaturePart(SignaturePartKind.FieldExpectedOffset, ReadUInt());
+                    foreach (var p in EmitField())
+                        yield return p;
+                    yield break;
+
+                case ReadyToRunFixupKind.Verify_FieldOffset:
+                    yield return new SignaturePart(SignaturePartKind.FieldExpectedOffset, ReadUInt());
+                    yield return new SignaturePart(SignaturePartKind.VerifyFieldOffsetSecond, ReadUInt());
+                    foreach (var p in EmitField())
+                        yield return p;
+                    yield break;
+
+                case ReadyToRunFixupKind.Check_InstructionSetSupport:
+                {
+                    uint count = ReadUInt();
+                    yield return new SignaturePart(SignaturePartKind.InstructionSetCount, count);
+                    for (uint i = 0; i < count; i++)
+                        yield return new SignaturePart(SignaturePartKind.InstructionSetEncoded, ReadUInt());
+                    yield break;
+                }
+
+                case ReadyToRunFixupKind.DelegateCtor:
+                    foreach (var p in EmitMethod())
+                        yield return p;
+                    foreach (var p in EmitType())
+                        yield return p;
+                    yield break;
+
+                case ReadyToRunFixupKind.Check_IL_Body:
+                case ReadyToRunFixupKind.Verify_IL_Body:
+                {
+                    uint ilByteCount = ReadUInt();
+                    yield return new SignaturePart(SignaturePartKind.ILBodyByteCount, ilByteCount);
+                    byte[] ilBytes = new byte[ilByteCount];
+                    for (uint i = 0; i < ilByteCount; i++)
+                        ilBytes[i] = ReadByte();
+                    yield return new SignaturePart(SignaturePartKind.ILBodyBlob, ilBytes);
+
+                    uint typeCount = ReadUInt();
+                    yield return new SignaturePart(SignaturePartKind.ILBodyTypeCount, typeCount);
+                    for (uint i = 0; i < typeCount; i++)
+                        foreach (var p in EmitType())
+                            yield return p;
+
+                    foreach (var p in EmitMethod())
+                        yield return p;
+                    yield break;
+                }
+
+                default:
+                    yield break;
             }
-
-            // Delegate constructor
-            case ReadyToRunFixupKind.DelegateCtor:
-            {
-                R2RMethodRef targetMethod = ParseMethod();
-                R2RTypeNode delegateType = ParseType();
-                return new R2RDelegateCtorFixupPayload(targetMethod, delegateType);
-            }
-
-            // IL body checks
-            case ReadyToRunFixupKind.Check_IL_Body:
-            case ReadyToRunFixupKind.Verify_IL_Body:
-            {
-                uint ilByteCount = ReadUInt();
-                byte[] ilBytes = new byte[ilByteCount];
-                for (uint i = 0; i < ilByteCount; i++)
-                    ilBytes[i] = ReadByte();
-
-                uint typeCount = ReadUInt();
-                var types = ImmutableArray.CreateBuilder<R2RTypeNode>((int)typeCount);
-                for (uint i = 0; i < typeCount; i++)
-                    types.Add(ParseType());
-
-                R2RMethodRef method = ParseMethod();
-                return new R2RILBodyFixupPayload(method, ilBytes.ToImmutableArray(), types.MoveToImmutable());
-            }
-
-            default:
-                return R2REmptyFixupPayload.Instance;
         }
-    }
 
-    private R2RTypeLayoutFixupPayload ParseTypeLayoutPayload(R2RTypeNode type)
-    {
-        var layoutFlags = (ReadyToRunTypeLayoutFlags)ReadUInt();
-        uint size = ReadUInt();
-
-        byte hfaType = 0;
-        if (layoutFlags.HasFlag(ReadyToRunTypeLayoutFlags.READYTORUN_LAYOUT_HFA))
+        private IEnumerable<SignaturePart> EmitTypeLayoutPayload()
         {
-            hfaType = (byte)ReadUInt();
-        }
+            uint flags = ReadUInt();
+            yield return new SignaturePart(SignaturePartKind.TypeLayoutFlags, flags);
 
-        uint alignment = 0;
-        if (layoutFlags.HasFlag(ReadyToRunTypeLayoutFlags.READYTORUN_LAYOUT_Alignment))
-        {
-            if (!layoutFlags.HasFlag(ReadyToRunTypeLayoutFlags.READYTORUN_LAYOUT_Alignment_Native))
+            uint size = ReadUInt();
+            yield return new SignaturePart(SignaturePartKind.TypeLayoutSize, size);
+
+            var layoutFlags = (ReadyToRunTypeLayoutFlags)flags;
+
+            if (layoutFlags.HasFlag(ReadyToRunTypeLayoutFlags.READYTORUN_LAYOUT_HFA))
+                yield return new SignaturePart(SignaturePartKind.TypeLayoutHfaType, ReadByte());
+
+            if (layoutFlags.HasFlag(ReadyToRunTypeLayoutFlags.READYTORUN_LAYOUT_Alignment)
+                && !layoutFlags.HasFlag(ReadyToRunTypeLayoutFlags.READYTORUN_LAYOUT_Alignment_Native))
             {
-                alignment = ReadUInt();
+                yield return new SignaturePart(SignaturePartKind.TypeLayoutAlignment, ReadUInt());
             }
-        }
 
-        var gcLayout = ImmutableArray<byte>.Empty;
-        if (layoutFlags.HasFlag(ReadyToRunTypeLayoutFlags.READYTORUN_LAYOUT_GCLayout))
-        {
-            if (!layoutFlags.HasFlag(ReadyToRunTypeLayoutFlags.READYTORUN_LAYOUT_GCLayout_Empty))
+            if (layoutFlags.HasFlag(ReadyToRunTypeLayoutFlags.READYTORUN_LAYOUT_GCLayout)
+                && !layoutFlags.HasFlag(ReadyToRunTypeLayoutFlags.READYTORUN_LAYOUT_GCLayout_Empty))
             {
                 int cbGCRefMap = ((int)size / _targetPointerSize + 7) / 8;
-                var builder = ImmutableArray.CreateBuilder<byte>(cbGCRefMap);
+                byte[] blob = new byte[cbGCRefMap];
                 for (int i = 0; i < cbGCRefMap; i++)
-                    builder.Add(ReadByte());
-                gcLayout = builder.MoveToImmutable();
+                    blob[i] = ReadByte();
+                yield return new SignaturePart(SignaturePartKind.TypeLayoutGcRefBlob, blob);
             }
         }
-
-        return new R2RTypeLayoutFixupPayload(type, size, alignment, layoutFlags, hfaType, gcLayout);
     }
 }

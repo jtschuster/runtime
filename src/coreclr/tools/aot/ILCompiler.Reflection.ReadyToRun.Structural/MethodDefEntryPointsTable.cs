@@ -38,57 +38,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
                 if (!methodEntryPoints.TryGetAt(rid - 1, ref offset))
                     continue;
 
-                uint id = 0;
-                offset = (int)_nativeReader.DecodeUnsigned((uint)offset, ref id);
-
-                int? fixupOffset = null;
-                RuntimeFunctionIndex runtimeFunctionIndex;
-
-                if ((id & 1) != 0)
-                {
-                    if ((id & 2) != 0)
-                    {
-                        uint val = 0;
-                        _nativeReader.DecodeUnsigned((uint)offset, ref val);
-                        offset -= (int)val;
-                    }
-
-                    fixupOffset = offset;
-                    runtimeFunctionIndex = (RuntimeFunctionIndex)(id >> 2);
-                }
-                else
-                {
-                    runtimeFunctionIndex = (RuntimeFunctionIndex)(id >> 1);
-                }
-
-                var fixupCells = new List<FixupCellRef>();
-                if (fixupOffset.HasValue)
-                {
-                    NibbleReader nibbleReader = new NibbleReader(_nativeReader, fixupOffset.Value);
-                    uint curTableIndex = nibbleReader.ReadUInt();
-
-                    while (true)
-                    {
-                        uint cellIndex = nibbleReader.ReadUInt();
-
-                        while (true)
-                        {
-                            fixupCells.Add(new FixupCellRef(curTableIndex, cellIndex));
-
-                            uint delta = nibbleReader.ReadUInt();
-                            if (delta == 0)
-                                break;
-
-                            cellIndex += delta;
-                        }
-
-                        uint tableDelta = nibbleReader.ReadUInt();
-                        if (tableDelta == 0)
-                            break;
-
-                        curTableIndex += tableDelta;
-                    }
-                }
+                (RuntimeFunctionIndex runtimeFunctionIndex, List<FixupCellRef> fixupCells) = DecodeRuntimeFunctionIdAndFixupCells(offset);
 
                 entries.Add(new MethodDefEntry(rid, runtimeFunctionIndex, fixupCells));
             }

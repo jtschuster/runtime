@@ -237,8 +237,8 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural
         public R2RFixupSignature DecodeFixupSignature(int signatureRva)
         {
             int offset = _platformBinaryReader.GetOffset(signatureRva);
-            var decoder = new RawSignatureDecoder(_nativeReader, offset, TargetPointerSize);
-            return decoder.ParseFixupSignature();
+            R2RSignature signature = RawSignatureDecoder.DecodeFixupSignature(_nativeReader, offset, TargetPointerSize);
+            return R2RFixupSignature.FromSignature(signature);
         }
     }
 }

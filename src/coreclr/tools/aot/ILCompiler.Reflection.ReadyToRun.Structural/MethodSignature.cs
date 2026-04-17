@@ -13,7 +13,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural;
 /// Structural representation of a method reference in an R2R signature.
 /// Stores the raw token and flags without resolving method names from metadata.
 /// </summary>
-public sealed class R2RMethodRef
+public sealed partial class MethodSignature
 {
     /// <summary>
     /// Flags from the method signature encoding.
@@ -52,7 +52,7 @@ public sealed class R2RMethodRef
     /// </summary>
     public R2RTypeNode ConstrainedType { get; }
 
-    public R2RMethodRef(
+    public MethodSignature(
         ReadyToRunMethodSigFlags flags,
         int moduleIndex,
         R2RTypeNode ownerType,

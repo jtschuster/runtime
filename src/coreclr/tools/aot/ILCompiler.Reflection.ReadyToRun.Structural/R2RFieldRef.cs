@@ -12,7 +12,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural;
 /// Structural representation of a field reference in an R2R signature.
 /// Stores the raw token and flags without resolving field names from metadata.
 /// </summary>
-public sealed class R2RFieldRef
+public sealed partial class R2RFieldRef
 {
     /// <summary>
     /// Flags from the field signature encoding.

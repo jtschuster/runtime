@@ -13,7 +13,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Structural;
 /// Structural representation of a type signature in an R2R image.
 /// Stores raw tokens (module index, handle kind, RID) without metadata name resolution.
 /// </summary>
-public abstract class R2RTypeNode
+public abstract partial class R2RTypeNode
 {
     public abstract R2RTypeNodeKind Kind { get; }
 

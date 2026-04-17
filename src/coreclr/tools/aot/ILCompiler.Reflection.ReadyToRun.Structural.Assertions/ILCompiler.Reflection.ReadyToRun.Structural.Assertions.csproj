@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>$(NetCoreAppCurrent)</TargetFramework>
+    <NoWarn>$(NoWarn);8002;NU1701</NoWarn>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <AnalysisLevel>none</AnalysisLevel>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ILCompiler.Reflection.ReadyToRun.Structural\ILCompiler.Reflection.ReadyToRun.Structural.csproj" />
+  </ItemGroup>
+</Project>
