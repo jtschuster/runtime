@@ -23,7 +23,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
     public partial class ReadyToRunReader
     {
-        public AvailableTypesTable GetAvailableTypesTable(ReadyToRunSectionHandle section)
+        public AvailableTypesTable GetAvailableTypesTable(ReadyToRunSection section)
         {
             int sectionOffset = GetOffsetForRVA(section.RelativeVirtualAddress);
             NativeParser parser = new NativeParser(_nativeReader, (uint)sectionOffset);

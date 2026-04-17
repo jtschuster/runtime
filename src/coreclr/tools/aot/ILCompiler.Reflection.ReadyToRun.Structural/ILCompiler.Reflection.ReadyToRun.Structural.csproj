@@ -26,6 +26,8 @@
          BaseUnwindInfo/BaseGcSlot/etc. hierarchy that Structural redeclares in its own
          namespace (see BaseInfoTypes.cs). -->
     <Compile Include="..\ILCompiler.Reflection.ReadyToRun\DebugInfoTypes.cs" Link="DebugInfoTypes.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\OperatingSystem.cs" Link="OperatingSystem.cs" />
+    <Compile Include="..\ILCompiler.Reflection.ReadyToRun\CorExceptionFlag.cs" Link="CorExceptionFlag.cs" />
     <Compile Include="..\ILCompiler.Reflection.ReadyToRun\PEReaderExtensions.cs" Link="PEReaderExtensions.cs" />
     <Compile Include="..\ILCompiler.Reflection.ReadyToRun\NativeArray.cs" Link="NativeArray.cs" />
     <Compile Include="..\ILCompiler.Reflection.ReadyToRun\NativeHashtable.cs" Link="NativeHashtable.cs" />

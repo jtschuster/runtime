@@ -22,7 +22,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
     public partial class ReadyToRunReader
     {
-        public DebugInfoTable GetDebugInfoTable(ReadyToRunSectionHandle section)
+        public DebugInfoTable GetDebugInfoTable(ReadyToRunSection section)
         {
             int sectionOffset = GetOffsetForRVA(section.RelativeVirtualAddress);
             NativeArray debugInfoArray = new NativeArray(_nativeReader, (uint)sectionOffset);

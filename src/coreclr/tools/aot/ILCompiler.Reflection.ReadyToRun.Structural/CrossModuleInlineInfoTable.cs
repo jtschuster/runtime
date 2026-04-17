@@ -25,7 +25,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
     public partial class ReadyToRunReader
     {
-        public CrossModuleInlineInfoTable GetCrossModuleInlineInfoTable(ReadyToRunSectionHandle section)
+        public CrossModuleInlineInfoTable GetCrossModuleInlineInfoTable(ReadyToRunSection section)
         {
             bool multiModuleFormat = (ReadyToRunHeader.Flags & (uint)ReadyToRunFlags.READYTORUN_FLAG_MultiModuleVersionBubble) != 0;
 

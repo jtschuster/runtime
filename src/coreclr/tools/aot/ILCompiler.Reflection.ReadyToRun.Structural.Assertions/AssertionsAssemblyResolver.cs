@@ -53,7 +53,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Assertions
 
             if (startAtTwo)
             {
-                ReadyToRunSectionHandle? manifestHandle = null;
+                ReadyToRunSection? manifestHandle = null;
                 foreach (var s in reader.GetSections())
                 {
                     if (s.Type == ReadyToRunSectionType.ManifestMetadata)
@@ -141,7 +141,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Assertions
                 ? 0
                 : mainMetadata.GetTableRowCount(TableIndex.AssemblyRef);
 
-            ReadyToRunSectionHandle? manifestHandle = null;
+            ReadyToRunSection? manifestHandle = null;
             foreach (var s in reader.GetSections())
             {
                 if (s.Type == ReadyToRunSectionType.ManifestMetadata)

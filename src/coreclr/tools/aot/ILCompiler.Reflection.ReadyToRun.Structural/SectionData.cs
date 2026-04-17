@@ -16,7 +16,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         public ReadyToRunSectionType Type { get; }
 
         /// <summary>Relative virtual address of the section.</summary>
-        public SectionRva RelativeVirtualAddress { get; }
+        public ImageRVA RelativeVirtualAddress { get; }
 
         /// <summary>Size of the section in bytes.</summary>
         public int Size { get; }
@@ -24,7 +24,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         /// <summary>File offset of the section within the image.</summary>
         public int FileOffset { get; }
 
-        public SectionData(ReadyToRunSectionType type, SectionRva rva, int size, int fileOffset)
+        public SectionData(ReadyToRunSectionType type, ImageRVA rva, int size, int fileOffset)
         {
             Type = type;
             RelativeVirtualAddress = rva;

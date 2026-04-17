@@ -23,7 +23,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
     public partial class ReadyToRunReader
     {
-        public InliningInfoTable GetInliningInfoTable(ReadyToRunSectionHandle section)
+        public InliningInfoTable GetInliningInfoTable(ReadyToRunSection section)
         {
             int startOffset = GetOffsetForRVA(section.RelativeVirtualAddress);
             int offset = startOffset;

@@ -22,7 +22,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
     public partial class ReadyToRunReader
     {
-        public ExceptionInfoTable GetExceptionInfoTable(ReadyToRunSectionHandle section)
+        public ExceptionInfoTable GetExceptionInfoTable(ReadyToRunSection section)
         {
             int offset = GetOffsetForRVA(section.RelativeVirtualAddress);
             int length = section.Size;

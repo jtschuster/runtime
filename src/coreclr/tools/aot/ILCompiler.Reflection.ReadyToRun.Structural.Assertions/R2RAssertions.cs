@@ -165,7 +165,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Assertions
 
         public bool HasCrossModuleInliningInfo(out string reason)
         {
-            foreach (ReadyToRunSectionHandle s in _reader.GetSections())
+            foreach (ReadyToRunSection s in _reader.GetSections())
             {
                 if (s.Type == ReadyToRunSectionType.CrossModuleInlineInfo)
                 {
@@ -181,7 +181,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Assertions
         public bool HasCrossModuleInlinedMethod(string inlinerMethodName, string inlineeMethodName, out string reason)
         {
             var observed = new List<string>();
-            foreach (ReadyToRunSectionHandle s in _reader.GetSections())
+            foreach (ReadyToRunSection s in _reader.GetSections())
             {
                 if (s.Type != ReadyToRunSectionType.CrossModuleInlineInfo)
                     continue;
@@ -214,7 +214,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Assertions
                 reason = "expectedInlinerNames is empty";
                 return false;
             }
-            foreach (ReadyToRunSectionHandle s in _reader.GetSections())
+            foreach (ReadyToRunSection s in _reader.GetSections())
             {
                 if (s.Type != ReadyToRunSectionType.CrossModuleInlineInfo)
                     continue;
@@ -347,7 +347,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Assertions
 
         private IEnumerable<(string inliner, string inlinee)> EnumerateInliningPairs()
         {
-            foreach (ReadyToRunSectionHandle s in _reader.GetSections())
+            foreach (ReadyToRunSection s in _reader.GetSections())
             {
                 switch (s.Type)
                 {
@@ -391,7 +391,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Assertions
             }
         }
 
-        private IEnumerable<(string inliner, string inlinee)> EnumerateInliningInfo2Pairs(ReadyToRunSectionHandle section, int ownerModuleIndex)
+        private IEnumerable<(string inliner, string inlinee)> EnumerateInliningInfo2Pairs(ReadyToRunSection section, int ownerModuleIndex)
         {
             InliningInfo2Table table = _reader.GetInliningInfo2Table(section);
             foreach (InliningInfo2Entry entry in table.Entries)
@@ -409,8 +409,8 @@ namespace ILCompiler.Reflection.ReadyToRun.Assertions
 
         private IEnumerable<(string inliner, string inlinee)> EnumeratePerComponentInliningInfo2()
         {
-            ReadyToRunSectionHandle? componentAssembliesHandle = null;
-            foreach (ReadyToRunSectionHandle s in _reader.GetSections())
+            ReadyToRunSection? componentAssembliesHandle = null;
+            foreach (ReadyToRunSection s in _reader.GetSections())
             {
                 if (s.Type == ReadyToRunSectionType.ComponentAssemblies)
                 {
@@ -439,7 +439,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Assertions
                     continue;
                 }
 
-                foreach (ReadyToRunSectionHandle cs in coreHeader.Sections)
+                foreach (ReadyToRunSection cs in coreHeader.Sections)
                 {
                     if (cs.Type == ReadyToRunSectionType.InliningInfo2)
                     {

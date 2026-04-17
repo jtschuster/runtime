@@ -48,7 +48,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
     public partial class ReadyToRunReader
     {
-        public TypeGenericInfoMapTable GetTypeGenericInfoMapTable(ReadyToRunSectionHandle section)
+        public TypeGenericInfoMapTable GetTypeGenericInfoMapTable(ReadyToRunSection section)
         {
             int offset = GetOffsetForRVA(section.RelativeVirtualAddress);
             int count = _nativeReader.ReadInt32(ref offset);

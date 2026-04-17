@@ -23,7 +23,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
     public partial class ReadyToRunReader
     {
-        public PgoInstrumentationDataTable GetPgoInstrumentationDataTable(ReadyToRunSectionHandle section)
+        public PgoInstrumentationDataTable GetPgoInstrumentationDataTable(ReadyToRunSection section)
         {
             int sectionOffset = GetOffsetForRVA(section.RelativeVirtualAddress);
             NativeParser parser = new NativeParser(_nativeReader, (uint)sectionOffset);

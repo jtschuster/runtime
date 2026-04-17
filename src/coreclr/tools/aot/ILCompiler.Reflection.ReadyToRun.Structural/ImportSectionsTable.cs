@@ -75,7 +75,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
     public partial class ReadyToRunReader
     {
-        public ImportSectionsTableSection GetImportSectionsTableSection(ReadyToRunSectionHandle section)
+        public ImportSectionsTableSection GetImportSectionsTableSection(ReadyToRunSection section)
         {
             int offset = this.GetOffsetForRVA(section.RelativeVirtualAddress);
             int endOffset = offset + section.Size;

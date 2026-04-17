@@ -7,7 +7,7 @@ using Internal.Runtime;
 
 namespace ILCompiler.Reflection.ReadyToRun
 {
-    public struct ReadyToRunSectionHandle
+    public struct ReadyToRunSection
     {
         /// <summary>
         /// The ReadyToRun section type
@@ -17,14 +17,14 @@ namespace ILCompiler.Reflection.ReadyToRun
         /// <summary>
         /// The RVA to the section
         /// </summary>
-        public SectionRva RelativeVirtualAddress { get; set; }
+        public ImageRVA RelativeVirtualAddress { get; set; }
 
         /// <summary>
         /// The size of the section
         /// </summary>
         public int Size { get; set; }
 
-        public ReadyToRunSectionHandle(ReadyToRunSectionType type, SectionRva rva, int size)
+        public ReadyToRunSection(ReadyToRunSectionType type, ImageRVA rva, int size)
         {
             Type = type;
             RelativeVirtualAddress = rva;
@@ -38,5 +38,5 @@ namespace ILCompiler.Reflection.ReadyToRun
     }
 
     /// <summary>Opaque handle representing an RVA pointing to the start of a ReadyToRun section.</summary>
-    public enum SectionRva {}
+    public enum ImageRVA {}
 }

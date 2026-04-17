@@ -41,7 +41,7 @@ internal sealed class MethodInventory
 
         // Walk image-wide sections
         bool foundImageWideMethodDef = false;
-        foreach (ReadyToRunSectionHandle section in reader.GetSections())
+        foreach (ReadyToRunSection section in reader.GetSections())
         {
             switch (section.Type)
             {
@@ -75,7 +75,7 @@ internal sealed class MethodInventory
     private static List<ImportSectionSignatures> BuildImportSectionSignatures(StructuralReader reader, NativeReader nativeReader)
     {
         var sections = new List<ImportSectionSignatures>();
-        foreach (ReadyToRunSectionHandle sectionHandle in reader.GetSections())
+        foreach (ReadyToRunSection sectionHandle in reader.GetSections())
         {
             if (sectionHandle.Type != ReadyToRunSectionType.ImportSections)
                 continue;
@@ -115,7 +115,7 @@ internal sealed class MethodInventory
     private static void AddMethodDefEntries(
         StructuralReader reader,
         AssertionsAssemblyResolver resolver,
-        ReadyToRunSectionHandle section,
+        ReadyToRunSection section,
         int moduleIndex,
         IReadOnlyList<ImportSectionSignatures> importSections,
         List<MethodInventoryEntry> output)
@@ -154,8 +154,8 @@ internal sealed class MethodInventory
         IReadOnlyList<ImportSectionSignatures> importSections,
         List<MethodInventoryEntry> output)
     {
-        ReadyToRunSectionHandle? componentAssembliesHandle = null;
-        foreach (ReadyToRunSectionHandle s in reader.GetSections())
+        ReadyToRunSection? componentAssembliesHandle = null;
+        foreach (ReadyToRunSection s in reader.GetSections())
         {
             if (s.Type == ReadyToRunSectionType.ComponentAssemblies)
             {
@@ -186,7 +186,7 @@ internal sealed class MethodInventory
                 continue;
             }
 
-            foreach (ReadyToRunSectionHandle section in coreHeader.Sections)
+            foreach (ReadyToRunSection section in coreHeader.Sections)
             {
                 if (section.Type == ReadyToRunSectionType.MethodDefEntryPoints)
                 {
@@ -202,7 +202,7 @@ internal sealed class MethodInventory
         StructuralReader reader,
         NativeReader nativeReader,
         AssertionsAssemblyResolver resolver,
-        ReadyToRunSectionHandle section,
+        ReadyToRunSection section,
         IReadOnlyList<ImportSectionSignatures> importSections,
         List<MethodInventoryEntry> output)
     {

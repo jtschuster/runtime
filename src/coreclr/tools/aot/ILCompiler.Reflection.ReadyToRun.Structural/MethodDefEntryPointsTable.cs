@@ -24,7 +24,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
     public partial class ReadyToRunReader
     {
-        public MethodDefEntryPointsTable GetMethodDefEntryPointsTable(ReadyToRunSectionHandle section)
+        public MethodDefEntryPointsTable GetMethodDefEntryPointsTable(ReadyToRunSection section)
         {
             int sectionOffset = GetOffsetForRVA(section.RelativeVirtualAddress);
             NativeArray methodEntryPoints = new NativeArray(_nativeReader, (uint)sectionOffset);

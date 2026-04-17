@@ -39,7 +39,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
     public partial class ReadyToRunReader
     {
-        public MethodIsGenericMapTable GetMethodIsGenericMapTable(ReadyToRunSectionHandle section)
+        public MethodIsGenericMapTable GetMethodIsGenericMapTable(ReadyToRunSection section)
         {
             int offset = GetOffsetForRVA(section.RelativeVirtualAddress);
             int count = _nativeReader.ReadInt32(ref offset);

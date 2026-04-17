@@ -23,7 +23,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
     public partial class ReadyToRunReader
     {
-        public RuntimeFunctionsTable GetRuntimeFunctionsTable(ReadyToRunSectionHandle section)
+        public RuntimeFunctionsTable GetRuntimeFunctionsTable(ReadyToRunSection section)
         {
             int offset = GetOffsetForRVA(section.RelativeVirtualAddress);
             int entrySize = CalculateRuntimeFunctionSize();

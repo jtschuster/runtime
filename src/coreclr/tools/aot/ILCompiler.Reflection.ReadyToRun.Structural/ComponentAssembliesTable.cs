@@ -22,7 +22,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
     public partial class ReadyToRunReader
     {
-        public ComponentAssembliesTable GetComponentAssembliesTable(ReadyToRunSectionHandle section)
+        public ComponentAssembliesTable GetComponentAssembliesTable(ReadyToRunSection section)
         {
             int offset = GetOffsetForRVA(section.RelativeVirtualAddress);
             int count = section.Size / ComponentAssembly.Size;

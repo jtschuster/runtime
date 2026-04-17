@@ -23,7 +23,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
     public partial class ReadyToRunReader
     {
-        public HotColdMapTable GetHotColdMapTable(ReadyToRunSectionHandle section)
+        public HotColdMapTable GetHotColdMapTable(ReadyToRunSection section)
         {
             int offset = GetOffsetForRVA(section.RelativeVirtualAddress);
             int count = section.Size / (2 * sizeof(int));

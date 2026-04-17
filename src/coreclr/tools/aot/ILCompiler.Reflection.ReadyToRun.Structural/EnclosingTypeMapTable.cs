@@ -36,7 +36,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
     public partial class ReadyToRunReader
     {
-        public EnclosingTypeMapTable GetEnclosingTypeMapTable(ReadyToRunSectionHandle section)
+        public EnclosingTypeMapTable GetEnclosingTypeMapTable(ReadyToRunSection section)
         {
             int offset = GetOffsetForRVA(section.RelativeVirtualAddress);
             ushort count = _nativeReader.ReadUInt16(ref offset);

@@ -115,12 +115,12 @@ namespace ILCompiler.Reflection.ReadyToRun
         public int GetOffsetForRVA(int rva) => _platformBinaryReader.GetOffset(rva);
 
         /// <summary>Get the file offset corresponding to a section RVA.</summary>
-        public int GetOffsetForRVA(SectionRva rva) => _platformBinaryReader.GetOffset((int)rva);
+        public int GetOffsetForRVA(ImageRVA rva) => _platformBinaryReader.GetOffset((int)rva);
 
         /// <summary>
         /// All section handles from the global R2R header.
         /// </summary>
-        public IReadOnlyList<ReadyToRunSectionHandle> GetSections() => GetHeader().Sections;
+        public IReadOnlyList<ReadyToRunSection> GetSections() => GetHeader().Sections;
 
         public ReadyToRunHeader GetHeader()
         {
@@ -137,7 +137,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         }
 
         /// <summary>Gets the compiler identifier string from a CompilerIdentifier section.</summary>
-        public string GetCompilerIdentifier(ReadyToRunSectionHandle section)
+        public string GetCompilerIdentifier(ReadyToRunSection section)
         {
             if (section.Size <= 1)
                 return string.Empty;
@@ -151,7 +151,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         }
 
         /// <summary>Gets the owner composite executable filename from an OwnerCompositeExecutable section.</summary>
-        public string GetOwnerCompositeExecutable(ReadyToRunSectionHandle section)
+        public string GetOwnerCompositeExecutable(ReadyToRunSection section)
         {
             if (section.Size <= 1)
                 return string.Empty;
@@ -180,7 +180,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         /// Returns a MetadataReader for the ManifestMetadata module.
         /// The ReadyToRunReader must remain alive and undisposed while the returned reader is in use.
         /// </summary>
-        public MetadataReader GetManifestMetadataReader(ReadyToRunSectionHandle manifestSection)
+        public MetadataReader GetManifestMetadataReader(ReadyToRunSection manifestSection)
         {
             int manifestOffset = GetOffsetForRVA(manifestSection.RelativeVirtualAddress);
             int manifestSize = manifestSection.Size;

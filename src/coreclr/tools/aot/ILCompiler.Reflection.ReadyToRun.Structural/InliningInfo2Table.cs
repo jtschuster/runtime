@@ -30,7 +30,7 @@ namespace ILCompiler.Reflection.ReadyToRun
 
     public partial class ReadyToRunReader
     {
-        public InliningInfo2Table GetInliningInfo2Table(ReadyToRunSectionHandle section)
+        public InliningInfo2Table GetInliningInfo2Table(ReadyToRunSection section)
         {
             int sectionOffset = GetOffsetForRVA(section.RelativeVirtualAddress);
             NativeParser parser = new NativeParser(_nativeReader, (uint)sectionOffset);

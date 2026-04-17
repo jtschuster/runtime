@@ -19,9 +19,9 @@ namespace ILCompiler.Reflection.ReadyToRun
         public uint Flags { get; }
 
         /// <summary>The ReadyToRun section handles.</summary>
-        public IReadOnlyList<ReadyToRunSectionHandle> Sections { get; }
+        public IReadOnlyList<ReadyToRunSection> Sections { get; }
 
-        public ReadyToRunCoreHeader(uint flags, IReadOnlyList<ReadyToRunSectionHandle> sections)
+        public ReadyToRunCoreHeader(uint flags, IReadOnlyList<ReadyToRunSection> sections)
         {
             Flags = flags;
             Sections = sections;
@@ -60,10 +60,10 @@ namespace ILCompiler.Reflection.ReadyToRun
         /// <summary>
         /// The ReadyToRun section RVAs and sizes
         /// </summary>
-        public IReadOnlyList<ReadyToRunSectionHandle> Sections { get; private set; }
+        public IReadOnlyList<ReadyToRunSection> Sections { get; private set; }
 
 
-        public ReadyToRunHeader(uint signature, ushort majorVersion, ushort minorVersion, uint flags, IReadOnlyList<ReadyToRunSectionHandle> sections)
+        public ReadyToRunHeader(uint signature, ushort majorVersion, ushort minorVersion, uint flags, IReadOnlyList<ReadyToRunSection> sections)
         {
             Signature = signature;
             MajorVersion = majorVersion;
@@ -127,7 +127,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         {
             uint flags = _nativeReader.ReadUInt32(ref curOffset);
             int nSections = _nativeReader.ReadInt32(ref curOffset);
-            var sections = new List<ReadyToRunSectionHandle>(nSections);
+            var sections = new List<ReadyToRunSection>(nSections);
 
             for (int i = 0; i < nSections; i++)
             {
@@ -139,7 +139,7 @@ namespace ILCompiler.Reflection.ReadyToRun
                 }
                 int sectionStartRva = _nativeReader.ReadInt32(ref curOffset);
                 int sectionLength = _nativeReader.ReadInt32(ref curOffset);
-                sections.Add(new ReadyToRunSectionHandle(sectionType, (SectionRva)sectionStartRva, sectionLength));
+                sections.Add(new ReadyToRunSection(sectionType, (ImageRVA)sectionStartRva, sectionLength));
             }
             return new ReadyToRunCoreHeader(flags, sections);
         }
