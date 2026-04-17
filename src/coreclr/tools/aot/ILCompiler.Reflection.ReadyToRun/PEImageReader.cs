@@ -81,7 +81,7 @@ namespace ILCompiler.Reflection.ReadyToRun
             => _peReader.HasMetadata ? new StandaloneAssemblyMetadata(_peReader) : null;
 
         public IAssemblyMetadata GetManifestAssemblyMetadata(System.Reflection.Metadata.MetadataReader manifestReader)
-            => new ManifestAssemblyMetadata(_peReader, manifestReader);
+            => new ManifestAssemblyMetadata(manifestReader);
 
         public void DumpImageInformation(TextWriter writer)
         {

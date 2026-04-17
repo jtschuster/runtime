@@ -2,9 +2,6 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.IO;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Runtime.CompilerServices;
@@ -14,9 +11,9 @@ using ILCompiler.Reflection.ReadyToRun;
 namespace ILCompiler.Reflection.ReadyToRun.MachO
 {
     /// <summary>
-    /// Wrapper around Mach-O file that implements IBinaryImageReader
+    /// Wrapper around a Mach-O image that implements <see cref="IPlatformBinaryReader"/>.
     /// </summary>
-    public class MachOImageReader : IBinaryImageReader, IDisposable
+    public class MachOImageReader : IPlatformBinaryReader
     {
         private readonly byte[] _image;
         private readonly MachHeader _header;
@@ -24,8 +21,6 @@ namespace ILCompiler.Reflection.ReadyToRun.MachO
         private readonly GCHandle _pinnedArray;
 
         public Machine Machine { get; }
-        public OperatingSystem OperatingSystem => OperatingSystem.Apple;
-        public ulong ImageBase => 0;
 
         public MachOImageReader(byte[] image)
         {
@@ -59,9 +54,6 @@ namespace ILCompiler.Reflection.ReadyToRun.MachO
                 _pinnedArray.Free();
             }
         }
-
-        public ImmutableArray<byte> GetEntireImage()
-            => Unsafe.As<byte[], ImmutableArray<byte>>(ref Unsafe.AsRef(in _image));
 
         public int GetOffset(int rva)
         {
@@ -108,63 +100,6 @@ namespace ILCompiler.Reflection.ReadyToRun.MachO
         public unsafe MetadataReader GetManifestAssemblyMetadata(int offset, int size)
         {
             return new MetadataReader((byte*)Unsafe.AsPointer(ref _image[offset]), size);
-        }
-
-        public void DumpImageInformation(TextWriter writer)
-        {
-            writer.WriteLine($"FileType: {_header.FileType}");
-            writer.WriteLine($"CpuType: 0x{_header.CpuType:X}");
-            writer.WriteLine($"NumberOfCommands: {_header.NumberOfCommands}");
-            writer.WriteLine($"SizeOfCommands: {_header.SizeOfCommands} byte(s)");
-
-            writer.WriteLine("Sections:");
-            EnumerateSections((segmentName, section) =>
-            {
-                string sectionName = section.SectionName.GetString();
-                ulong vmAddr = section.GetVMAddress(_header);
-                ulong size = section.GetSize(_header);
-                writer.WriteLine($"  {segmentName},{sectionName,-16} 0x{vmAddr:X8} - 0x{vmAddr + size:X8}");
-            });
-        }
-
-        public Dictionary<string, int> GetSections()
-        {
-            Dictionary<string, int> sectionMap = [];
-            EnumerateSections((segmentName, section) =>
-            {
-                string sectionName = section.SectionName.GetString();
-                ulong size = section.GetSize(_header);
-                System.Diagnostics.Debug.Assert(size <= int.MaxValue);
-                sectionMap[$"{segmentName},{sectionName}"] = (int)size;
-            });
-            return sectionMap;
-        }
-
-        private unsafe void EnumerateSections(Action<string, Section64LoadCommand> callback)
-        {
-            long commandsPtr = sizeof(MachHeader);
-            for (int i = 0; i < _header.NumberOfCommands; i++)
-            {
-                Read(commandsPtr, out LoadCommand loadCommand);
-
-                if (loadCommand.GetCommandType(_header) == MachLoadCommandType.Segment64)
-                {
-                    Read(commandsPtr, out Segment64LoadCommand segment);
-                    uint sectionsCount = segment.GetSectionsCount(_header);
-                    string segmentName = segment.Name.GetString();
-
-                    // Sections come immediately after the segment load command
-                    long sectionPtr = commandsPtr + sizeof(Segment64LoadCommand);
-                    for (uint j = 0; j < sectionsCount; j++)
-                    {
-                        Read(sectionPtr, out Section64LoadCommand section);
-                        callback(segmentName, section);
-                        sectionPtr += sizeof(Section64LoadCommand);
-                    }
-                }
-
-                commandsPtr += loadCommand.GetCommandSize(_header);
-            }
         }
 
         private static Machine GetMachineType(uint cpuType)

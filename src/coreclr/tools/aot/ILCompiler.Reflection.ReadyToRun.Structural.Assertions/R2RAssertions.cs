@@ -76,7 +76,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Assertions
                 && imageBytes[0] == 0xCF && imageBytes[1] == 0xFA && imageBytes[2] == 0xED && imageBytes[3] == 0xFE;
 
             PEReader peReader = null;
-            IBinaryImageReader imageReader;
+            IPlatformBinaryReader imageReader;
             if (isMachO)
             {
                 imageReader = new MachO.MachOImageReader(imageBytes);

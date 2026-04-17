@@ -32,7 +32,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Assertions
 
         public AssertionsAssemblyResolver(
             StructuralReader reader,
-            IBinaryImageReader imageReader,
+            IPlatformBinaryReader imageReader,
             string mainFilePath,
             string[] extraProbeDirs)
         {
@@ -133,7 +133,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Assertions
             return null;
         }
 
-        private static string[] BuildModuleNameTable(StructuralReader reader, IBinaryImageReader imageReader)
+        private static string[] BuildModuleNameTable(StructuralReader reader, IPlatformBinaryReader imageReader)
         {
             MetadataReader mainMetadata = imageReader.GetStandaloneAssemblyMetadata();
             bool isComposite = reader.Composite;
@@ -203,7 +203,7 @@ namespace ILCompiler.Reflection.ReadyToRun.Assertions
             return names;
         }
 
-        private void LoadModuleMetadata(IBinaryImageReader imageReader)
+        private void LoadModuleMetadata(IPlatformBinaryReader imageReader)
         {
             MetadataReader standaloneMetadata = imageReader.GetStandaloneAssemblyMetadata();
             if (standaloneMetadata is not null)

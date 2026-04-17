@@ -2,35 +2,29 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System;
-using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.IO;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 
 namespace ILCompiler.Reflection.ReadyToRun
 {
     /// <summary>
-    /// Wrapper around PEReader that implements IBinaryImageReader
+    /// Wrapper around <see cref="PEReader"/> that implements <see cref="IPlatformBinaryReader"/>.
     /// </summary>
-    public class PEImageReader : IBinaryImageReader
+    public class PEImageReader : IPlatformBinaryReader
     {
         private readonly PEReader _peReader;
         private readonly bool _leaveOpen;
 
         public Machine Machine { get; }
-        public OperatingSystem OperatingSystem { get; }
-        public ulong ImageBase => _peReader.PEHeaders.PEHeader.ImageBase;
 
         public PEImageReader(PEReader peReader, bool leaveOpen = false)
         {
             _peReader = peReader;
             _leaveOpen = leaveOpen;
 
-            // Extract machine and OS from PE header
-            // The OS is encoded in the machine type
+            // Extract machine and OS from PE header. The OS is encoded as an XOR mask on the machine type.
             uint rawMachine = (uint)_peReader.PEHeaders.CoffHeader.Machine;
-            OperatingSystem = OperatingSystem.Unknown;
+            OperatingSystem detectedOs = OperatingSystem.Unknown;
 
             foreach (OperatingSystem os in System.Enum.GetValues(typeof(OperatingSystem)))
             {
@@ -38,12 +32,12 @@ namespace ILCompiler.Reflection.ReadyToRun
                 if (System.Enum.IsDefined(typeof(Machine), candidateMachine))
                 {
                     Machine = candidateMachine;
-                    OperatingSystem = os;
+                    detectedOs = os;
                     break;
                 }
             }
 
-            if (OperatingSystem == OperatingSystem.Unknown)
+            if (detectedOs == OperatingSystem.Unknown)
             {
                 throw new BadImageFormatException($"Invalid PE Machine type: {rawMachine}");
             }
@@ -56,8 +50,6 @@ namespace ILCompiler.Reflection.ReadyToRun
                 _peReader.Dispose();
             }
         }
-
-        public ImmutableArray<byte> GetEntireImage() => _peReader.GetEntireImage().GetContent();
 
         public int GetOffset(int rva) => _peReader.GetOffset(rva);
 
@@ -95,43 +87,6 @@ namespace ILCompiler.Reflection.ReadyToRun
         {
             byte* pImage = _peReader.GetEntireImage().Pointer;
             return new MetadataReader(pImage + offset, size);
-        }
-
-        public void DumpImageInformation(TextWriter writer)
-        {
-            writer.WriteLine($"MetadataSize: {_peReader.PEHeaders.MetadataSize} byte(s)");
-
-            if (_peReader.PEHeaders.PEHeader is PEHeader header)
-            {
-                writer.WriteLine($"SizeOfImage: {header.SizeOfImage} byte(s)");
-                writer.WriteLine($"ImageBase: 0x{header.ImageBase:X}");
-                writer.WriteLine($"FileAlignment: 0x{header.FileAlignment:X}");
-                writer.WriteLine($"SectionAlignment: 0x{header.SectionAlignment:X}");
-            }
-            else
-            {
-                writer.WriteLine("No PEHeader");
-            }
-
-            writer.WriteLine($"CorHeader.Flags: {_peReader.PEHeaders.CorHeader?.Flags}");
-
-            writer.WriteLine("Sections:");
-            foreach (var section in _peReader.PEHeaders.SectionHeaders)
-                writer.WriteLine($"  {section.Name} {section.VirtualAddress} - {(section.VirtualAddress + section.VirtualSize)}");
-
-            var exportTable = _peReader.GetExportTable();
-            exportTable.DumpToConsoleError();
-        }
-
-        public Dictionary<string, int> GetSections()
-        {
-            Dictionary<string, int> sectionMap = [];
-            foreach (SectionHeader sectionHeader in _peReader.PEHeaders.SectionHeaders)
-            {
-                sectionMap.Add(sectionHeader.Name, sectionHeader.SizeOfRawData);
-            }
-
-            return sectionMap;
         }
     }
 }

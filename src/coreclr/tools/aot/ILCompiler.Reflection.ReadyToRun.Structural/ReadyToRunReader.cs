@@ -21,7 +21,7 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// </summary>
     public sealed partial class ReadyToRunReader : IR2RImageContext, IDisposable
     {
-        private readonly IBinaryImageReader _platformBinaryReader;
+        private readonly IPlatformBinaryReader _platformBinaryReader;
         private readonly NativeReader _nativeReader;
         private readonly string _filename;
 
@@ -29,7 +29,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         private ReadyToRunHeader _header;
         private bool? _isComposite;
 
-        public ReadyToRunReader(IBinaryImageReader platformBinaryReader, NativeReader nativeReader, string filename = null)
+        public ReadyToRunReader(IPlatformBinaryReader platformBinaryReader, NativeReader nativeReader, string filename = null)
         {
             _platformBinaryReader = platformBinaryReader;
             _nativeReader = nativeReader;
