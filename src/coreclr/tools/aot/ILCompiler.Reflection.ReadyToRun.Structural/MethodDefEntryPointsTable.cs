@@ -12,6 +12,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// fixup cell references (import section table + cell index pairs) it needs
     /// resolved before execution.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>MethodEntryPointTableNode</c>.
+    /// </remarks>
     public sealed class MethodDefEntryPointsTable
     {
         public IReadOnlyList<MethodDefEntry> Entries { get; }

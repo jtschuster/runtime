@@ -12,6 +12,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// runtime function index, and optional fixup cells.
     /// No signature decoding is performed.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>InstanceEntryPointTableNode</c>.
+    /// </remarks>
     public sealed class InstanceMethodEntryPointsTable
     {
         public IReadOnlyList<InstanceMethodEntry> Entries { get; }

@@ -105,6 +105,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// <summary>
     /// EH info for a single runtime function — a simple list of eagerly-parsed EH clauses.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>MethodWithGCInfo.EHInfo blob (referenced by ExceptionInfoLookupTableNode)</c>.
+    /// </remarks>
     public sealed class EHInfo
     {
         /// <summary>Starting RVA of the corresponding runtime function.</summary>

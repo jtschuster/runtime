@@ -11,6 +11,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// A NativeHashtable where each entry contains a signature blob offset
     /// and a PGO data blob offset. No signature decoding is performed.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>InstrumentationDataTableNode</c>.
+    /// </remarks>
     public sealed class PgoInstrumentationDataTable
     {
         public IReadOnlyList<PgoEntry> Entries { get; }

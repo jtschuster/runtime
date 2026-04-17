@@ -11,6 +11,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// Contains an index of inlinee RIDs to nibble-encoded lists of inliner RIDs.
     /// No method name resolution is performed.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>(legacy R2R V1 inlining info; not emitted by current Crossgen2 — produced by older R2R compilers)</c>.
+    /// </remarks>
     public sealed class InliningInfoTable
     {
         public IReadOnlyList<InliningInfoEntry> Entries { get; }

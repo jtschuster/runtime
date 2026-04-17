@@ -10,6 +10,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// Structural projection of the ComponentAssemblies section.
     /// Each entry contains RVAs to the per-assembly COR header and R2R header.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>AssemblyTableNode</c>.
+    /// </remarks>
     public sealed class ComponentAssembliesTable
     {
         public IReadOnlyList<ComponentAssemblyEntry> Entries { get; }

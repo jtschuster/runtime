@@ -13,6 +13,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// A NativeHashtable of inlining entries with cross-module support.
     /// No method name resolution is performed.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>InliningInfoNode (InfoType.CrossModuleInliningForCrossModuleDataOnly or InfoType.CrossModuleAllMethods)</c>.
+    /// </remarks>
     public sealed class CrossModuleInlineInfoTable
     {
         public IReadOnlyList<CrossModuleInlineEntry> Entries { get; }

@@ -10,6 +10,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// Structural projection of the DebugInfo section.
     /// A NativeSparseArray mapping runtime function IDs to debug data offsets.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>DebugInfoTableNode</c>.
+    /// </remarks>
     public sealed class DebugInfoTable
     {
         public IReadOnlyList<DebugInfoEntry> Entries { get; }

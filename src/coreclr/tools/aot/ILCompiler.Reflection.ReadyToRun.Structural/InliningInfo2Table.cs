@@ -18,6 +18,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// has its own InliningInfo2 table; module index 0 within an entry refers
     /// to that component assembly (the "owner"), not the image.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>InliningInfoNode (InfoType.InliningInfo2)</c>.
+    /// </remarks>
     public sealed class InliningInfo2Table
     {
         public IReadOnlyList<InliningInfo2Entry> Entries { get; }

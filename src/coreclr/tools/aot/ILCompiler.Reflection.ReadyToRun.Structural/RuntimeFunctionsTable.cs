@@ -11,6 +11,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// Structural projection of the RuntimeFunctions section.
     /// A sorted array of runtime function entries, one per compiled code region.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>RuntimeFunctionsTableNode</c>.
+    /// </remarks>
     public sealed class RuntimeFunctionsTable
     {
         public IReadOnlyList<RuntimeFunctionEntry> Entries { get; }

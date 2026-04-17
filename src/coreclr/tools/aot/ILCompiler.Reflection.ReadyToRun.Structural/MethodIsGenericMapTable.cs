@@ -9,6 +9,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// A bitvector where each bit indicates whether the corresponding
     /// MethodDef (1-based RID) has generic parameters.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>MethodIsGenericMapNode</c>.
+    /// </remarks>
     public sealed class MethodIsGenericMapTable
     {
         /// <summary>Total number of method entries in the map.</summary>

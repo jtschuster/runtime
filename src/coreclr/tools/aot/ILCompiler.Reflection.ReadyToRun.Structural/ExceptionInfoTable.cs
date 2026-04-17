@@ -10,6 +10,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// Structural projection of the ExceptionInfo section.
     /// Each entry maps a method RVA to its EH info RVA.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>ExceptionInfoLookupTableNode</c>.
+    /// </remarks>
     public sealed class ExceptionInfoTable
     {
         public IReadOnlyList<ExceptionInfoEntry> Entries { get; }

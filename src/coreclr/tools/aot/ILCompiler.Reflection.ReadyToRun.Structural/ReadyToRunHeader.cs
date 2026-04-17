@@ -32,6 +32,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// Structure representing the ReadyToRun header in a PE image.
     /// based on <a href="https://github.com/dotnet/runtime/blob/main/src/coreclr/inc/readytorun.h">src/inc/readytorun.h</a> READYTORUN_HEADER
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>ReadyToRunHeaderNode</c>.
+    /// </remarks>
     public class ReadyToRunHeader
     {
         // READYTORUN_HEADER fields

@@ -17,6 +17,9 @@ public partial class ReadyToRunReader
     /// - On I386: GcInfo offset == UnwindInfo offset (same location).
     /// - On other architectures: GcInfo offset == UnwindInfo offset + UnwindInfo.Size.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: per-method GC info blob attached to <c>MethodWithGCInfo</c> and aggregated by <c>RuntimeFunctionsGCInfoNode</c>.
+    /// </remarks>
     public BaseGcInfo GetGcInfo(UnwindInfoHandle handle)
     {
         if (_gcInfoCache.TryGetValue(handle, out BaseGcInfo cached))

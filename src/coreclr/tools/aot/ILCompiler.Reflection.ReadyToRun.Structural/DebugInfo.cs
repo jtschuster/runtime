@@ -14,6 +14,9 @@ namespace ILCompiler.Reflection.ReadyToRun;
 /// legacy <see cref="RuntimeFunction"/> or <see cref="ReadyToRunMethod"/> types.
 /// Contains sequence-point bounds and native variable locations.
 /// </summary>
+/// <remarks>
+/// Crossgen2 emitter: <c>DebugInfoTableNode (per-method DebugInfo blob built by DebugInfoBuilder)</c>.
+/// </remarks>
 public sealed class DebugInfo
 {
     /// <summary>Sequence-point bounds mapping native offsets to IL offsets.</summary>

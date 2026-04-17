@@ -15,6 +15,10 @@ public partial class ReadyToRunReader
     /// Resolve an <see cref="UnwindInfoHandle"/> to its parsed unwind information.
     /// Returns null if the handle cannot be decoded for the current architecture.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: per-RuntimeFunction unwind data attached to <c>MethodWithGCInfo</c>
+    /// (for x64/arm64 this is the PE <c>.pdata</c>/<c>xdata</c> referenced by <c>RuntimeFunctionsTableNode</c> entries).
+    /// </remarks>
     public BaseUnwindInfo GetUnwindInfo(UnwindInfoHandle handle)
     {
         if (_unwindInfoCache.TryGetValue(handle, out BaseUnwindInfo cached))

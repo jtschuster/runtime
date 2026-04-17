@@ -11,6 +11,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// Each entry pairs a hot runtime function index with the first cold
     /// runtime function index for the same method.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>HotColdMapNode</c>.
+    /// </remarks>
     public sealed class HotColdMapTable
     {
         public IReadOnlyList<HotColdMapEntry> Entries { get; }

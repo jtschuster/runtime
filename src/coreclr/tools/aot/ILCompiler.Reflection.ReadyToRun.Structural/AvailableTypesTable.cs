@@ -11,6 +11,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// A NativeHashtable of (rid, isExported) entries per available type.
     /// No type name resolution is performed.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>TypesTableNode</c>.
+    /// </remarks>
     public sealed class AvailableTypesTable
     {
         public IReadOnlyList<AvailableTypeEntry> Entries { get; }

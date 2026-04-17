@@ -11,6 +11,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// Packed 4-bit entries, one per TypeDef, encoding generic parameter count,
     /// constraints, and variance info.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>TypeGenericInfoMapNode</c>.
+    /// </remarks>
     public sealed class TypeGenericInfoMapTable
     {
         /// <summary>Number of TypeDef entries in the map.</summary>

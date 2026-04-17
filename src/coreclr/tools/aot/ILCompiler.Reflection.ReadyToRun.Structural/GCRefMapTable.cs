@@ -67,6 +67,9 @@ public sealed class GCRefMap
 /// Contains one <see cref="GCRefMap"/> per slot in the owning import section.
 /// Obtained via <see cref="ReadyToRunReader.GetGCRefMapTable(AuxiliaryDataTableHandle, int, Machine)"/>.
 /// </summary>
+/// <remarks>
+/// Crossgen2 emitter: <c>GCRefMapNode (one per ImportSectionNode that requests a GC ref map)</c>.
+/// </remarks>
 public sealed class GCRefMapTable : IEnumerable<GCRefMap>
 {
     private readonly IReadOnlyList<GCRefMap> _entries;

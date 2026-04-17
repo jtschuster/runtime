@@ -13,6 +13,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// Structural projection of the ImportsTable section.
     /// Each entry is a raw import section descriptor without decoded signatures.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>ImportSectionsTableNode</c> (entries are <c>ImportSectionNode</c> instances).
+    /// </remarks>
     public sealed class ImportSectionsTableSection
     {
         public IReadOnlyList<ImportSectionEntry> Entries { get; }

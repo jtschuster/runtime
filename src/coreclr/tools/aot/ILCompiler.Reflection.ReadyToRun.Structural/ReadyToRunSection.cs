@@ -7,6 +7,9 @@ using Internal.Runtime;
 
 namespace ILCompiler.Reflection.ReadyToRun
 {
+    /// <remarks>
+    /// Crossgen2 emitter: <c>ReadyToRunHeaderNode (each entry corresponds to one section registered via Header.Add)</c>.
+    /// </remarks>
     public struct ReadyToRunSection
     {
         /// <summary>

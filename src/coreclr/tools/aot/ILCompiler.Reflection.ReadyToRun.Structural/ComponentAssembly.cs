@@ -6,6 +6,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// <summary>
     /// Structure representing an element of the assembly table in composite R2R images.
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>AssemblyHeaderNode (per-component header in composite build mode)</c>.
+    /// </remarks>
     public class ComponentAssembly
     {
         public const int Size = 4 * sizeof(int);

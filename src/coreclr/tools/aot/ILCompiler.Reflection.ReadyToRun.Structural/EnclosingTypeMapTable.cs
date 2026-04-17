@@ -8,6 +8,9 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// Structural projection of the EnclosingTypeMap section.
     /// Maps each TypeDef (1-based RID) to the RID of its enclosing type (0 if not nested).
     /// </summary>
+    /// <remarks>
+    /// Crossgen2 emitter: <c>EnclosingTypeMapNode</c>.
+    /// </remarks>
     public sealed class EnclosingTypeMapTable
     {
         /// <summary>Number of TypeDef entries in the map.</summary>
