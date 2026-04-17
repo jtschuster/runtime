@@ -21,6 +21,9 @@
 
   <ItemGroup>
     <ProjectReference Include="../ILCompiler.Reflection.ReadyToRun.Structural.Assertions/ILCompiler.Reflection.ReadyToRun.Structural.Assertions.csproj" />
+    <ProjectReference Include="../ILCompiler.Reflection.ReadyToRun/ILCompiler.Reflection.ReadyToRun.csproj">
+      <Aliases>legacy</Aliases>
+    </ProjectReference>
   </ItemGroup>
 
   <!-- Test case source files are embedded as resources so we can compile them with Roslyn at test time.

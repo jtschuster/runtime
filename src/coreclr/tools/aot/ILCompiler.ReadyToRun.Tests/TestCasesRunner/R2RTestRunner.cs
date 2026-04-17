@@ -208,6 +208,8 @@ internal sealed class R2RTestRunner
                     string ilDir = Path.Combine(baseOutputDir, "IL");
                     using var r2r = R2RAssertions.Open(outputPath, _paths.RuntimePackDir, ilDir);
                     compilation.Validate(r2r);
+
+                    StructuralLegacyParity.AssertParity(outputPath, _paths.RuntimePackDir, ilDir);
                 }
             }
         }
