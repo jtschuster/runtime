@@ -8,6 +8,10 @@ parameters:
   testGroup: ''
   crossBuild: false
   readyToRun: false
+  # Bake R2R into test assemblies on the build agent (after Generate CORE_ROOT)
+  # instead of on every Helix worker. Requires readyToRun: true. Pilot scope:
+  # plain non-composite only (no compositeBuildMode/largeVersionBubble/hotColdSplitting).
+  buildTimeReadyToRun: false
   hotColdSplitting: false
   liveLibrariesBuildConfig: ''
   compositeBuildMode: false
@@ -133,6 +137,9 @@ jobs:
       - ${{ if eq(parameters.largeVersionBubble, true) }}:
         - name: LogNamePrefix
           value: TestRunLogs_R2R_CG2_LargeVersionBubble
+      - ${{ if eq(parameters.buildTimeReadyToRun, true) }}:
+        - name: LogNamePrefix
+          value: TestRunLogs_R2R_CG2_BuildTime
 
     - name: testFilterArg
       value: ''
@@ -256,6 +263,19 @@ jobs:
     - script: $(Build.SourcesDirectory)/src/tests/build$(scriptExt) generatelayoutonly $(logRootNameArg)Layout $(runtimeFlavorArgs) $(crossgenArg) $(buildConfig) $(archType) $(crossArg) $(priorityArg) $(librariesOverrideArg) $(runtimeVariantArg) -ci $(extraBuildArgs)
       displayName: Generate CORE_ROOT
 
+    # Build-time R2R bake: compile each merged-runner's test assemblies with
+    # Crossgen2 here on the build agent, so Helix workers no longer invoke
+    # crossgen2 at test execution time. The Helix payload below skips
+    # RunCrossGen2=1 when buildTimeReadyToRun is true.
+    - ${{ if eq(parameters.buildTimeReadyToRun, true) }}:
+      - ${{ if or(eq(parameters.compositeBuildMode, true), eq(parameters.largeVersionBubble, true), eq(parameters.hotColdSplitting, true)) }}:
+        - script: |
+            echo 'Error: buildTimeReadyToRun pilot does not yet support compositeBuildMode, largeVersionBubble, or hotColdSplitting variants.' 1>&2
+            exit 1
+          displayName: 'Reject unsupported build-time R2R variant combinations'
+      - script: $(Build.SourcesDirectory)/src/tests/build$(scriptExt) $(logRootNameArg)R2RBake skipnative skipgeneratelayout -r2r $(buildConfig) $(archType) $(priorityArg) $(librariesOverrideArg) -ci $(extraBuildArgs)
+        displayName: Build-time R2R bake (test assemblies)
+
     # Build a Mono LLVM AOT cross-compiler for non-amd64 targets (in this case, just arm64)
     - ${{ if and(eq(parameters.runtimeFlavor, 'mono'), or(eq(parameters.runtimeVariant, 'llvmaot'), eq(parameters.runtimeVariant, 'llvmfullaot'))) }}:
       - ${{ if eq(parameters.archType, 'arm64') }}:
@@ -314,7 +334,7 @@ jobs:
 
         timeoutPerTestInMinutes: $(timeoutPerTestInMinutes)
         timeoutPerTestCollectionInMinutes: $(timeoutPerTestCollectionInMinutes)
-        runCrossGen2: ${{ eq(parameters.readyToRun, true) }}
+        runCrossGen2: ${{ and(eq(parameters.readyToRun, true), ne(parameters.buildTimeReadyToRun, true)) }}
         compositeBuildMode: ${{ parameters.compositeBuildMode }}
         runInUnloadableContext: ${{ parameters.runInUnloadableContext }}
         runInterpreter: ${{ parameters.runInterpreter }}
