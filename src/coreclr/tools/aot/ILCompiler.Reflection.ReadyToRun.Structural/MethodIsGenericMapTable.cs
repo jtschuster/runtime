@@ -36,7 +36,7 @@ namespace ILCompiler.Reflection.ReadyToRun
             int index = rid - 1;
             int byteIndex = index / 8;
             int bitIndex = index % 8;
-            return (_data[byteIndex] & (1 << bitIndex)) != 0;
+            return (_data[byteIndex] & (1 << (7 - bitIndex))) != 0;
         }
     }
 

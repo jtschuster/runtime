@@ -44,6 +44,13 @@ namespace ILCompiler.Reflection.ReadyToRun
         /// </summary>
         public const uint READYTORUN_SIGNATURE = 0x00525452; // 'RTR'
 
+        /// <summary>
+        /// The highest R2R major version this reader has been validated against.
+        /// Mirrors <c>READYTORUN_MAJOR_VERSION</c> in <c>src/coreclr/inc/readytorun.h</c>.
+        /// Bump in lockstep with that constant when adding support for a newer format.
+        /// </summary>
+        public const ushort MAXIMUM_SUPPORTED_MAJOR_VERSION = 18;
+
         public uint Signature { get; }
 
         /// <summary>
@@ -117,6 +124,13 @@ namespace ILCompiler.Reflection.ReadyToRun
 
             var MajorVersion = _nativeReader.ReadUInt16(ref imageOffset);
             var MinorVersion = _nativeReader.ReadUInt16(ref imageOffset);
+
+            if (MajorVersion > ReadyToRunHeader.MAXIMUM_SUPPORTED_MAJOR_VERSION)
+            {
+                throw new BadImageFormatException(
+                    $"R2R header major version {MajorVersion}.{MinorVersion} is newer than the maximum supported version " +
+                    $"({ReadyToRunHeader.MAXIMUM_SUPPORTED_MAJOR_VERSION}.x). The image may contain format changes this reader does not understand.");
+            }
 
             var coreHeader = ReadReadyToRunCoreHeader(ref imageOffset);
             return new ReadyToRunHeader(Signature, MajorVersion, MinorVersion, coreHeader.Flags, coreHeader.Sections);

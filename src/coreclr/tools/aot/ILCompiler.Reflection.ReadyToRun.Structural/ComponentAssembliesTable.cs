@@ -28,7 +28,7 @@ namespace ILCompiler.Reflection.ReadyToRun
         public ComponentAssembliesTable GetComponentAssembliesTable(ReadyToRunSection section)
         {
             int offset = GetOffsetForRVA(section.RelativeVirtualAddress);
-            int count = section.Size / ComponentAssembly.Size;
+            int count = section.Size / ComponentAssemblyEntry.Size;
             var entries = new List<ComponentAssemblyEntry>(count);
 
             for (int i = 0; i < count; i++)
@@ -49,13 +49,23 @@ namespace ILCompiler.Reflection.ReadyToRun
     /// </summary>
     public sealed class ComponentAssemblyEntry
     {
+        /// <summary>Size in bytes of a single entry on disk (4 × <see cref="int"/>).</summary>
+        public const int Size = 4 * sizeof(int);
+
         /// <summary>RVA of the COR header for this assembly.</summary>
         public int CorHeaderRva { get; }
 
         /// <summary>Size of the COR header.</summary>
         public int CorHeaderSize { get; }
 
-        /// <summary>RVA of the per-assembly R2R header.</summary>
+        /// <summary>
+        /// RVA of the per-assembly R2R header (<c>READYTORUN_CORE_HEADER</c>).
+        /// </summary>
+        /// <remarks>
+        /// To enumerate the per-component section table, feed this RVA into
+        /// <see cref="ReadyToRunHeader.ReadReadyToRunCoreHeader(ref int)"/> at the
+        /// corresponding file offset (use <see cref="ReadyToRunReader.GetOffsetForRVA"/>).
+        /// </remarks>
         public int AssemblyHeaderRva { get; }
 
         /// <summary>Size of the per-assembly R2R header.</summary>

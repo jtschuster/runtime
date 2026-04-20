@@ -31,12 +31,16 @@ namespace ILCompiler.Reflection.ReadyToRun
             int length = section.Size;
             var entries = new List<ExceptionInfoEntry>();
 
-            while (length >= 2 * sizeof(int))
+            // The encoding ends with a sentinel record (MethodRva = ~0u, EhInfoRva = endOfEhInfo)
+            // used to compute the size of the previous record's clauses. It is not a real entry.
+            int totalRecords = length / (2 * sizeof(int));
+            int realEntries = totalRecords > 0 ? totalRecords - 1 : 0;
+
+            for (int i = 0; i < realEntries; i++)
             {
                 var methodRva = (CodeRva)_nativeReader.ReadInt32(ref offset);
                 var ehInfoRva = (EHInfoHandle)_nativeReader.ReadInt32(ref offset);
                 entries.Add(new ExceptionInfoEntry(methodRva, ehInfoRva));
-                length -= 2 * sizeof(int);
             }
 
             return new ExceptionInfoTable(entries);

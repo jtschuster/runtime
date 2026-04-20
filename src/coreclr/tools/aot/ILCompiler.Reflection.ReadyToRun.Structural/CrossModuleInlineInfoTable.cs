@@ -77,7 +77,7 @@ namespace ILCompiler.Reflection.ReadyToRun
                     uint inlinerDeltaAndFlag = curParser.GetUnsigned();
                     streamSize--;
 
-                    uint moduleIndex = 0;
+                    uint moduleIndex = inlineeModuleIndex;
                     if (multiModuleFormat)
                     {
                         currentRid += inlinerDeltaAndFlag >> 1;

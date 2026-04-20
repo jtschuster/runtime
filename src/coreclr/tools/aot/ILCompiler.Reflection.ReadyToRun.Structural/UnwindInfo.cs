@@ -34,6 +34,8 @@ public partial class ReadyToRunReader
                 Machine.Amd64 => new Amd64.UnwindInfo(ImageReader, unwindOffset),
                 Machine.ArmThumb2 => new Arm.UnwindInfo(ImageReader, unwindOffset),
                 Machine.Arm64 => new Arm64.UnwindInfo(ImageReader, unwindOffset),
+                Machine.LoongArch64 => new LoongArch64.UnwindInfo(ImageReader, unwindOffset),
+                Machine.RiscV64 => new RiscV64.UnwindInfo(ImageReader, unwindOffset),
                 _ => null,
             };
         }
