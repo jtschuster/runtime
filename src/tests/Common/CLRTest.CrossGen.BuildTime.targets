@@ -53,6 +53,7 @@
     <ItemGroup>
       <_ILStagingSource Include="$(OutDir)*.dll" />
       <_ILStagingSource Include="$(OutDir)*.pdb" />
+      <_ILStagingSource Include="$(OutDir)*.no-r2r" />
     </ItemGroup>
 
     <Message Importance="Low"
@@ -95,6 +96,12 @@
   -->
   <ItemGroup Condition="'$(IsMergedTestRunnerAssembly)' == 'true' and '$(__BuildTimeReadyToRun)' == 'true'">
     <_BuildTimeR2RInputFile Include="$([MSBuild]::NormalizeDirectory('$(OutDir)', '$(__BuildTimeIlOutputSubdir)'))*.dll" />
+    <!--
+      Marker files participate in incrementality: adding or removing a
+      <CrossGenTest>false</CrossGenTest> opt-out must trigger a rebake so the
+      excluded DLL is copied as-IL (or re-included for crossgen).
+    -->
+    <_BuildTimeR2RInputFile Include="$([MSBuild]::NormalizeDirectory('$(OutDir)', '$(__BuildTimeIlOutputSubdir)'))*.no-r2r" />
   </ItemGroup>
 
   <Target Name="_RunBuildTimeCrossgen2"
@@ -156,17 +163,65 @@
       <_Crossgen2CommonArg Include="-r:$(CORE_ROOT)\netstandard.dll" />
     </ItemGroup>
 
+    <!--
+      Per-test opt-out: child projects with <CrossGenTest>false</CrossGenTest>
+      publish a sidecar marker '<TargetFileName>.no-r2r' (see
+      CLRTest.CrossGen.targets:_WriteBuildTimeR2RNoR2RMarker). The merged-runner
+      OutDir collects them via ProjectReference's transitive copy, and
+      _StageBuildTimeIL stages them into IL/ alongside the DLLs.
+
+      Here we resolve those markers into an exclusion set of full DLL paths.
+      Excluded DLLs are NOT crossgen'd; instead they are copied IL-as-is into
+      the R2R output dir so the overlay still includes them. This matches the
+      runtime-prologue behavior where opt-out tests load IL.
+
+      A marker named 'covariant-returns.dll.no-r2r' produces %(Filename) =
+      'covariant-returns.dll' and %(Extension) = '.no-r2r'. We rebuild the
+      DLL path under _BuildTimeIlDir to get the excluded source DLL.
+    -->
+    <ItemGroup Condition="'$(_BuildTimeR2RRun)' == 'true'">
+      <_BuildTimeR2RNoMarker Include="$(_BuildTimeIlDir)*.no-r2r" />
+      <_BuildTimeR2RExcludeDll Include="@(_BuildTimeR2RNoMarker -> '$(_BuildTimeIlDir)%(Filename)')" />
+      <_BuildTimeR2RExcludePdb Include="@(_BuildTimeR2RNoMarker -> '$(_BuildTimeIlDir)%(Filename).pdb')"
+                               Condition="Exists('$(_BuildTimeIlDir)%(_BuildTimeR2RNoMarker.Filename).pdb')" />
+    </ItemGroup>
+
+    <Message Importance="High"
+             Text="[R2R-compile] $(MSBuildProjectName): excluding from R2R (CrossGenTest=false): @(_BuildTimeR2RExcludeDll -> '%(Filename)%(Extension)', ', ')"
+             Condition="'$(_BuildTimeR2RRun)' == 'true' and '@(_BuildTimeR2RExcludeDll)' != ''" />
+
+    <!--
+      Pass-through copy of opted-out DLLs (and PDBs) from IL/ to R2R/. These
+      assemblies remain in IL form at run time. The Copy uses SkipUnchangedFiles
+      so it interacts cleanly with the stamp-based incrementality on the
+      target itself.
+    -->
+    <Copy SourceFiles="@(_BuildTimeR2RExcludeDll);@(_BuildTimeR2RExcludePdb)"
+          DestinationFolder="$(_BuildTimeR2RDir)"
+          SkipUnchangedFiles="true"
+          Retries="2"
+          Condition="'$(_BuildTimeR2RRun)' == 'true' and '@(_BuildTimeR2RExcludeDll)' != ''" />
+
     <!-- ======== Composite mode: one crossgen2 invocation, one output DLL. ======== -->
     <PropertyGroup Condition="'$(_BuildTimeR2RRun)' == 'true' and '$(_BuildTimeCompositeMode)' == 'true'">
       <_CompositeOutputFile>$(_BuildTimeR2RDir)composite-r2r.dll</_CompositeOutputFile>
       <_CompositeResponseFile>$(_BuildTimeR2RDir)composite-r2r.rsp</_CompositeResponseFile>
     </PropertyGroup>
 
+    <!--
+      Composite input must be an explicit list (not a glob) so we can subtract
+      the excluded DLLs. _CompositeInput materializes the glob, then Remove
+      drops the opt-out entries.
+    -->
     <ItemGroup Condition="'$(_BuildTimeR2RRun)' == 'true' and '$(_BuildTimeCompositeMode)' == 'true'">
+      <_CompositeInput Include="$(_BuildTimeIlDir)*.dll" />
+      <_CompositeInput Remove="@(_BuildTimeR2RExcludeDll)" />
       <_CompositeRspLine Include="@(_Crossgen2CommonArg)" />
       <_CompositeRspLine Include="--composite" />
       <_CompositeRspLine Include="-o:$(_CompositeOutputFile)" />
-      <_CompositeRspLine Include="$(_BuildTimeIlDir)*.dll" />
+      <!-- Reference (don't compile) the excluded DLLs so the composite can resolve them. -->
+      <_CompositeRspLine Include="@(_BuildTimeR2RExcludeDll -> '-r:%(FullPath)')" />
+      <_CompositeRspLine Include="@(_CompositeInput -> '%(FullPath)')" />
     </ItemGroup>
 
     <WriteLinesToFile File="$(_CompositeResponseFile)"
@@ -179,11 +234,12 @@
              Condition="'$(_BuildTimeR2RRun)' == 'true' and '$(_BuildTimeCompositeMode)' == 'true'" />
 
     <Exec Command="&quot;$(_BuildTimeCrossgen2Path)&quot; @&quot;$(_CompositeResponseFile)&quot;"
-          Condition="'$(_BuildTimeR2RRun)' == 'true' and '$(_BuildTimeCompositeMode)' == 'true'" />
+          Condition="'$(_BuildTimeR2RRun)' == 'true' and '$(_BuildTimeCompositeMode)' == 'true' and '@(_CompositeInput)' != ''" />
 
     <!-- ======== Per-file mode: one crossgen2 invocation per input DLL. ======== -->
     <ItemGroup Condition="'$(_BuildTimeR2RRun)' == 'true' and '$(_BuildTimeCompositeMode)' != 'true'">
       <_PerFileInput Include="$(_BuildTimeIlDir)*.dll" />
+      <_PerFileInput Remove="@(_BuildTimeR2RExcludeDll)" />
       <_PerFileRspLine Include="@(_Crossgen2CommonArg)" />
       <_PerFileRspLine Include="-r:$(_BuildTimeIlDir)*.dll" />
     </ItemGroup>

@@ -273,7 +273,7 @@ jobs:
             echo 'Error: buildTimeReadyToRun pilot does not yet support compositeBuildMode, largeVersionBubble, or hotColdSplitting variants.' 1>&2
             exit 1
           displayName: 'Reject unsupported build-time R2R variant combinations'
-      - script: $(Build.SourcesDirectory)/src/tests/build$(scriptExt) $(logRootNameArg)R2RBake skipnative skipgeneratelayout -r2r $(buildConfig) $(archType) $(priorityArg) $(librariesOverrideArg) -ci $(extraBuildArgs)
+      - script: $(Build.SourcesDirectory)/src/tests/build$(scriptExt) $(logRootNameArg)R2RBake skipnative skipgeneratelayout -r2r $(buildConfig) $(archType) $(crossArg) $(priorityArg) $(librariesOverrideArg) -ci $(extraBuildArgs)
         displayName: Build-time R2R bake (test assemblies)
 
     # Build a Mono LLVM AOT cross-compiler for non-amd64 targets (in this case, just arm64)

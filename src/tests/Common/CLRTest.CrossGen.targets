@@ -386,4 +386,38 @@ if defined RunCrossGen2 (
       <CLRTestBatchPreCommands>$(CLRTestBatchPreCommands);$(CrossgenBatchScript)</CLRTestBatchPreCommands>
     </PropertyGroup>
   </Target>
+
+  <!--
+    Build-time R2R opt-out marker.
+
+    When a test project sets <CrossGenTest>false</CrossGenTest>, also publish a
+    sidecar marker file '<TargetFileName>.no-r2r' alongside the assembly so that
+    the build-time R2R bake (CLRTest.CrossGen.BuildTime.targets) on the merged
+    runner can identify which child DLLs to skip during crossgen2.
+
+    The runtime-prologue path (above) already honors CrossGenTest=false. The
+    build-time bake operates on the merged-runner's OutDir long after children
+    have built, so it needs a propagated signal. We declare the marker as
+    <None CopyToOutputDirectory> at evaluation time and write it from a target
+    that runs before GetCopyToOutputDirectoryItems, ensuring it travels through
+    ProjectReference's transitive copy-to-output collection into the merged
+    runner's OutDir.
+
+    The marker is a 0-byte file; only its existence and name matter.
+  -->
+  <ItemGroup Condition="'$(CrossGenTest)' == 'false' and '$(IsMergedTestRunnerAssembly)' != 'true'">
+    <None Include="$(IntermediateOutputPath)$(TargetFileName).no-r2r"
+          CopyToOutputDirectory="PreserveNewest"
+          Visible="false" />
+  </ItemGroup>
+
+  <Target Name="_WriteBuildTimeR2RNoR2RMarker"
+          BeforeTargets="GetCopyToOutputDirectoryItems;AssignTargetPaths"
+          Condition="'$(CrossGenTest)' == 'false' and '$(IsMergedTestRunnerAssembly)' != 'true'">
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <WriteLinesToFile File="$(IntermediateOutputPath)$(TargetFileName).no-r2r"
+                      Lines=""
+                      Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+  </Target>
 </Project>
