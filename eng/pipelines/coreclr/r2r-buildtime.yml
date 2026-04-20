@@ -8,6 +8,21 @@ variables:
   - template: /eng/pipelines/common/variables.yml
   - template: /eng/pipelines/helix-platforms.yml
 
+  # Crossgen2 dump-capture knobs for the build-time R2R bake step
+  # (consumed by run-test-job.yml when buildTimeReadyToRun=true).
+  # Override per-pipeline-run via the Variables UI when triaging:
+  #   * BuildTimeR2RDumpType: 1 = Mini (~5-20MB, default; stack + modules),
+  #                           2 = Heap (~100-500MB; adds private R/W memory),
+  #                           3 = Triage, 4 = Full (~GBs).
+  #   * BuildTimeR2RDumpKeepCount: max number of dumps retained per agent
+  #     before the cull step deletes the rest. Bound chosen so worst-case
+  #     capture stays within the ADO ~10GB pipeline-artifact recommendation
+  #     even at Type=2.
+  - name: BuildTimeR2RDumpType
+    value: 1
+  - name: BuildTimeR2RDumpKeepCount
+    value: 10
+
 extends:
   template:  /eng/pipelines/common/templates/pipeline-with-resources.yml
   parameters:

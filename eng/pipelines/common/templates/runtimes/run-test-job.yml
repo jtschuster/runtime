@@ -281,6 +281,18 @@ jobs:
       # follow-up PublishPipelineArtifact step (condition: failed()) can ship
       # them out for triage. .NET respects DOTNET_DbgEnableMiniDump on Windows
       # as well as Unix, so a single cross-platform setup works.
+      #
+      # Sizing: build-agent disk (~50-80GB on 1ES public pools) and pipeline
+      # artifact recommendations (~10GB) cap how much we can capture. The bake
+      # runs ~360 crossgen2 invocations across all merged runners with parallel
+      # MSBuild; a systemic crossgen2 regression could easily produce dozens
+      # of crashes. To stay within those budgets we capture Mini dumps
+      # (DbgMiniDumpType=1, ~5-20MB each: stack + modules + handle data +
+      # thread info) by default rather than the Helix-default Heap dumps
+      # (~100-500MB), and a follow-up cull step caps the dump count. Mini
+      # dumps are usually sufficient for crossgen2 triage; bumping to Type=2
+      # (Heap) or Type=4 (Full) can be done via the BuildTimeR2RDumpType
+      # pipeline variable when richer state is needed.
       - ${{ if ne(parameters.osGroup, 'windows') }}:
         - script: mkdir -p $(Build.ArtifactStagingDirectory)/Crossgen2Dumps
           displayName: 'Prepare crossgen2 dump dir'
@@ -292,14 +304,50 @@ jobs:
         displayName: Build-time R2R bake (test assemblies)
         env:
           DOTNET_DbgEnableMiniDump: 1
-          # MiniDumpType=2 = MiniDumpWithPrivateReadWriteMemory (heap dump),
-          # matches the Helix wrapper's level so triage tooling sees the same
-          # surface area on either path.
-          DOTNET_DbgMiniDumpType: 2
+          DOTNET_DbgMiniDumpType: $(BuildTimeR2RDumpType)
           ${{ if ne(parameters.osGroup, 'windows') }}:
             DOTNET_DbgMiniDumpName: $(Build.ArtifactStagingDirectory)/Crossgen2Dumps/coredump.%p.dmp
           ${{ if eq(parameters.osGroup, 'windows') }}:
             DOTNET_DbgMiniDumpName: $(Build.ArtifactStagingDirectory)\Crossgen2Dumps\coredump.%p.dmp
+
+      # Cull captured dumps so an unbounded crash storm can't blow past the
+      # build-agent disk budget or the pipeline artifact recommendation.
+      # Keeps the BuildTimeR2RDumpKeepCount oldest (= first to crash, which
+      # is usually the most diagnostic) dumps and deletes the rest. Reports
+      # total captured size for visibility.
+      - ${{ if ne(parameters.osGroup, 'windows') }}:
+        - script: |
+            set -u
+            DIR="$(Build.ArtifactStagingDirectory)/Crossgen2Dumps"
+            [ -d "$DIR" ] || exit 0
+            COUNT=$(find "$DIR" -maxdepth 1 -name 'coredump.*.dmp' | wc -l)
+            BYTES=$(du -sb "$DIR" 2>/dev/null | cut -f1)
+            echo "Captured $COUNT dump(s), total ${BYTES:-0} bytes."
+            KEEP=$(BuildTimeR2RDumpKeepCount)
+            if [ "$COUNT" -gt "$KEEP" ]; then
+              echo "Keeping first $KEEP, deleting $((COUNT - KEEP))."
+              find "$DIR" -maxdepth 1 -name 'coredump.*.dmp' -printf '%T@ %p\n' \
+                | sort -n | tail -n +$((KEEP + 1)) | cut -d' ' -f2- \
+                | xargs -r rm -f
+            fi
+          displayName: 'Cap crossgen2 dump count'
+          condition: always()
+          continueOnError: true
+      - ${{ if eq(parameters.osGroup, 'windows') }}:
+        - powershell: |
+            $dir = "$(Build.ArtifactStagingDirectory)\Crossgen2Dumps"
+            if (-not (Test-Path $dir)) { exit 0 }
+            $dumps = Get-ChildItem -LiteralPath $dir -Filter 'coredump.*.dmp' -File -ErrorAction SilentlyContinue | Sort-Object LastWriteTime
+            $bytes = ($dumps | Measure-Object Length -Sum).Sum
+            Write-Host "Captured $($dumps.Count) dump(s), total $bytes bytes."
+            $keep = [int]"$(BuildTimeR2RDumpKeepCount)"
+            if ($dumps.Count -gt $keep) {
+              Write-Host "Keeping first $keep, deleting $($dumps.Count - $keep)."
+              $dumps | Select-Object -Skip $keep | Remove-Item -Force -ErrorAction SilentlyContinue
+            }
+          displayName: 'Cap crossgen2 dump count'
+          condition: always()
+          continueOnError: true
 
       - task: PublishPipelineArtifact@1
         displayName: 'Publish crossgen2 crash dumps'
