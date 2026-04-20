@@ -273,8 +273,44 @@ jobs:
             echo 'Error: buildTimeReadyToRun pilot does not yet support compositeBuildMode, largeVersionBubble, or hotColdSplitting variants.' 1>&2
             exit 1
           displayName: 'Reject unsupported build-time R2R variant combinations'
+
+      # Dump capture for crossgen2 crashes during the bake. The Helix path
+      # configures DOTNET_DbgEnableMiniDump via testenvironment.proj /
+      # RunnerTemplate.sh; the build-agent path needs its own opt-in. We point
+      # the dumps at $(Build.ArtifactStagingDirectory)/Crossgen2Dumps so a
+      # follow-up PublishPipelineArtifact step (condition: failed()) can ship
+      # them out for triage. .NET respects DOTNET_DbgEnableMiniDump on Windows
+      # as well as Unix, so a single cross-platform setup works.
+      - ${{ if ne(parameters.osGroup, 'windows') }}:
+        - script: mkdir -p $(Build.ArtifactStagingDirectory)/Crossgen2Dumps
+          displayName: 'Prepare crossgen2 dump dir'
+      - ${{ if eq(parameters.osGroup, 'windows') }}:
+        - script: if not exist "$(Build.ArtifactStagingDirectory)\Crossgen2Dumps" mkdir "$(Build.ArtifactStagingDirectory)\Crossgen2Dumps"
+          displayName: 'Prepare crossgen2 dump dir'
+
       - script: $(Build.SourcesDirectory)/src/tests/build$(scriptExt) $(logRootNameArg)R2RBake skipnative skipgeneratelayout -r2r $(buildConfig) $(archType) $(crossArg) $(priorityArg) $(librariesOverrideArg) -ci $(extraBuildArgs)
         displayName: Build-time R2R bake (test assemblies)
+        env:
+          DOTNET_DbgEnableMiniDump: 1
+          # MiniDumpType=2 = MiniDumpWithPrivateReadWriteMemory (heap dump),
+          # matches the Helix wrapper's level so triage tooling sees the same
+          # surface area on either path.
+          DOTNET_DbgMiniDumpType: 2
+          ${{ if ne(parameters.osGroup, 'windows') }}:
+            DOTNET_DbgMiniDumpName: $(Build.ArtifactStagingDirectory)/Crossgen2Dumps/coredump.%p.dmp
+          ${{ if eq(parameters.osGroup, 'windows') }}:
+            DOTNET_DbgMiniDumpName: $(Build.ArtifactStagingDirectory)\Crossgen2Dumps\coredump.%p.dmp
+
+      - task: PublishPipelineArtifact@1
+        displayName: 'Publish crossgen2 crash dumps'
+        # condition: failed() rather than always() because dump capture only
+        # runs on crash; on a green build the dir is empty and uploading
+        # an empty artifact is wasted bandwidth.
+        condition: failed()
+        continueOnError: true
+        inputs:
+          targetPath: $(Build.ArtifactStagingDirectory)/Crossgen2Dumps
+          artifactName: 'Crossgen2Dumps_$(osGroup)$(osSubgroup)_$(archType)_$(buildConfig)'
 
     # Build a Mono LLVM AOT cross-compiler for non-amd64 targets (in this case, just arm64)
     - ${{ if and(eq(parameters.runtimeFlavor, 'mono'), or(eq(parameters.runtimeVariant, 'llvmaot'), eq(parameters.runtimeVariant, 'llvmfullaot'))) }}:
