@@ -1,9 +1,7 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
-using System;
 using System.Collections.Generic;
-using System.IO;
 
 namespace ILCompiler.Reflection.ReadyToRun
 {
@@ -47,59 +45,6 @@ namespace ILCompiler.Reflection.ReadyToRun
             HandlerEnd = handlerEnd;
             ClassTokenOrFilterOffset = classTokenOrFilterOffset;
         }
-
-        /// <summary>
-        /// Emit a textual representation of the EH clause to a given text writer.
-        /// </summary>
-        public void WriteTo(TextWriter writer, int methodRva, bool dumpRva)
-        {
-            writer.Write($"Flags {(uint)Flags:X2} ");
-            writer.Write($"TryOff {TryOffset:X4} ");
-            if (dumpRva)
-                writer.Write($"(RVA {(TryOffset + methodRva):X4}) ");
-            writer.Write($"TryEnd {TryEnd:X4} ");
-            if (dumpRva)
-                writer.Write($"(RVA {(TryEnd + methodRva):X4}) ");
-            writer.Write($"HndOff {HandlerOffset:X4} ");
-            if (dumpRva)
-                writer.Write($"(RVA {(HandlerOffset + methodRva):X4}) ");
-            writer.Write($"HndEnd {HandlerEnd:X4} ");
-            if (dumpRva)
-                writer.Write($"(RVA {(HandlerEnd + methodRva):X4}) ");
-            writer.Write($"ClsFlt {ClassTokenOrFilterOffset:X4}");
-
-            switch (Flags & CorExceptionFlag.COR_ILEXCEPTION_CLAUSE_KIND_MASK)
-            {
-                case CorExceptionFlag.COR_ILEXCEPTION_CLAUSE_NONE:
-                    writer.Write(" CATCH");
-                    break;
-
-                case CorExceptionFlag.COR_ILEXCEPTION_CLAUSE_FILTER:
-                    writer.Write($" FILTER (RVA {(ClassTokenOrFilterOffset + methodRva):X4})");
-                    break;
-
-                case CorExceptionFlag.COR_ILEXCEPTION_CLAUSE_FINALLY:
-                    writer.Write(" FINALLY");
-                    break;
-
-                case CorExceptionFlag.COR_ILEXCEPTION_CLAUSE_FAULT:
-                    writer.Write(" FAULT");
-                    break;
-
-                default:
-                    throw new NotImplementedException(Flags.ToString());
-            }
-
-            if ((Flags & CorExceptionFlag.COR_ILEXCEPTION_CLAUSE_DUPLICATED) != (CorExceptionFlag)0)
-            {
-                writer.Write(" DUPLICATED");
-            }
-
-            if ((Flags & CorExceptionFlag.COR_ILEXCEPTION_CLAUSE_SAMETRY) != (CorExceptionFlag)0)
-            {
-                writer.Write(" SAMETRY");
-            }
-        }
     }
 
     /// <summary>
@@ -120,18 +65,6 @@ namespace ILCompiler.Reflection.ReadyToRun
         {
             MethodRelativeVirtualAddress = methodRva;
             EHClauses = clauses;
-        }
-
-        /// <summary>
-        /// Emit the textual representation of the EH info into a given writer.
-        /// </summary>
-        public void WriteTo(TextWriter writer, bool dumpRva)
-        {
-            foreach (EHClause ehClause in EHClauses)
-            {
-                ehClause.WriteTo(writer, (int)MethodRelativeVirtualAddress, dumpRva: dumpRva);
-                writer.WriteLine();
-            }
         }
     }
 }
