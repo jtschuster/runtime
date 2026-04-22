@@ -280,7 +280,90 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                 dependencyList.AddRange(_nonRelocationDependencies);
             }
 
+            AddCovariantAsyncThunkDependency(factory, dependencyList);
+
             return dependencyList;
+        }
+
+        /// <summary>
+        /// If this method is a virtual Task&lt;T&gt;-returning override of a Task-returning base method
+        /// (a covariant return override), root the return-dropping async thunk that bridges the two
+        /// signatures. The VM installs such a thunk into the base's void-returning async variant
+        /// slot on the derived type's vtable. Without a pre-compiled R2R thunk, the VM falls back
+        /// to generating transient IL at load time.
+        ///
+        /// Triggering on the user-written method (rather than its async variant) is necessary
+        /// because non-async covariant overrides — e.g. <c>public override Task&lt;T&gt; M() =&gt;
+        /// Task.FromResult(...);</c> — never produce a separately-compiled async variant body
+        /// reachable from this <see cref="MethodWithGCInfo"/> path, so a variant-based hook would
+        /// silently miss them.
+        ///
+        /// Note: we don't gate on the async variant being rooted. In R2R even an "orphan" thunk
+        /// (whose variant is not pre-compiled) is still useful — the call from the thunk into the
+        /// variant goes through the standard R2R fixup → JIT-on-demand path, and the thunk itself
+        /// being precompiled still avoids a JIT pass. Empirically, [ASYNC]-table presence is not
+        /// 1:1 with CompiledMethodNode rooting (variants can reach the table through other nodes
+        /// like the entrypoint table), so a conditional dependency on CompiledMethodNode would
+        /// drop legitimately-needed thunks without preventing any real waste.
+        /// </summary>
+        private void AddCovariantAsyncThunkDependency(NodeFactory factory, DependencyList dependencyList)
+        {
+            if (!_method.IsVirtual)
+                return;
+            if (_method.IsAsyncVariant() || _method.IsReturnDroppingAsyncThunk())
+                return;
+
+            MethodSignature sig = _method.Signature;
+            if (!sig.ReturnsTaskOrValueTask())
+                return;
+
+            TypeDesc returnType = sig.ReturnType;
+            if (!returnType.HasInstantiation)
+                return;
+
+            MetadataType returnTypeDef = (MetadataType)returnType.GetTypeDefinition();
+            if (!returnTypeDef.Name.SequenceEqual("Task`1"u8))
+                return;
+
+            if (!(_method.OwningType is MetadataType owningType) || owningType.IsValueType || owningType.IsInterface)
+                return;
+
+            if (!IsCovariantTaskOverride(_method, owningType))
+                return;
+
+            var ctx = (CompilerTypeSystemContext)_method.Context;
+            MethodDesc asyncVariant = ctx.GetAsyncVariantMethod(_method);
+            MethodDesc thunk = ctx.GetReturnDroppingAsyncVariantMethod(asyncVariant);
+
+            if (!factory.CompilationModuleGroup.ContainsMethodBody(thunk, false))
+                return;
+
+            dependencyList.Add(factory.CompiledMethodNode(thunk), "Covariant-async return-dropping thunk");
+        }
+
+        private static bool IsCovariantTaskOverride(MethodDesc method, MetadataType owningType)
+        {
+            // The derived method must appear as the Body of a MethodImpl record whose Decl returns
+            // non-generic Task (the base's signature that the thunk matches). Compare at the
+            // type-definition level: InstantiatedType.VirtualMethodImplsForType specializes records
+            // per-instantiation, which would require us to also instantiate 'method' for comparison.
+            MetadataType typeDef = (MetadataType)owningType.GetTypeDefinition();
+            MethodDesc methodDef = method.GetMethodDefinition();
+            foreach (MethodImplRecord record in typeDef.VirtualMethodImplsForType)
+            {
+                if (record.Body != methodDef)
+                    continue;
+
+                TypeDesc declReturn = record.Decl.Signature.ReturnType;
+                if (declReturn is MetadataType declReturnType
+                    && declReturnType.Module == method.Context.SystemModule
+                    && declReturnType.Namespace.SequenceEqual("System.Threading.Tasks"u8)
+                    && declReturnType.Name.SequenceEqual("Task"u8))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         public override bool StaticDependenciesAreComputed => _methodCode != null;

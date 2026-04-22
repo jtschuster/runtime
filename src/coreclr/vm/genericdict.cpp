@@ -879,6 +879,7 @@ Dictionary::PopulateEntry(
             uint32_t methodSlot = -1;
             BOOL fRequiresDispatchStub = 0;
             BOOL isAsyncVariant = 0;
+            BOOL isReturnDroppingThunk = 0;
 
             if (isReadyToRunModule)
             {
@@ -891,9 +892,7 @@ Dictionary::PopulateEntry(
                 isUnboxingStub = ((methodFlags & ENCODE_METHOD_SIG_UnboxingStub) != 0);
                 fMethodNeedsInstantiation = ((methodFlags & ENCODE_METHOD_SIG_MethodInstantiation) != 0);
                 isAsyncVariant = ((methodFlags & ENCODE_METHOD_SIG_AsyncVariant) != 0);
-                // We don't have a way to retrieve the return dropping thunk with FindOrCreateAssociatedMethodDesc
-                // ENCODE_METHOD_SIG_ReturnDroppingAsyncThunk is only used to match a signature to a MethodDesc we already have
-                _ASSERTE((methodFlags & ENCODE_METHOD_SIG_ReturnDroppingAsyncThunk) == 0);
+                isReturnDroppingThunk = ((methodFlags & ENCODE_METHOD_SIG_ReturnDroppingAsyncThunk) != 0);
 
                 if (methodFlags & ENCODE_METHOD_SIG_OwnerType)
                 {
@@ -945,7 +944,11 @@ Dictionary::PopulateEntry(
                         pMethod = MemberLoader::GetMethodDescFromMethodDef(static_cast<Module*>(pZapSigContext->pInfoModule), TokenFromRid(rid, mdtMethodDef), FALSE);
                     }
 
-                    if (isAsyncVariant)
+                    if (isReturnDroppingThunk)
+                    {
+                        pMethod = pMethod->GetAsyncVariant()->GetReturnDroppingThunk();
+                    }
+                    else if (isAsyncVariant)
                     {
                         pMethod = pMethod->GetAsyncVariant();
                     }
@@ -983,9 +986,7 @@ Dictionary::PopulateEntry(
                 isUnboxingStub = ((methodFlags & ENCODE_METHOD_SIG_UnboxingStub) != 0);
                 fMethodNeedsInstantiation = ((methodFlags & ENCODE_METHOD_SIG_MethodInstantiation) != 0);
                 isAsyncVariant = ((methodFlags & ENCODE_METHOD_SIG_AsyncVariant) != 0);
-                // We don't have a way to retrieve the return dropping thunk with FindOrCreateAssociatedMethodDesc
-                // ENCODE_METHOD_SIG_ReturnDroppingAsyncThunk is only used to match a signature to a MethodDesc we already have
-                _ASSERTE((methodFlags & ENCODE_METHOD_SIG_ReturnDroppingAsyncThunk) == 0);
+                isReturnDroppingThunk = ((methodFlags & ENCODE_METHOD_SIG_ReturnDroppingAsyncThunk) != 0);
 
                 if ((methodFlags & ENCODE_METHOD_SIG_SlotInsteadOfToken) != 0)
                 {
@@ -1023,7 +1024,11 @@ Dictionary::PopulateEntry(
                     // The RID map should have been filled out if we fully loaded the class
                     pMethod = pMethodDefMT->GetModule()->LookupMethodDef(token);
 
-                    if (isAsyncVariant)
+                    if (isReturnDroppingThunk)
+                    {
+                        pMethod = pMethod->GetAsyncVariant()->GetReturnDroppingThunk();
+                    }
+                    else if (isAsyncVariant)
                     {
                         pMethod = pMethod->GetAsyncVariant();
                     }

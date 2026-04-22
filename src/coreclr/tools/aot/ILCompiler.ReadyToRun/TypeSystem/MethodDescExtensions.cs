@@ -1,4 +1,5 @@
 
+using ILCompiler;
 using Internal.IL.Stubs;
 using Internal.JitInterface;
 using Internal.TypeSystem;
@@ -16,6 +17,10 @@ namespace ILCompiler.ReadyToRun.TypeSystem
             if (method.IsAsyncVariant())
             {
                 return method.GetTargetOfAsyncVariant();
+            }
+            if (method.IsReturnDroppingAsyncThunk())
+            {
+                return ((ReturnDroppingAsyncThunk)method.GetTypicalMethodDefinition()).AsyncVariantTarget.GetPrimaryMethodDesc();
             }
             if (method.IsUnboxingThunk())
             {

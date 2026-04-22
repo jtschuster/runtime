@@ -2742,6 +2742,7 @@ void CEEInfo::embedGenericHandle(
 
         Instantiation methodInst = pMD->GetMethodInstantiation();
 
+        MethodDesc* pMDIn = pMD;
         pMD = MethodDesc::FindOrCreateAssociatedMethodDesc(pMD, th.GetMethodTable(), FALSE, methodInst, FALSE);
 
         // Normalize the method handle for reflection

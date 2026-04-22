@@ -110,7 +110,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                 if (method.Method is AsyncResumptionStub)
                     continue;
 
-                Debug.Assert(method.Method.HasInstantiation || method.Method.OwningType.HasInstantiation || method.Method.IsAsyncVariant());
+                Debug.Assert(method.Method.HasInstantiation || method.Method.OwningType.HasInstantiation || method.Method.IsAsyncVariant() || method.Method.IsReturnDroppingAsyncThunk());
 
                 int methodIndex = factory.RuntimeFunctionsTable.GetIndex(method);
 

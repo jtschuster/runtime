@@ -1016,6 +1016,10 @@ namespace ILCompiler.Reflection.ReadyToRun
             {
                 signaturePrefixes.Add("[ASYNC]");
             }
+            if ((methodFlags & (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_ReturnDroppingAsyncThunk) != 0)
+            {
+                signaturePrefixes.Add("[ReturnDroppingThunk]");
+            }
 
             return new DecodedMethodSignature(owningType, methodHandle, methodTypeArgs, constrainedType, signaturePrefixes.ToArray());
         }

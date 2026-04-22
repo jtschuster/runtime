@@ -111,7 +111,7 @@ public:
                                BOOL unboxingStub,
                                Instantiation inst,
                                BOOL getSharedNotStub,
-                               bool isAsyncVariant);
+                               AsyncVariantLookup asyncVariantLookup);
 
     BOOL ContainsMethodDesc(MethodDesc* pMD);
 

@@ -806,7 +806,7 @@ BOOL MethodDesc::HasSameMethodDefAs(MethodDesc * pMD)
     if (this == pMD)
         return TRUE;
 
-    return (GetMemberDef() == pMD->GetMemberDef()) && (GetModule() == pMD->GetModule() && pMD->IsAsyncVariantMethod() == IsAsyncVariantMethod());
+    return (GetMemberDef() == pMD->GetMemberDef()) && (GetModule() == pMD->GetModule() && pMD->GetAsyncVariantLookup() == GetAsyncVariantLookup());
 }
 
 //*******************************************************************************
@@ -1977,12 +1977,13 @@ MethodDesc* MethodDesc::ResolveGenericVirtualMethod(OBJECTREF *orThis)
                                                                   pTargetMDBeforeGenericMethodArgs->GetExactClassInstantiation(TypeHandle(pObjMT))).GetMethodTable();
     }
 
-    RETURN(MethodDesc::FindOrCreateAssociatedMethodDesc(
+    MethodDesc* pResultMD = MethodDesc::FindOrCreateAssociatedMethodDesc(
         pTargetMDBeforeGenericMethodArgs,
         pTargetMT,
         (pTargetMT->IsValueType()), /* get unboxing entry point if a struct*/
         pStaticMD->GetMethodInstantiation(),
-        FALSE /* no allowInstParam */ ));
+        FALSE /* no allowInstParam */ );
+    RETURN(pResultMD);
 }
 
 PCODE MethodDesc::GetSingleCallableAddrOfCode()

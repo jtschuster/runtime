@@ -268,7 +268,8 @@ using PTR_MethodDescCodeData = DPTR(MethodDescCodeData);
 enum class AsyncVariantLookup
 {
     Ordinary = 0,
-    Async
+    Async,
+    ReturnDroppingThunk,
 };
 
 enum class MethodReturnKind
@@ -1718,11 +1719,14 @@ public:
                                                         BOOL allowCreate = TRUE,
                                                         ClassLoadLevel level = CLASS_LOADED)
     {
-        // If this assert fires, we may just need to add a lookup that matches AsyncMethodFlags::ReturnDroppingThunk
-        // It does not look like there is a scenario for directly calling ReturnDroppingThunk right now.
-        _ASSERTE(!pPrimaryMD->IsReturnDroppingThunk());
         // by default async lookup matches the primaryMD
-        AsyncVariantLookup variantLookup = pPrimaryMD->IsAsyncVariantMethod() ? AsyncVariantLookup::Async : AsyncVariantLookup::Ordinary;
+        AsyncVariantLookup variantLookup;
+        if (pPrimaryMD->IsReturnDroppingThunk())
+            variantLookup = AsyncVariantLookup::ReturnDroppingThunk;
+        else if (pPrimaryMD->IsAsyncVariantMethod())
+            variantLookup = AsyncVariantLookup::Async;
+        else
+            variantLookup = AsyncVariantLookup::Ordinary;
 
         return FindOrCreateAssociatedMethodDesc(
             pPrimaryMD,
@@ -1767,6 +1771,12 @@ public:
     {
         MethodTable* mt = GetMethodTable();
         return FindOrCreateAssociatedMethodDesc(this, mt, FALSE, GetMethodInstantiation(), allowInstParam, AsyncVariantLookup::Async, FALSE, FALSE, mt->GetLoadLevel());
+    }
+
+    MethodDesc* GetReturnDroppingThunk(BOOL allowInstParam = TRUE)
+    {
+        MethodTable* mt = GetMethodTable();
+        return FindOrCreateAssociatedMethodDesc(this, mt, FALSE, GetMethodInstantiation(), allowInstParam, AsyncVariantLookup::ReturnDroppingThunk, FALSE, TRUE, mt->GetLoadLevel());
     }
 
     // True if a MD is an funny BoxedEntryPointStub (not from the method table) or
@@ -2054,6 +2064,16 @@ public:
         return hasAsyncFlags(asyncFlags, AsyncMethodFlags::ReturnDroppingThunk);
     }
 
+    inline AsyncVariantLookup GetAsyncVariantLookup() const
+    {
+        LIMITED_METHOD_DAC_CONTRACT;
+        if (IsReturnDroppingThunk())
+            return AsyncVariantLookup::ReturnDroppingThunk;
+        if (IsAsyncVariantMethod())
+            return AsyncVariantLookup::Async;
+        return AsyncVariantLookup::Ordinary;
+    }
+
     inline bool MatchesAsyncVariantLookup(AsyncVariantLookup lookup) const
     {
         LIMITED_METHOD_DAC_CONTRACT;
@@ -2061,16 +2081,24 @@ public:
         if (lookup == AsyncVariantLookup::Ordinary)
             return !IsAsyncVariantMethod();
 
+        if (!HasAsyncMethodData())
+            return false;
+
+        AsyncMethodFlags asyncFlags = GetAddrOfAsyncMethodData()->flags;
+        bool isAsyncVariant = hasAsyncFlags(asyncFlags, AsyncMethodFlags::IsAsyncVariant);
+        bool isReturnDroppingThunk = hasAsyncFlags(asyncFlags, AsyncMethodFlags::ReturnDroppingThunk);
+
         if (lookup == AsyncVariantLookup::Async)
         {
-            if (!HasAsyncMethodData())
-                return false;
-
             // Note: AsyncVariantLookup::Async only matches regular async variants. ReturnDroppingThunk intentionally
-            //       does not match any lookups. Noone should call ReturnDroppingThunk directly. The only way it gets
-            //       invoked is when it adds itself as a virtual override to a regular async variant.
-            AsyncMethodFlags asyncFlags = GetAddrOfAsyncMethodData()->flags;
-            return hasAsyncFlags(asyncFlags, AsyncMethodFlags::IsAsyncVariant) && !hasAsyncFlags(asyncFlags, AsyncMethodFlags::ReturnDroppingThunk);
+            //       does not match this lookup; callers that need to find a thunk must use
+            //       AsyncVariantLookup::ReturnDroppingThunk.
+            return isAsyncVariant && !isReturnDroppingThunk;
+        }
+
+        if (lookup == AsyncVariantLookup::ReturnDroppingThunk)
+        {
+            return isAsyncVariant && isReturnDroppingThunk;
         }
 
         return false;
@@ -3863,7 +3891,7 @@ public:
                                                                     mdMethodDef methodDef,
                                                                     Instantiation methodInst,
                                                                     BOOL getSharedNotStub,
-                                                                    BOOL asyncThunk);
+                                                                    AsyncVariantLookup asyncVariantLookup);
 
 private:
 

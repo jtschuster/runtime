@@ -1025,6 +1025,10 @@ namespace ILCompiler.Reflection.ReadyToRun
                 {
                     builder.Append("[ASYNC] ");
                 }
+                if ((flags & ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_ReturnDroppingAsyncThunk) != 0)
+                {
+                    builder.Append("[ReturnDroppingThunk] ");
+                }
                 builder.Append(method);
                 return builder.ToString();
             }

@@ -625,7 +625,6 @@ void MethodDesc::EmitAsyncMethodThunk(MethodDesc* pTaskReturningVariant, MetaSig
 void MethodDesc::EmitReturnDroppingThunk(MethodDesc* pAsyncOtherVariant, MetaSig& msig, ILStubLinker* pSL)
 {
     _ASSERTE(pAsyncOtherVariant->IsAsyncVariantMethod());
-
     _ASSERTE(!pAsyncOtherVariant->IsVoid());
     _ASSERTE(pAsyncOtherVariant->IsVirtual());
     _ASSERTE(this->IsVoid());
