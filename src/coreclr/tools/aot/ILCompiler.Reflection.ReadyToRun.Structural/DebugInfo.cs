@@ -25,19 +25,13 @@ public sealed class DebugInfo
     /// <summary>Native variable location information.</summary>
     public IReadOnlyList<NativeVarInfo> Variables { get; }
 
-    /// <summary>Machine architecture used to interpret register numbers.</summary>
-    public Machine Machine { get; }
-
     public DebugInfo(
         IReadOnlyList<DebugInfoBoundsEntry> bounds,
-        IReadOnlyList<NativeVarInfo> variables,
-        Machine machine)
+        IReadOnlyList<NativeVarInfo> variables)
     {
         Bounds = bounds;
         Variables = variables;
-        Machine = machine;
     }
-
 }
 
 public partial class ReadyToRunReader
@@ -113,7 +107,7 @@ public partial class ReadyToRunReader
                 ParseNativeVarInfo(imageReader, variablesOffset, machine, variables);
             }
 
-            return new DebugInfo(bounds, variables, machine);
+            return new DebugInfo(bounds, variables);
         }
         catch
         {
@@ -155,22 +149,28 @@ public partial class ReadyToRunReader
                         bitTemp >>= (int)bitsPerEntry;
                         bitsCollected -= bitsPerEntry;
 
-                        var entry = new DebugInfoBoundsEntry();
+                        SourceTypes sourceTypes = 0;
                         if ((mappingDataEncoded & 0x1) != 0)
-                            entry.SourceTypes |= SourceTypes.CallInstruction;
+                            sourceTypes |= SourceTypes.CallInstruction;
                         if ((mappingDataEncoded & 0x2) != 0)
-                            entry.SourceTypes |= SourceTypes.StackEmpty;
+                            sourceTypes |= SourceTypes.StackEmpty;
                         if (majorVersion >= 17 && (mappingDataEncoded & 0x4) != 0)
-                            entry.SourceTypes |= SourceTypes.Async;
+                            sourceTypes |= SourceTypes.Async;
 
                         mappingDataEncoded >>= (int)bitsForSourceType;
                         uint nativeOffsetDelta = (uint)(mappingDataEncoded & ((1UL << (int)bitsForNativeDelta) - 1));
                         previousNativeOffset += nativeOffsetDelta;
-                        entry.NativeOffset = previousNativeOffset;
+                        var nativeOffset = previousNativeOffset;
 
                         mappingDataEncoded >>= (int)bitsForNativeDelta;
-                        entry.ILOffset = (uint)(mappingDataEncoded) + (uint)DebugInfoBoundsType.MaxMappingValue;
+                        var ilOffset = (uint)mappingDataEncoded + (uint)DebugInfoBoundsType.MaxMappingValue;
 
+                        var entry = new DebugInfoBoundsEntry()
+                        {
+                            NativeOffset = nativeOffset,
+                            ILOffset = ilOffset,
+                            SourceTypes = sourceTypes
+                        };
                         bounds.Add(entry);
                         curBoundsProcessed++;
                     }
@@ -185,11 +185,13 @@ public partial class ReadyToRunReader
                 uint previousNativeOffset = 0;
                 for (int i = 0; i < boundsEntryCount; ++i)
                 {
-                    var entry = new DebugInfoBoundsEntry();
                     previousNativeOffset += reader.ReadUInt();
-                    entry.NativeOffset = previousNativeOffset;
-                    entry.ILOffset = reader.ReadUInt() + (uint)DebugInfoBoundsType.MaxMappingValue;
-                    entry.SourceTypes = (SourceTypes)reader.ReadUInt();
+                    var entry = new DebugInfoBoundsEntry()
+                    {
+                        NativeOffset = previousNativeOffset,
+                        ILOffset = reader.ReadUInt() + (uint)DebugInfoBoundsType.MaxMappingValue,
+                        SourceTypes = (SourceTypes)reader.ReadUInt()
+                    };
                     bounds.Add(entry);
                 }
             }
@@ -206,14 +208,14 @@ public partial class ReadyToRunReader
 
             for (int i = 0; i < nativeVarCount; ++i)
             {
-                var entry = new NativeVarInfo();
-                entry.StartOffset = reader.ReadUInt();
-                entry.EndOffset = entry.StartOffset + reader.ReadUInt();
-                entry.VariableNumber = (uint)(reader.ReadUInt() + (int)ImplicitILArguments.Max);
-
-                // We don't have method signature info here, so we can't distinguish
-                // parameters from locals. Leave Variable at default.
-                entry.Variable = new Variable();
+                uint startOffset = reader.ReadUInt();
+                var entry = new NativeVarInfo()
+                {
+                    StartOffset = startOffset,
+                    EndOffset = startOffset + reader.ReadUInt(),
+                    VariableNumber = (uint)(reader.ReadUInt() + (int)ImplicitILArguments.Max),
+                    Variable = new Variable()
+                };
 
                 var varLoc = new VarLoc();
                 varLoc.VarLocType = (VarLocType)reader.ReadUInt();
