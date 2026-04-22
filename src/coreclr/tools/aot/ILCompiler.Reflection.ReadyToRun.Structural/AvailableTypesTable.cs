@@ -2,6 +2,8 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 using System.Collections.Generic;
+using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
 
 
 namespace ILCompiler.Reflection.ReadyToRun
@@ -66,6 +68,11 @@ namespace ILCompiler.Reflection.ReadyToRun
         {
             Rid = rid;
             IsExportedType = isExportedType;
+        }
+
+        public EntityHandle GetMetadataToken()
+        {
+            return IsExportedType ? MetadataTokens.ExportedTypeHandle((int)Rid) : MetadataTokens.TypeDefinitionHandle((int)Rid);
         }
     }
 }
