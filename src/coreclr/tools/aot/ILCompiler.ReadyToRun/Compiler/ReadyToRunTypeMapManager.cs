@@ -58,7 +58,7 @@ namespace ILCompiler.ReadyToRun
             if (IsEmpty)
                 return;
 
-            header.Add(ReadyToRunSectionType.TypeMapAssemblyTargets, new TypeMapAssemblyTargetsNode(assemblyTypeMaps, importReferenceProvider));
+            header.Add(ReadyToRunSectionType.TypeMapAssemblyTargets, new TypeMapAssemblyTargetsNode(triggeringModule, assemblyTypeMaps, importReferenceProvider));
         }
     }
 }

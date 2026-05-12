@@ -5,6 +5,7 @@ using ILCompiler.DependencyAnalysis;
 using ILCompiler.DependencyAnalysisFramework;
 using Internal.NativeFormat;
 using Internal.Text;
+using Internal.TypeSystem;
 
 namespace ILCompiler.ReadyToRun
 {
@@ -12,9 +13,11 @@ namespace ILCompiler.ReadyToRun
     {
         private TypeMapMetadata _assemblyTypeMaps;
         private ImportReferenceProvider _importReferenceProvider;
+        private ModuleDesc _triggeringModule;
 
-        public TypeMapAssemblyTargetsNode(TypeMapMetadata assemblyTypeMaps, ImportReferenceProvider importReferenceProvider)
+        public TypeMapAssemblyTargetsNode(ModuleDesc triggeringModule, TypeMapMetadata assemblyTypeMaps, ImportReferenceProvider importReferenceProvider)
         {
+            _triggeringModule = triggeringModule;
             _assemblyTypeMaps = assemblyTypeMaps;
             _importReferenceProvider = importReferenceProvider;
         }
@@ -24,6 +27,11 @@ namespace ILCompiler.ReadyToRun
         public override int ClassCode => 1564556383;
 
         public override bool StaticDependenciesAreComputed => true;
+
+        public override int CompareToImpl(ISortableNode other, CompilerComparer comparer)
+        {
+            return comparer.Compare(_triggeringModule, ((TypeMapAssemblyTargetsNode)other)._triggeringModule);
+        }
 
         public int Offset => 0;
 
@@ -87,7 +95,7 @@ namespace ILCompiler.ReadyToRun
             return builder.ToObjectData();
         }
         public override ObjectNodeSection GetSection(NodeFactory factory) => ObjectNodeSection.ReadOnlyDataSection;
-        protected override string GetName(NodeFactory context) => "Type Map Assembly Targets Tables";
+        protected override string GetName(NodeFactory context) => $"Type Map Assembly Targets Tables ({_triggeringModule.GetDisplayName()})";
         public void AppendMangledName(NameMangler nameMangler, Utf8StringBuilder sb) => sb.Append(nameMangler.CompilationUnitPrefix).Append("__TypeMapAssemblyTargets"u8);
     }
 }
