@@ -228,7 +228,18 @@ For each unknown failure, search GitHub for existing issues that might already t
 
 3. **Check MihuBot results**: The CI analysis script with `-SearchMihuBot` may have already found related issues — use those results.
 
-If an existing open issue already tracks the failure, **do not create a new issue**. Instead, add a comment to the existing issue with the new build link and any additional failure details:
+### Validate Failure Mode Match
+
+When a candidate issue is found by test/work item name, you MUST verify that the **failure mode** (error message or error signature) matches before treating it as the same issue. Do NOT match solely on test name or work item name.
+
+- Extract the **key error message or signature** from the existing issue body (e.g., `"Multiple nodes of this type are not supported"`, `"NullReferenceException"`, a specific assertion message, etc.)
+- Compare it against the **actual error output** from the current CI failure (from the console log or CI analysis output)
+- If the error signatures are **different**, this is a **new, distinct failure** even though it involves the same test or work item. Proceed to Step 5 to create a new issue. In the new issue, note that a different failure for the same test exists (link the other issue) to provide context.
+- If the error signatures **match**, treat it as a recurrence and add a comment to the existing issue.
+
+### Recurrence Comments
+
+If an existing open issue already tracks the failure (same test AND same failure mode), **do not create a new issue**. Instead, add a comment to the existing issue with the new build link and failure details:
 
 ```markdown
 ### Recurrence
@@ -238,9 +249,20 @@ This failure was observed again in a recent build:
 - **Pipeline**: <pipeline name>
 - **Build**: [<build_id>](https://dev.azure.com/dnceng-public/public/_build/results?buildId=<build_id>)
 - **Configuration**: <OS/arch/config if available>
+- **Failed Step**: <name of the CI job step that failed>
+- **Console Log**: [<work_item_name>](<link to Helix console log>)
+
+<details>
+<summary><b>Error snippet</b></summary>
+
+\`\`\`
+<paste a short (up to 500 char) snippet of the key error message from the console log that confirms this is the same failure mode>
+\`\`\`
+
+</details>
 ```
 
-This helps track how frequently the failure is occurring and on which configurations.
+This helps track how frequently the failure is occurring, on which configurations, and confirms the failure mode is unchanged. Including the console log link lets investigators quickly verify the failure details.
 
 ## Step 5: Create Issues for New Failures
 
@@ -277,6 +299,7 @@ Create issues with the following structure:
 
 - **Pipeline**: <pipeline name>
 - **Build**: [<build_id>](https://dev.azure.com/dnceng-public/public/_build/results?buildId=<build_id>)
+- **Failed Step**: <name of the CI job step that failed>
 - **Failed Tests**: List each failing test with its fully qualified name
 - **Configuration**: <OS/arch/config if available>
 - **Error Category**: <test-failure|build-error|crash|timeout>
