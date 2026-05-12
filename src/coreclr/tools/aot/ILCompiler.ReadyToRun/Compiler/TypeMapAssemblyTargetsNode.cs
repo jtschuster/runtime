@@ -96,6 +96,6 @@ namespace ILCompiler.ReadyToRun
         }
         public override ObjectNodeSection GetSection(NodeFactory factory) => ObjectNodeSection.ReadOnlyDataSection;
         protected override string GetName(NodeFactory context) => $"Type Map Assembly Targets Tables ({_triggeringModule.GetDisplayName()})";
-        public void AppendMangledName(NameMangler nameMangler, Utf8StringBuilder sb) => sb.Append(nameMangler.CompilationUnitPrefix).Append("__TypeMapAssemblyTargets"u8);
+        public void AppendMangledName(NameMangler nameMangler, Utf8StringBuilder sb) => sb.Append(nameMangler.CompilationUnitPrefix).Append("__TypeMapAssemblyTargets_"u8).Append(_triggeringModule.Assembly.GetName().Name);
     }
 }
