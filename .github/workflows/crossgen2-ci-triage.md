@@ -8,6 +8,8 @@ on:
 engine:
   id: copilot
   model: claude-opus-4.6
+  env:
+    COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN || secrets.GITHUB_TOKEN || secrets.GH_TOKEN }}
 
 timeout-minutes: 30
 
