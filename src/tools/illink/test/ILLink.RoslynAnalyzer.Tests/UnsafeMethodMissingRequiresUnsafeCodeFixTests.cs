@@ -6,6 +6,7 @@ using System;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading.Tasks;
+using ILLink.RoslynAnalyzer;
 using ILLink.Shared;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -143,7 +144,7 @@ namespace ILLink.RoslynAnalyzer.Tests
                     context.ReportDiagnostic(Diagnostic.Create(
                         s_rule,
                         location,
-                        method.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)));
+                        method.GetDisplayName()));
                 }
             }
 
