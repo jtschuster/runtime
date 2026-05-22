@@ -24,6 +24,7 @@ namespace ILLink.CodeFix
     public sealed class RequiresUnsafeCodeFixProvider : BaseAttributeCodeFixProvider
     {
         private const string WrapInUnsafeBlockTitle = "Wrap in unsafe block";
+        internal const string FullyQualifiedRequiresUnsafeAttribute = "System.Diagnostics.CodeAnalysis.RequiresUnsafeAttribute";
 
         public static ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(DiagnosticDescriptors.GetDiagnosticDescriptor(DiagnosticId.RequiresUnsafe));
 
@@ -31,7 +32,7 @@ namespace ILLink.CodeFix
 
         private protected override LocalizableString CodeFixTitle => new LocalizableResourceString(nameof(Resources.RequiresUnsafeCodeFixTitle), Resources.ResourceManager, typeof(Resources));
 
-        private protected override string FullyQualifiedAttributeName => RequiresUnsafeAnalyzer.FullyQualifiedRequiresUnsafeAttribute;
+        private protected override string FullyQualifiedAttributeName => FullyQualifiedRequiresUnsafeAttribute;
 
         private protected override AttributeableParentTargets AttributableParentTargets => AttributeableParentTargets.MethodOrConstructor;
 

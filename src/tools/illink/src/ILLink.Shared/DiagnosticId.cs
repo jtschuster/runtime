@@ -221,11 +221,11 @@ namespace ILLink.Shared
         InvalidFeatureGuard = 4001,
 
 #if DEBUG
-        // RequiresUnsafe diagnostics are in the 5000 range, separate from other diagnostics.
+        // RequiresUnsafe diagnostic ids are still supported by code fixes.
         RequiresUnsafe = 5000,
-        RequiresUnsafeAttributeMismatch = 5001,
-        RequiresUnsafeOnStaticConstructor = 5002,
-        RequiresUnsafeOnEntryPoint = 5003,
+        _unused_RequiresUnsafeAttributeMismatch = 5001,
+        _unused_RequiresUnsafeOnStaticConstructor = 5002,
+        _unused_RequiresUnsafeOnEntryPoint = 5003,
         UnsafeMethodMissingRequiresUnsafe = 5004,
         _EndRequiresUnsafeWarningsSentinel,
 #endif

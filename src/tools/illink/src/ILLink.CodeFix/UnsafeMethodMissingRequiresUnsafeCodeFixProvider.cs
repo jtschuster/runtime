@@ -65,7 +65,7 @@ namespace ILLink.CodeFix
             if (await document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false) is not { } model)
                 return document;
 
-            if (model.Compilation.GetBestTypeByMetadataName(RequiresUnsafeAnalyzer.FullyQualifiedRequiresUnsafeAttribute) is not { } attributeSymbol)
+            if (model.Compilation.GetBestTypeByMetadataName(RequiresUnsafeCodeFixProvider.FullyQualifiedRequiresUnsafeAttribute) is not { } attributeSymbol)
                 return document;
 
             var editor = await DocumentEditor.CreateAsync(document, cancellationToken).ConfigureAwait(false);
