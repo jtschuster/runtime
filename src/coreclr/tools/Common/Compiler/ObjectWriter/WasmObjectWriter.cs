@@ -882,7 +882,7 @@ namespace ILCompiler.ObjectWriter
                     throw new InvalidOperationException($"Unsupported relocation size for relocation: {reloc.Type}");
                 }
 
-                SymbolDefinition definedSymbol = _definedSymbols[reloc.SymbolName];
+                _definedSymbols.TryGetValue(reloc.SymbolName, out SymbolDefinition? definedSymbol);
 
                 // The virtual address of the relocation we are resolving
                 uint virtualRelocOffset = 0;
@@ -899,7 +899,7 @@ namespace ILCompiler.ObjectWriter
                 // TODO-Wasm: Enforce the below boolean as an assert once we are emitting proper Wasm code
                 // relocs for all code containing nodes
                 // ---> bool betweenWebcilSections = false;
-                if (_sections[definedSymbol.SectionIndex] is WebcilSection targetSection)
+                if (definedSymbol is not null && _sections[definedSymbol.SectionIndex] is WebcilSection targetSection)
                 {
                     symbolWebcilSection = targetSection;
                     virtualSymbolImageOffset = symbolWebcilSection.Header.VirtualAddress + (uint)definedSymbol.Value;
@@ -950,7 +950,7 @@ namespace ILCompiler.ObjectWriter
                             break;
                         case RelocType.IMAGE_REL_FILE_ABSOLUTE:
                             Debug.Assert(symbolWebcilSection != null);
-                            long fileOffset = symbolWebcilSection.Header.PointerToRawData + definedSymbol.Value;
+                            long fileOffset = symbolWebcilSection.Header.PointerToRawData + definedSymbol!.Value;
                             Relocation.WriteValue(reloc.Type, pData, fileOffset + addend);
                             break;
                         case RelocType.WASM_MEMORY_ADDR_REL_SLEB:
@@ -1009,6 +1009,21 @@ namespace ILCompiler.ObjectWriter
                             // These are module-local function pointer indices, so we can simply write out the assigned function index
                             // for this particular symbol
                             Relocation.WriteValue(reloc.Type, pData, index + addend);
+                            break;
+                        }
+                        case RelocType.WASM_GLOBAL_INDEX_LEB:
+                        {
+                            // Resolve the well-known base-global symbol to its fixed imported global index.
+                            // The R2R Webcil module imports these at the positions defined by _defaultGlobalImports.
+                            string symbolName = reloc.SymbolName.ToString();
+                            int globalIndex = symbolName switch
+                            {
+                                WasmBaseGlobalSymbolNode.StackPointerSymbolName => StackPointerGlobalIndex,
+                                WasmBaseGlobalSymbolNode.ImageBaseSymbolName => ImageBaseGlobalIndex,
+                                WasmBaseGlobalSymbolNode.TableBaseSymbolName => TableBaseGlobalIndex,
+                                _ => throw new InvalidDataException($"Unknown wasm base global symbol: {symbolName}")
+                            };
+                            Relocation.WriteValue(reloc.Type, pData, globalIndex + addend);
                             break;
                         }
                         default:

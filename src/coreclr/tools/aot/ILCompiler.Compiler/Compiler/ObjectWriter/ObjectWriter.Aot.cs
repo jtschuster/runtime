@@ -148,5 +148,11 @@ namespace ILCompiler.ObjectWriter
                 EmitReferencedMethod(relocSymbolName);
             }
         }
+
+        static partial void TryCreateArchitectureSpecificWriter(NodeFactory factory, ObjectWritingOptions options, ref ObjectWriter writer)
+        {
+            if (factory.Target.Architecture == TargetArchitecture.Wasm32)
+                writer = new WasmNativeObjectWriter(factory, options);
+        }
     }
 }

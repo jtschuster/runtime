@@ -801,9 +801,20 @@ namespace ILCompiler.ObjectWriter.WasmInstructions
         {
             return new WasmGlobalVarExpr(WasmExprKind.GlobalGet, index);
         }
+
+        public static WasmExpr Get(ISymbolNode symbol)
+        {
+            return new WasmLEBConstantReloc(WasmExprKind.GlobalGet, symbol, RelocType.WASM_GLOBAL_INDEX_LEB);
+        }
+
         public static WasmExpr Set(int index)
         {
             return new WasmGlobalVarExpr(WasmExprKind.GlobalSet, index);
+        }
+
+        public static WasmExpr Set(ISymbolNode symbol)
+        {
+            return new WasmLEBConstantReloc(WasmExprKind.GlobalSet, symbol, RelocType.WASM_GLOBAL_INDEX_LEB);
         }
     }
 

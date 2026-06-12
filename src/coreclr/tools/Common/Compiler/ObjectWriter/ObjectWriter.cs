@@ -699,14 +699,20 @@ namespace ILCompiler.ObjectWriter
 
         partial void EmitUnwindInfoForNode(ObjectNode node, Utf8String currentSymbolName, SectionWriter sectionWriter);
 
+        // Hook for architecture-specific writers added by partial implementations in other projects (e.g. WasmNativeObjectWriter).
+        // If not implemented, writer remains null and the platform-based default is used.
+        static partial void TryCreateArchitectureSpecificWriter(NodeFactory factory, ObjectWritingOptions options, ref ObjectWriter writer);
+
         public static void EmitObject(string objectFilePath, IReadOnlyCollection<DependencyNode> nodes, NodeFactory factory, ObjectWritingOptions options, IObjectDumper dumper, Logger logger)
         {
             var stopwatch = Stopwatch.StartNew();
 
-            ObjectWriter objectWriter =
-                factory.Target.IsApplePlatform ? new MachObjectWriter(factory, options) :
-                factory.Target.OperatingSystem == TargetOS.Windows ? new CoffObjectWriter(factory, options) :
-                new ElfObjectWriter(factory, options);
+            ObjectWriter writer = null;
+            TryCreateArchitectureSpecificWriter(factory, options, ref writer);
+            ObjectWriter objectWriter = writer ??
+                (factory.Target.IsApplePlatform ? new MachObjectWriter(factory, options) :
+                 factory.Target.OperatingSystem == TargetOS.Windows ? new CoffObjectWriter(factory, options) :
+                 new ElfObjectWriter(factory, options));
 
             using Stream outputFileStream = new FileStream(objectFilePath, FileMode.Create);
             objectWriter.EmitObject(outputFileStream, nodes, dumper, logger);
