@@ -324,6 +324,7 @@
     <Compile Include="..\..\Common\Compiler\DependencyAnalysis\ShadowMethodNode.cs" Link="Compiler\DependencyAnalysis\ShadowMethodNode.cs" />
     <Compile Include="..\..\Common\Compiler\DependencyAnalysis\SortableDependencyNode.cs" Link="Compiler\DependencyAnalysis\SortableDependencyNode.cs" />
     <Compile Include="..\..\Common\Compiler\DependencyAnalysis\WasmTypeNode.cs" Link="Compiler\DependencyAnalysis\WasmTypeNode.cs" />
+    <Compile Include="..\..\Common\Compiler\DependencyAnalysis\WasmBaseGlobalSymbolNode.cs" Link="Compiler\DependencyAnalysis\WasmBaseGlobalSymbolNode.cs" />
     <Compile Include="..\..\Common\Compiler\DependencyAnalysis\INodeWithTypeSignature.cs" Link="Compiler\DependencyAnalysis\INodeWithTypeSignature.cs" />
     <Compile Include="..\..\Common\Compiler\DependencyAnalysis\Target_ARM64\AddrMode.cs" Link="Compiler\DependencyAnalysis\Target_ARM64\AddrMode.cs" />
     <Compile Include="..\..\Common\Compiler\DependencyAnalysis\Target_ARM64\ARM64Emitter.cs" Link="Compiler\DependencyAnalysis\Target_ARM64\ARM64Emitter.cs" />
@@ -369,6 +370,8 @@
     <Compile Include="..\..\Common\Compiler\ObjectWriter\StringTableBuilder.cs" Link="Compiler\ObjectWriter\StringTableBuilder.cs" />
     <Compile Include="..\..\Common\Compiler\ObjectWriter\TypeString.cs" Link="Compiler\ObjectWriter\TypeString.cs" />
     <Compile Include="..\..\Common\Compiler\ObjectWriter\CodeDataLayoutMode.cs" Link="Compiler\ObjectWriter\CodeDataLayoutMode.cs" />
+    <Compile Include="..\..\Common\Compiler\ObjectWriter\WasmAbiConstants.cs" Link="Compiler\ObjectWriter\WasmAbiConstants.cs" />
+    <Compile Include="..\..\Common\Compiler\ObjectWriter\WasmNativeObjectWriter.cs" Link="Compiler\ObjectWriter\WasmNativeObjectWriter.cs" />
     <Compile Include="..\..\Common\Compiler\DependencyTrackingLevel.cs" Link="Compiler\DependencyTrackingLevel.cs" />
     <Compile Include="..\..\Common\Compiler\DevirtualizationManager.cs" Link="Compiler\DevirtualizationManager.cs" />
     <Compile Include="..\..\Common\Compiler\FeatureSettings.cs" Link="Compiler\FeatureSettings.cs" />
