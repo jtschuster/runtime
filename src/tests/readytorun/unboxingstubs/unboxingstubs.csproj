@@ -1,0 +1,73 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RequiresProcessIsolation>true</RequiresProcessIsolation>
+    <ReferenceXUnitWrapperGenerator>false</ReferenceXUnitWrapperGenerator>
+    <!-- This test crossgen2's itself in the pre-commands below, so opt out of the default crossgen handling. -->
+    <CrossGenTest>false</CrossGenTest>
+    <!-- This test launches crossgen2, skip when sanitizers are enabled. -->
+    <CLRTestTargetUnsupported Condition="'$(EnableNativeSanitizers)' != ''">true</CLRTestTargetUnsupported>
+    <!-- crossgen2 is not supported on Mono or wasm. -->
+    <CLRTestTargetUnsupported Condition="'$(RuntimeFlavor)' == 'mono'">true</CLRTestTargetUnsupported>
+    <CLRTestTargetUnsupported Condition="'$(TargetArchitecture)' == 'wasm'">true</CLRTestTargetUnsupported>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(MSBuildProjectName).cs" />
+  </ItemGroup>
+  <PropertyGroup>
+    <CLRTestBatchPreCommands><![CDATA[
+$(CLRTestBatchPreCommands)
+
+REM Suppress some DOTNET variables for the duration of Crossgen2 execution
+setlocal
+set "DOTNET_GCName="
+set "DOTNET_GCStress="
+set "DOTNET_HeapVerify="
+set "DOTNET_ReadyToRun="
+
+md IL_DLLS 2>NUL
+copy /y unboxingstubs.dll IL_DLLS\unboxingstubs.dll
+if not exist IL_DLLS\unboxingstubs.dll (
+    echo FAILED to copy unboxingstubs.dll to IL_DLLS
+    exit /b 1
+)
+
+REM Crossgen2 the test so its value-type virtual/interface methods get precompiled unboxing stubs
+%Core_Root%\crossgen2\crossgen2.exe -O -r:%Core_Root%\*.dll -o:unboxingstubs.dll IL_DLLS\unboxingstubs.dll
+
+set CrossGenStatus=!ERRORLEVEL!
+IF NOT !CrossGenStatus!==0 (
+    ECHO Crossgen of unboxingstubs.dll failed with exitcode - !CrossGenStatus!
+    Exit /b 1
+)
+
+endlocal
+]]></CLRTestBatchPreCommands>
+    <CLRTestBashPreCommands><![CDATA[
+$(CLRTestBashPreCommands)
+
+# Suppress some DOTNET variables for the duration of Crossgen2 execution
+export -n DOTNET_GCName DOTNET_GCStress DOTNET_HeapVerify DOTNET_ReadyToRun
+
+mkdir -p IL_DLLS
+
+cp unboxingstubs.dll IL_DLLS/unboxingstubs.dll
+if [ ! -f IL_DLLS/unboxingstubs.dll ]
+then
+  echo Failed to copy unboxingstubs.dll to IL_DLLS
+  exit 1
+fi
+
+# Crossgen2 the test so its value-type virtual/interface methods get precompiled unboxing stubs
+"$CORE_ROOT"/crossgen2/crossgen2 -O -r:"$CORE_ROOT"/*.dll -o:unboxingstubs.dll IL_DLLS/unboxingstubs.dll
+
+__cgExitCode=$?
+if [ $__cgExitCode -ne 0 ]
+then
+  echo Crossgen of unboxingstubs.dll failed with exitcode: $__cgExitCode
+  exit 1
+fi
+
+export DOTNET_GCName DOTNET_GCStress DOTNET_HeapVerify DOTNET_ReadyToRun
+]]></CLRTestBashPreCommands>
+  </PropertyGroup>
+</Project>

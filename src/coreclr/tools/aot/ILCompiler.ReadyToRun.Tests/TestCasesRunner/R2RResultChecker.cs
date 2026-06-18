@@ -670,6 +670,64 @@ internal static class R2RAssert
     }
 
     /// <summary>
+    /// Returns the distinct signature strings of all precompiled unboxing-stub entries (marked
+    /// with the <c>[UNBOX]</c> prefix) in the R2R image.
+    /// </summary>
+    private static List<string> GetUnboxingStubSignatures(ReadyToRunReader reader)
+    {
+        return GetAllMethods(reader)
+            .Select(m => m.SignatureString)
+            .Where(s => s.Contains("[UNBOX]", StringComparison.Ordinal))
+            .Distinct()
+            .ToList();
+    }
+
+    /// <summary>
+    /// Returns true if the R2R image contains exactly <paramref name="expectedCount"/> precompiled
+    /// unboxing-stub entries (<c>[UNBOX]</c> prefix) whose signature contains <paramref name="methodToken"/>.
+    /// Use a precise token (e.g. <c>"VirtualOverrideStruct.ToString("</c>) to avoid unintended substring matches.
+    /// </summary>
+    public static bool HasUnboxingStub(ReadyToRunReader reader, string methodToken, out string diagnostic, int expectedCount = 1)
+    {
+        List<string> unboxSigs = GetUnboxingStubSignatures(reader);
+        var matching = unboxSigs.Where(s => s.Contains(methodToken, StringComparison.Ordinal)).ToList();
+
+        if (matching.Count != expectedCount)
+        {
+            diagnostic = $"Expected exactly {expectedCount} [UNBOX] stub(s) matching '{methodToken}', " +
+                $"but found {matching.Count}: [{string.Join(", ", matching)}]. " +
+                $"All [UNBOX] stubs: [{string.Join(", ", unboxSigs)}]";
+            return false;
+        }
+
+        diagnostic = $"Found {expectedCount} [UNBOX] stub(s) matching '{methodToken}'.";
+        return true;
+    }
+
+    /// <summary>
+    /// Returns true if the R2R image contains NO precompiled unboxing-stub entry (<c>[UNBOX]</c>
+    /// prefix) whose signature contains <paramref name="methodToken"/>. Used to guard the feature
+    /// boundary (e.g. reference types, static methods, and generic value types/methods must not get
+    /// precompiled unboxing stubs).
+    /// </summary>
+    public static bool HasNoUnboxingStub(ReadyToRunReader reader, string methodToken, out string diagnostic)
+    {
+        var matching = GetUnboxingStubSignatures(reader)
+            .Where(s => s.Contains(methodToken, StringComparison.Ordinal))
+            .ToList();
+
+        if (matching.Count != 0)
+        {
+            diagnostic = $"Expected NO [UNBOX] stub matching '{methodToken}', but found {matching.Count}: " +
+                $"[{string.Join(", ", matching)}]";
+            return false;
+        }
+
+        diagnostic = $"No [UNBOX] stub matching '{methodToken}', as expected.";
+        return true;
+    }
+
+    /// <summary>
     /// Returns true if the R2R image contains exactly one [ASYNC] variant entry whose signature contains the given method name.
     /// Returns false if no match is found or if more than one [ASYNC] method signature matches the search token.
     /// Use a precise token (e.g. <c>".MethodName("</c>) to avoid unintended substring matches.

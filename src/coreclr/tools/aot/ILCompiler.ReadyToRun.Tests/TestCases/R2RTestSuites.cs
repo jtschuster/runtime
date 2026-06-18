@@ -401,6 +401,50 @@ public class R2RTestSuites
     }
 
     [Fact]
+    public void UnboxingStubEmission()
+    {
+        var unboxingStubEmission = new CompiledAssembly
+        {
+            AssemblyName = nameof(UnboxingStubEmission),
+            SourceResourceNames =
+            [
+                "UnboxingStubs/BasicUnboxingStubEmission.cs",
+            ],
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(UnboxingStubEmission),
+            [
+                new(nameof(UnboxingStubEmission), [new CrossgenAssembly(unboxingStubEmission)])
+                {
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            string diag;
+
+            // Positives: non-generic value-type virtual/interface instance methods get precompiled
+            // unboxing stubs.
+            Assert.True(R2RAssert.HasUnboxingStub(reader, "VirtualOverrideStruct.ToString(", out diag), diag);
+            Assert.True(R2RAssert.HasUnboxingStub(reader, "VirtualOverrideStruct.GetHashCode(", out diag), diag);
+            Assert.True(R2RAssert.HasUnboxingStub(reader, "VirtualOverrideStruct.Equals(", out diag), diag);
+            Assert.True(R2RAssert.HasUnboxingStub(reader, "ImplicitInterfaceStruct.InterfaceGet(", out diag), diag);
+            Assert.True(R2RAssert.HasUnboxingStub(reader, "ExplicitInterfaceStruct.", out diag), diag);
+            // Struct-returning virtual: exercises the return-buffer-vs-`this` register ordering.
+            Assert.True(R2RAssert.HasUnboxingStub(reader, "BigReturningStruct.GetBig(", out diag), diag);
+
+            // Negatives (feature boundary): reference types, static methods, and generic value
+            // types / generic methods must NOT get precompiled unboxing stubs.
+            Assert.True(R2RAssert.HasNoUnboxingStub(reader, "ReferenceTypeControl", out diag), diag);
+            Assert.True(R2RAssert.HasNoUnboxingStub(reader, "StaticControlMethod", out diag), diag);
+            Assert.True(R2RAssert.HasNoUnboxingStub(reader, "GenericValueControl", out diag), diag);
+            Assert.True(R2RAssert.HasNoUnboxingStub(reader, "GenericControlMethod", out diag), diag);
+        }
+    }
+
+    [Fact]
     public void RuntimeAsyncMethodEmission()
     {
         var runtimeAsyncMethodEmission = new CompiledAssembly
