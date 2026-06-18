@@ -1081,6 +1081,13 @@ static bool SigMatchesMethodDesc(MethodDesc* pMD, SigPointer &sig, ModuleBase * 
     if (sigIsAsync != pMD->IsAsyncVariantMethod())
         return false;
 
+    // An unboxing stub shares the underlying method's version-resilient hash bucket, so the
+    // unboxing flag must match to avoid binding a non-unboxing lookup to an unboxing-stub entry
+    // (or vice versa).
+    bool sigIsUnboxingStub = (methodFlags & ENCODE_METHOD_SIG_UnboxingStub) != 0;
+    if (sigIsUnboxingStub != (pMD->IsUnboxingStub() != FALSE))
+        return false;
+
     _ASSERTE((methodFlags & ENCODE_METHOD_SIG_SlotInsteadOfToken) == 0);
     _ASSERTE(((methodFlags & (ENCODE_METHOD_SIG_MemberRefToken | ENCODE_METHOD_SIG_UpdateContext)) == 0) ||
              ((methodFlags & (ENCODE_METHOD_SIG_MemberRefToken | ENCODE_METHOD_SIG_UpdateContext)) == (ENCODE_METHOD_SIG_MemberRefToken | ENCODE_METHOD_SIG_UpdateContext)));
@@ -1312,9 +1319,12 @@ PCODE ReadyToRunInfo::GetEntryPoint(MethodDesc * pMD, PrepareCodeConfig* pConfig
     ETW::MethodLog::GetR2RGetEntryPointStart(pMD);
 
     uint offset;
-    // Async variants are stored in the instance methods table
+    // Async variants and (non-generic) unboxing stubs are stored in the instance methods table.
+    // Generic unboxing stubs are not precompiled (crossgen2 only emits unboxing stub bodies for
+    // non-generic value types); they still reach the instance table via HasClassOrMethodInstantiation().
     if (pMD->HasClassOrMethodInstantiation()
-        || pMD->IsAsyncVariantMethod())
+        || pMD->IsAsyncVariantMethod()
+        || (pMD->IsUnboxingStub() && !pMD->HasClassOrMethodInstantiation()))
     {
         if (m_instMethodEntryPoints.IsNull())
             goto done;

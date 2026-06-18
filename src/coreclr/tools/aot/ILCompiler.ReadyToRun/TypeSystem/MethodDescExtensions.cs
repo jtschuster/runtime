@@ -29,6 +29,7 @@ namespace ILCompiler.ReadyToRun.TypeSystem
             {
                 PInvokeTargetNativeMethod pinvokeTarget => pinvokeTarget.Target,
                 AsyncResumptionStub resumptionStub => resumptionStub.TargetMethod.GetPrimaryMethodDesc(),
+                UnboxingStubMethod unboxingStub => unboxingStub.TargetMethod.GetPrimaryMethodDesc(),
                 _ => method,
             };
         }

@@ -390,6 +390,10 @@ namespace ILCompiler
 
         private bool VersionsWithMethodUncached(MethodDesc method)
         {
+            // A synthetic unboxing stub versions with wherever its underlying value-type method does.
+            if (method is UnboxingStubMethod unboxingStub)
+                method = unboxingStub.TargetMethod;
+
             if (method.OwningType is MetadataType owningType)
             {
                 if (!VersionsWithType(owningType))

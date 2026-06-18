@@ -27,6 +27,10 @@ namespace ILCompiler
             if (!_profileGuidedCompileRestrictionSet)
                 throw new InternalCompilerErrorException("Called ContainsMethodBody without setting profile guided restriction");
 
+            // A synthetic unboxing stub is contained wherever its underlying value-type method is.
+            if (method is UnboxingStubMethod unboxingStubMethod)
+                method = unboxingStubMethod.TargetMethod;
+
             if (_profileGuidedCompileRestriction != null)
             {
                 if (!_profileGuidedCompileRestriction.IsMethodInInputProfileData(method))

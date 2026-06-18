@@ -56,7 +56,16 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
         public static byte[] BuildSignatureForMethodDefinedInModule(MethodDesc method, NodeFactory factory)
         {
-            EcmaMethod typicalMethod = (EcmaMethod)method.GetPrimaryMethodDesc().GetTypicalMethodDefinition();
+            MethodDesc primaryMethod = method.GetPrimaryMethodDesc();
+            EcmaMethod typicalMethod = (EcmaMethod)primaryMethod.GetTypicalMethodDefinition();
+
+            // An unboxing stub's synthetic owning type (BoxedValueType) has no ECMA token, so it
+            // cannot be encoded as the signature owner. Encode the underlying value-type method
+            // (primaryMethod, owned by the real EcmaType) instead, and carry the unboxing-ness via
+            // the READYTORUN_METHOD_SIG_UnboxingStub flag (the `unboxing` argument below) — which
+            // is how the runtime binds the entry to the unboxing-stub MethodDesc.
+            bool isUnboxingStub = method is UnboxingStubMethod;
+            MethodDesc methodForToken = isUnboxingStub ? primaryMethod : method;
 
             ModuleToken moduleToken;
             if (factory.CompilationModuleGroup.VersionsWithMethodBody(typicalMethod))
@@ -73,7 +82,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
             ArraySignatureBuilder signatureBuilder = new ArraySignatureBuilder();
             signatureBuilder.EmitMethodSignature(
-                new MethodWithToken(method, moduleToken, constrainedType: null, unboxing: false, genericContextObject: null),
+                new MethodWithToken(methodForToken, moduleToken, constrainedType: null, unboxing: isUnboxingStub, genericContextObject: null),
                 enforceDefEncoding: true,
                 enforceOwningType: moduleToken.Module is EcmaModule ? factory.CompilationModuleGroup.EnforceOwningType((EcmaModule)moduleToken.Module) : true,
                 factory.SignatureContext,
@@ -110,7 +119,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                 if (method.Method is AsyncResumptionStub)
                     continue;
 
-                Debug.Assert(method.Method.HasInstantiation || method.Method.OwningType.HasInstantiation || method.Method.IsAsyncVariant());
+                Debug.Assert(method.Method.HasInstantiation || method.Method.OwningType.HasInstantiation || method.Method.IsAsyncVariant() || method.Method is UnboxingStubMethod);
 
                 int methodIndex = factory.RuntimeFunctionsTable.GetIndex(method);
 

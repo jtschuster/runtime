@@ -2408,7 +2408,15 @@ PCODE MethodDesc::DoPrestub(MethodTable *pDispatchingMT, CallerGCMode callerGCMo
     /**************************   CODE CREATION  *************************/
     if (IsUnboxingStub())
     {
-        pStub = MakeUnboxingStubWorker(this);
+#ifdef FEATURE_READYTORUN
+        // Prefer a precompiled unboxing stub body emitted into the R2R image, if present.
+        // SetCodeEntryPoint() below publishes it through the precode, exactly as the
+        // synthesized stub would be. Falls back to runtime synthesis on a miss.
+        PrepareCodeConfig config(NativeCodeVersion(this), FALSE, TRUE);
+        pCode = GetPrecompiledR2RCode(&config);
+#endif // FEATURE_READYTORUN
+        if (pCode == (PCODE)NULL)
+            pStub = MakeUnboxingStubWorker(this);
     }
 #if defined(FEATURE_SHARE_GENERIC_CODE)
     else if (IsInstantiatingStub())

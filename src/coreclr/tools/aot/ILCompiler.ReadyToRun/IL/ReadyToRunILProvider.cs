@@ -268,6 +268,10 @@ namespace Internal.IL
             {
                 return ars.EmitIL();
             }
+            else if (method is UnboxingStubMethod usm)
+            {
+                return usm.EmitIL();
+            }
             else
             {
                 return null;

@@ -281,6 +281,22 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                 dependencyList.AddRange(_nonRelocationDependencies);
             }
 
+            // Proactively emit an unboxing stub for non-generic value-type virtual instance
+            // methods so the runtime can bind the precompiled stub for vtable/interface dispatch
+            // (and other indirect paths) instead of synthesizing one in the prestub. The runtime
+            // marks all such methods as needing a tightly-bound unboxing stub
+            // (see MethodTableBuilder::NeedsTightlyBoundUnboxingStub).
+            MethodDesc method = _method;
+            if (method.IsVirtual
+                && !method.Signature.IsStatic
+                && method.OwningType.IsValueType
+                && !method.HasInstantiation
+                && !method.OwningType.HasInstantiation)
+            {
+                MethodDesc unboxingThunk = factory.TypeSystemContext.GetUnboxingThunk(method);
+                dependencyList.Add(factory.CompiledMethodNode(unboxingThunk), "Unboxing stub for value type virtual method");
+            }
+
             return dependencyList;
         }
 

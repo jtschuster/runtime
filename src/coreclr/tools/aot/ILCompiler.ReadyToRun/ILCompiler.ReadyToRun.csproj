@@ -51,6 +51,10 @@
     <Compile Include="..\..\Common\TypeSystem\IL\Stubs\AsyncResumptionStub.cs" Link="IL\Stubs\AsyncResumptionStub.cs" />
     <Compile Include="..\..\Common\TypeSystem\IL\Stubs\AsyncResumptionStub.Sorting.cs" Link="IL\Stubs\AsyncResumptionStub.Sorting.cs" />
     <Compile Include="..\..\Common\TypeSystem\IL\Stubs\AsyncResumptionStub.Mangling.cs" Link="IL\Stubs\AsyncResumptionStub.Mangling.cs" />
+    <Compile Include="..\..\Common\TypeSystem\CodeGen\INonEmittableType.cs" Link="TypeSystem\CodeGen\INonEmittableType.cs" />
+    <Compile Include="Compiler\BoxedValueType.cs" />
+    <Compile Include="Compiler\UnboxingStubMethod.cs" />
+    <Compile Include="Compiler\CompilerTypeSystemContext.BoxedTypes.cs" />
     <Compile Include="..\..\Common\TypeSystem\IL\Stubs\ComparerIntrinsics.cs" Link="IL\Stubs\ComparerIntrinsics.cs" />
     <Compile Include="..\..\Common\TypeSystem\IL\Stubs\InterlockedIntrinsics.cs" Link="IL\Stubs\InterlockedIntrinsics.cs" />
     <Compile Include="..\..\Common\TypeSystem\IL\Stubs\RuntimeHelpersIntrinsics.cs" Link="IL\Stubs\RuntimeHelpersIntrinsics.cs" />
