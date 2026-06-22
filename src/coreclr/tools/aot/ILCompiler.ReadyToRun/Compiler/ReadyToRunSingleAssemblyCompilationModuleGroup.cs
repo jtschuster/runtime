@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 
+using ILCompiler.ReadyToRun.TypeSystem;
 using Internal.ReadyToRunConstants;
 using Internal.TypeSystem;
 using Internal.TypeSystem.Ecma;
@@ -27,9 +28,9 @@ namespace ILCompiler
             if (!_profileGuidedCompileRestrictionSet)
                 throw new InternalCompilerErrorException("Called ContainsMethodBody without setting profile guided restriction");
 
-            // A synthetic unboxing stub is contained wherever its underlying value-type method is.
-            if (method is UnboxingStubMethod unboxingStubMethod)
-                method = unboxingStubMethod.TargetMethod;
+            // Containment is a metadata-level decision, so resolve any synthetic wrapper
+            // (unboxing stub, async variant, etc.) to the primary method it encodes for.
+            method = method.GetPrimaryMethodDesc();
 
             if (_profileGuidedCompileRestriction != null)
             {

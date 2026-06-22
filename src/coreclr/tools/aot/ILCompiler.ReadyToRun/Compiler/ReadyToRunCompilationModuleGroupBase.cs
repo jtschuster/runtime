@@ -9,6 +9,7 @@ using System.Linq;
 using System.Threading;
 using ILCompiler.DependencyAnalysis;
 using ILCompiler.DependencyAnalysis.ReadyToRun;
+using ILCompiler.ReadyToRun.TypeSystem;
 using Internal.IL;
 using Internal.TypeSystem;
 using Internal.TypeSystem.Ecma;
@@ -390,9 +391,9 @@ namespace ILCompiler
 
         private bool VersionsWithMethodUncached(MethodDesc method)
         {
-            // A synthetic unboxing stub versions with wherever its underlying value-type method does.
-            if (method is UnboxingStubMethod unboxingStub)
-                method = unboxingStub.TargetMethod;
+            // Versioning is a metadata-level decision, so resolve any synthetic wrapper
+            // (unboxing stub, async variant, etc.) to the primary method it encodes for.
+            method = method.GetPrimaryMethodDesc();
 
             if (method.OwningType is MetadataType owningType)
             {

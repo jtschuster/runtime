@@ -3513,12 +3513,9 @@ namespace Internal.JitInterface
         {
             MethodDesc method = HandleToObject(hMethod);
 #if READYTORUN
-            // Unwrap any unboxing thunk (the transient call-site marker or the storable
-            // UnboxingStubMethod) to the underlying value-type method so we resolve its def token.
-            if (method.IsUnboxingThunk())
-            {
-                method = method.GetUnboxedMethod();
-            }
+            // This returns only the metadata def token, so resolve any synthetic wrapper
+            // (unboxing thunk, async variant, etc.) to the primary method it encodes for.
+            method = method.GetPrimaryMethodDesc();
 #endif
             MethodDesc methodDefinition = method.GetTypicalMethodDefinition();
 
