@@ -59,14 +59,12 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             MethodDesc primaryMethod = method.GetPrimaryMethodDesc();
             EcmaMethod typicalMethod = (EcmaMethod)primaryMethod.GetTypicalMethodDefinition();
 
-            // An unboxing stub's synthetic owning type (BoxedValueType) has no ECMA token, so it
-            // cannot be encoded as the signature owner. Encode the underlying value-type method
-            // (primaryMethod, owned by the real EcmaType) instead, and carry the unboxing-ness via
-            // the READYTORUN_METHOD_SIG_UnboxingStub flag (the `unboxing` argument below) — which
-            // is how the runtime binds the entry to the unboxing-stub MethodDesc.
-            bool isUnboxingStub = method is UnboxingStubMethod;
-            MethodDesc methodForToken = isUnboxingStub ? primaryMethod : method;
-
+            // The unboxing stub (a MethodDelegator) flows through as MethodWithToken.Method: its
+            // OwningType/signature delegate to the underlying value-type method, and its unboxing-ness
+            // is recovered from identity in EmitMethodSignature (mirroring the async-variant flag) —
+            // so we no longer thread a side-channel `unboxing` bool here. The moduleToken below is
+            // still computed from the underlying value-type method because the stub's synthetic boxed
+            // owning type (BoxedValueType) has no ECMA token of its own.
             ModuleToken moduleToken;
             if (factory.CompilationModuleGroup.VersionsWithMethodBody(typicalMethod))
             {
@@ -82,7 +80,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
             ArraySignatureBuilder signatureBuilder = new ArraySignatureBuilder();
             signatureBuilder.EmitMethodSignature(
-                new MethodWithToken(methodForToken, moduleToken, constrainedType: null, unboxing: isUnboxingStub, genericContextObject: null),
+                new MethodWithToken(method, moduleToken, constrainedType: null, unboxing: false, genericContextObject: null),
                 enforceDefEncoding: true,
                 enforceOwningType: moduleToken.Module is EcmaModule ? factory.CompilationModuleGroup.EnforceOwningType((EcmaModule)moduleToken.Module) : true,
                 factory.SignatureContext,

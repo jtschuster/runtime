@@ -150,7 +150,11 @@ namespace Internal.JitInterface
 
         public MethodWithToken(MethodDesc method, ModuleToken token, TypeDesc constrainedType, bool unboxing, TypeSystemEntity genericContextObject, TypeDesc devirtualizedMethodOwner = null, bool forceOwningTypeFromMethodDesc = false)
         {
-            Debug.Assert(!method.IsUnboxingThunk());
+            // The storable unboxing stub (UnboxingStubMethod, a MethodDelegator) is allowed to flow
+            // through as Method: its unboxing-ness is recovered from identity in EmitMethodSignature.
+            // The transient generic unboxing marker (UnboxingMethodDesc) must NOT be stored here -- it
+            // is unwrapped to its target plus the `unboxing` bool at the call site before construction.
+            Debug.Assert(!(method is UnboxingMethodDesc));
             Debug.Assert(genericContextObject is null or MethodDesc or TypeDesc);
             Method = method;
             Token = token;
