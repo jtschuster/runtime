@@ -528,7 +528,8 @@ namespace ILCompiler.DependencyAnalysis
                     && compilableMethod.OwningType.IsValueType
                     && !compilableMethod.Signature.IsStatic
                     && !compilableMethod.HasInstantiation
-                    && !compilableMethod.OwningType.HasInstantiation)
+                    && !compilableMethod.OwningType.HasInstantiation
+                    && compilableMethod is not UnboxingStubMethod)
                 {
                     // Precompile the unboxing stub body (modeled as an instance method on a
                     // boxed-layout reference type) and route the import at it so the runtime

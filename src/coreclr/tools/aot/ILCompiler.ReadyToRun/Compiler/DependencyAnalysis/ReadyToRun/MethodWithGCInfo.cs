@@ -35,7 +35,10 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
         public MethodWithGCInfo(MethodDesc methodDesc)
         {
-            Debug.Assert(!methodDesc.IsUnboxingThunk());
+            // The only unboxing thunk permitted to be compiled as a body is the storable
+            // UnboxingStubMethod; the transient call-site marker (UnboxingMethodDesc) must never
+            // reach here.
+            Debug.Assert(!methodDesc.IsUnboxingThunk() || methodDesc is UnboxingStubMethod);
             GCInfoNode = new MethodGCInfoNode(this);
             _fixups = new List<ISymbolNode>();
             _method = methodDesc;
@@ -291,7 +294,8 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                 && !method.Signature.IsStatic
                 && method.OwningType.IsValueType
                 && !method.HasInstantiation
-                && !method.OwningType.HasInstantiation)
+                && !method.OwningType.HasInstantiation
+                && method is not UnboxingStubMethod)
             {
                 MethodDesc unboxingThunk = factory.TypeSystemContext.GetUnboxingThunk(method);
                 dependencyList.Add(factory.CompiledMethodNode(unboxingThunk), "Unboxing stub for value type virtual method");

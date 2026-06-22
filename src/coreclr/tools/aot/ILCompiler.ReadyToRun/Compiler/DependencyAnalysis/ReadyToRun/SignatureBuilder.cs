@@ -182,6 +182,14 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
         public void EmitTypeSignature(TypeDesc typeDesc, SignatureContext context)
         {
+            // An unboxing stub's boxed-`this` type (BoxedValueType) is reported to the JIT only via
+            // getMethodClass and has no metadata token. If it leaks into a type fixup (e.g. a
+            // compClassHnd MethodTable load emitted inside the stub body), encode the underlying
+            // value type instead: a boxed value type's object header points at the value type's own
+            // MethodTable, so the fixup resolves to the identical MethodTable at runtime.
+            if (typeDesc is BoxedValueType boxedValueType)
+                typeDesc = boxedValueType.ValueTypeRepresented;
+
             if (typeDesc is RuntimeDeterminedType runtimeDeterminedType)
             {
                 switch (runtimeDeterminedType.RuntimeDeterminedDetailsType.Kind)

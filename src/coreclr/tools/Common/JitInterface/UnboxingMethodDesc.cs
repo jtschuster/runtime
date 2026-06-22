@@ -88,14 +88,22 @@ namespace Internal.JitInterface
 
     internal static class UnboxingMethodDescExtensions
     {
+        // Recognizes both unboxing-thunk shapes: the transient JIT-EE call-site marker
+        // (UnboxingMethodDesc, used for not-yet-precompiled generic value types) and the storable
+        // compiled stub (any IMethodWithBoxedThis, e.g. R2R's UnboxingStubMethod).
         public static bool IsUnboxingThunk(this MethodDesc method)
         {
-            return method is UnboxingMethodDesc;
+            return method is UnboxingMethodDesc || method is IMethodWithBoxedThis;
         }
 
         public static MethodDesc GetUnboxedMethod(this MethodDesc method)
         {
-            return ((UnboxingMethodDesc)method).Target;
+            return method switch
+            {
+                UnboxingMethodDesc transientMarker => transientMarker.Target,
+                IMethodWithBoxedThis boxedThis => boxedThis.UnboxedTargetMethod,
+                _ => throw new InvalidOperationException(),
+            };
         }
     }
 }

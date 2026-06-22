@@ -149,6 +149,9 @@
     <Compile Include="..\..\Common\TypeSystem\Common\IAssemblyDesc.cs">
       <Link>TypeSystem\Common\IAssemblyDesc.cs</Link>
     </Compile>
+    <Compile Include="..\..\Common\TypeSystem\Common\IMethodWithBoxedThis.cs">
+      <Link>TypeSystem\Common\IMethodWithBoxedThis.cs</Link>
+    </Compile>
     <Compile Include="..\..\Common\TypeSystem\Common\IModuleResolver.cs">
       <Link>TypeSystem\Common\IModuleResolver.cs</Link>
     </Compile>

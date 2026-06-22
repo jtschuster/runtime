@@ -55,8 +55,10 @@ namespace ILCompiler
         {
             protected override int GetKeyHashCode(UnboxingStubKey key) => key.TargetMethod.GetHashCode();
             protected override int GetValueHashCode(UnboxingStubMethod value) => value.TargetMethod.GetHashCode();
-            protected override bool CompareKeyToValue(UnboxingStubKey key, UnboxingStubMethod value) => ReferenceEquals(key.TargetMethod, value.TargetMethod) && ReferenceEquals(key.OwningType, value.OwningType);
-            protected override bool CompareValueToValue(UnboxingStubMethod value1, UnboxingStubMethod value2) => ReferenceEquals(value1.TargetMethod, value2.TargetMethod) && ReferenceEquals(value1.OwningType, value2.OwningType);
+            // NOTE: UnboxingStubMethod.OwningType now delegates to the real value type (it is a
+            // MethodDelegator), so the boxed-layout owner is compared via BoxedThisType, not OwningType.
+            protected override bool CompareKeyToValue(UnboxingStubKey key, UnboxingStubMethod value) => ReferenceEquals(key.TargetMethod, value.TargetMethod) && ReferenceEquals(key.OwningType, value.BoxedThisType);
+            protected override bool CompareValueToValue(UnboxingStubMethod value1, UnboxingStubMethod value2) => ReferenceEquals(value1.TargetMethod, value2.TargetMethod) && ReferenceEquals(value1.BoxedThisType, value2.BoxedThisType);
             protected override UnboxingStubMethod CreateValueFromKey(UnboxingStubKey key) => new UnboxingStubMethod(key.OwningType, key.TargetMethod);
         }
         private UnboxingStubHashtable _unboxingStubHashtable = new UnboxingStubHashtable();

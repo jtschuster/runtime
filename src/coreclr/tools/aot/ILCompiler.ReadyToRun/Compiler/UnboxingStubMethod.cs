@@ -10,59 +10,67 @@ using Internal.TypeSystem;
 
 namespace ILCompiler
 {
-    // The compiled *body* of an unboxing stub, emitted into the R2R image. Modeled as an
-    // instance method on a BoxedValueType (a reference type with boxed-value-type layout) so the
-    // body uses the same calling convention callers use to invoke the unboxing stub: 'this'
-    // arrives as a boxed object reference. The body skips the MethodTable* (ldflda RawData.Data)
-    // to obtain a byref to the value and tail-calls the unboxed target. The BoxedValueType
-    // boxed-`this` modeling is ported from the NativeAOT compiler's BoxedTypes infrastructure.
-    // (NativeAOT emits the equivalent non-generic unboxing stub as a hand-written asm thunk,
-    // UnboxingStubNode; R2R models it as an IL stub because crossgen2 produces R2R image bodies by
-    // JIT-compiling IL.)
+    // PROTOTYPE (Option C v2): a single storable unboxing-thunk MethodDesc that serves BOTH as the
+    // call-site identity (returned by getUnboxingThunk for non-generic value types) AND as the
+    // compiled stub body emitted into the R2R image.
     //
-    // NOT to be confused with Internal.JitInterface.UnboxingMethodDesc: that is a transient
-    // JIT-EE *call-site marker* (a MethodDelegator over the real method, shared with NativeAOT,
-    // explicitly never stored) produced by getUnboxingThunk while compiling a *caller* of an
-    // unboxing entrypoint. This type is the opposite end: the stored, compilable stub body that
-    // such a call-site fixup ultimately binds to at runtime via the instance entry-point table.
+    // Modeled as a MethodDelegator so it is *transparently* the underlying value-type method
+    // everywhere callers observe it: OwningType -> the real value type, and Signature / IsVirtual /
+    // attributes / Instantiation are all delegated. That transparency is what lets the same object
+    // sit at a call site without tripping the JIT inliner's method-attribute invariants (the wall an
+    // ILStubMethod-based unification hit, because an IL stub reports IsVirtual=false).
+    //
+    // The boxed-`this` receiver (required by the body, which does `ldflda RawData.Data` to skip the
+    // MethodTable*) is injected only while the body itself is being compiled: CorInfoImpl.getMethodClass
+    // reports BoxedThisType (IMethodWithBoxedThis) when this == MethodBeingCompiled, and the real value
+    // type otherwise. The BoxedValueType modeling is ported from the NativeAOT BoxedTypes infrastructure.
+    //
+    // Contrast with Internal.JitInterface.UnboxingMethodDesc: that is the transient (never stored)
+    // call-site marker still used for *generic* value types, whose unboxing stubs are not yet
+    // precompiled and continue to be synthesized at runtime.
     //
     // Restricted to non-generic value types for now.
-    internal sealed class UnboxingStubMethod : ILStubMethod, IPrefixMangledMethod
+    internal sealed class UnboxingStubMethod : MethodDelegator, IPrefixMangledMethod, IMethodWithBoxedThis
     {
-        private readonly MethodDesc _targetMethod;
         private readonly BoxedValueType _boxedType;
 
         internal UnboxingStubMethod(BoxedValueType boxedType, MethodDesc targetMethod)
+            : base(targetMethod)
         {
             System.Diagnostics.Debug.Assert(targetMethod.OwningType.IsValueType);
             System.Diagnostics.Debug.Assert(!targetMethod.Signature.IsStatic);
+            System.Diagnostics.Debug.Assert(!targetMethod.HasInstantiation);
+            System.Diagnostics.Debug.Assert(!targetMethod.OwningType.HasInstantiation);
 
             _boxedType = boxedType;
-            _targetMethod = targetMethod;
         }
 
-        public override TypeSystemContext Context => _targetMethod.Context;
+        public MethodDesc TargetMethod => _wrappedMethod;
 
-        // The unboxing stub is an instance method on the boxed value type (a reference type),
-        // so the compiled body receives `this` as a boxed object reference.
-        public override TypeDesc OwningType => _boxedType;
+        // Distinct, storable identity (unlike the transient UnboxingMethodDesc whose sorting/hash
+        // throw): a unique name/mangling plus ClassCode/CompareToImpl. It deliberately shares the
+        // wrapped method's hash so the runtime finds it in the same InstanceEntryPointTable bucket
+        // (disambiguated by the READYTORUN_METHOD_SIG_UnboxingStub flag on its signature).
+        public override Utf8Span Name => _wrappedMethod.Name.Append("_Unbox"u8);
 
-        public override MethodSignature Signature => _targetMethod.Signature;
+        public override string DiagnosticName => _wrappedMethod.DiagnosticName + "_Unbox";
 
-        public MethodDesc TargetMethod => _targetMethod;
+        protected override int ComputeHashCode() => _wrappedMethod.GetHashCode();
 
-        public override Utf8Span Name => _targetMethod.Name.Append("_Unbox"u8);
+        // Non-generic only: canonicalization / definition / instantiation collapse to `this`.
+        // (GetCanonMethodTarget is abstract on MethodDelegator and MUST be overridden; returning
+        // `this` keeps the body node's identity reference-equal to MethodBeingCompiled.)
+        public override MethodDesc GetCanonMethodTarget(CanonicalFormKind kind) => this;
+        public override MethodDesc GetMethodDefinition() => this;
+        public override MethodDesc GetTypicalMethodDefinition() => this;
+        public override MethodDesc InstantiateSignature(Instantiation typeInstantiation, Instantiation methodInstantiation) => this;
 
-        public override string DiagnosticName => _targetMethod.DiagnosticName + "_Unbox";
+        // IMethodWithBoxedThis: the boxed-layout receiver the JIT reports for the body's `this`
+        // (only while this stub is itself being compiled; see CorInfoImpl.getMethodClass).
+        public TypeDesc BoxedThisType => _boxedType;
+        MethodDesc IMethodWithBoxedThis.UnboxedTargetMethod => _wrappedMethod;
 
-        public override Instantiation Instantiation => _targetMethod.Instantiation;
-
-        // The unboxing stub shares the version-resilient hash of the underlying method so
-        // that the runtime finds it in the same InstanceEntryPointTable bucket (it is
-        // disambiguated by the READYTORUN_METHOD_SIG_UnboxingStub flag on its signature).
-        protected override int ComputeHashCode() => _targetMethod.GetHashCode();
-
-        public override MethodIL EmitIL()
+        public MethodIL EmitIL()
         {
             if (_boxedType.ValueTypeRepresented.IsByRefLike)
             {
@@ -84,20 +92,20 @@ namespace ILCompiler
                 Context.SystemModule.GetKnownType("System.Runtime.CompilerServices"u8, "RawData"u8).GetField("Data"u8)));
 
             // Forward the remaining arguments.
-            for (int i = 0; i < _targetMethod.Signature.Length; i++)
+            for (int i = 0; i < _wrappedMethod.Signature.Length; i++)
             {
                 codeStream.EmitLdArg(i + 1);
             }
 
             // Call the unboxed target (becomes an R2R MethodEntry fixup).
-            codeStream.Emit(ILOpcode.call, emit.NewToken(_targetMethod));
+            codeStream.Emit(ILOpcode.call, emit.NewToken(_wrappedMethod));
             codeStream.Emit(ILOpcode.ret);
 
             return emit.Link(this);
         }
 
         // IPrefixMangledMethod: mangled from the underlying method with an "unbox" prefix.
-        MethodDesc IPrefixMangledMethod.BaseMethod => _targetMethod;
+        MethodDesc IPrefixMangledMethod.BaseMethod => _wrappedMethod;
         ReadOnlySpan<byte> IPrefixMangledMethod.Prefix => "unbox"u8;
 
         // Deterministic ordering support.
@@ -105,7 +113,7 @@ namespace ILCompiler
 
         protected override int CompareToImpl(MethodDesc other, TypeSystemComparer comparer)
         {
-            return comparer.Compare(_targetMethod, ((UnboxingStubMethod)other)._targetMethod);
+            return comparer.Compare(_wrappedMethod, ((UnboxingStubMethod)other)._wrappedMethod);
         }
     }
 }

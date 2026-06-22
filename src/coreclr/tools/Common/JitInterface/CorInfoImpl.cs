@@ -1334,6 +1334,15 @@ namespace Internal.JitInterface
         private CORINFO_CLASS_STRUCT_* getMethodClass(CORINFO_METHOD_STRUCT_* method)
         {
             var m = HandleToObject(method);
+
+            // An unboxing thunk's body receives `this` as a boxed object reference (it does
+            // `ldflda RawData.Data` to recover a byref to the value). Report the boxed-layout type
+            // for `this` only while the thunk itself is being compiled; at call sites the thunk is
+            // observed transparently as the real value-type method (MethodDelegator), so callers see
+            // the value type's owning class.
+            if (m is IMethodWithBoxedThis boxedThis && ReferenceEquals(m, MethodBeingCompiled))
+                return ObjectToHandle(boxedThis.BoxedThisType);
+
             return ObjectToHandle(m.OwningType);
         }
 
@@ -3504,9 +3513,11 @@ namespace Internal.JitInterface
         {
             MethodDesc method = HandleToObject(hMethod);
 #if READYTORUN
-            if (method is UnboxingMethodDesc unboxingMethodDesc)
+            // Unwrap any unboxing thunk (the transient call-site marker or the storable
+            // UnboxingStubMethod) to the underlying value-type method so we resolve its def token.
+            if (method.IsUnboxingThunk())
             {
-                method = unboxingMethodDesc.Target;
+                method = method.GetUnboxedMethod();
             }
 #endif
             MethodDesc methodDefinition = method.GetTypicalMethodDefinition();

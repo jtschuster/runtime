@@ -3015,6 +3015,13 @@ namespace Internal.JitInterface
 
         private MethodDesc getUnboxingThunk(MethodDesc method)
         {
+            // For non-generic value types we precompile the unboxing stub body and use a single
+            // storable thunk (UnboxingStubMethod, a MethodDelegator) as BOTH the call-site identity
+            // and the compiled body. Generic value-type unboxing stubs are not yet precompiled, so
+            // keep returning the transient call-site marker for them (synthesized at runtime).
+            if (!method.OwningType.HasInstantiation && !method.HasInstantiation)
+                return _compilation.TypeSystemContext.GetUnboxingThunk(method);
+
             return _unboxingThunkFactory.GetUnboxingMethod(method);
         }
 
