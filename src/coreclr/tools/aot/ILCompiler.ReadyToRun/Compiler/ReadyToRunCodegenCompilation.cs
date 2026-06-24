@@ -737,8 +737,8 @@ namespace ILCompiler
                         if (method.IsAsyncCall() && shouldBeCompiled)
                             AddNecessaryAsyncReferences(method);
 
-                        if (method.IsCompilerGeneratedILBodyForAsync() && shouldBeCompiled)
-                            EnsureAsyncThunkTokensAreAvailable(method);
+                        if (NeedsManifestTokensForCompilerGeneratedBody(method) && shouldBeCompiled)
+                            EnsureCompilerGeneratedThunkTokensAreAvailable(method);
 
                         if (!_nodeFactory.CompilationModuleGroup.VersionsWithMethodBody(method))
                             EnsureInstantiationReferencesArePresentForExternalMethod(method);
@@ -777,9 +777,20 @@ namespace ILCompiler
                 _nodeFactory.GenerateHotColdMap(_dependencyGraph);
             }
 
-            void EnsureAsyncThunkTokensAreAvailable(MethodDesc method)
+            // True for compiler-generated method bodies whose synthetic IL may reference corelib
+            // entities that have no recoverable metadata token when compiling an assembly outside the
+            // corelib version bubble: async thunks/resumption stubs, and shared-generic value-type
+            // unboxing thunks (which call SetNextCallGenericContext and load RawData.Data).
+            bool NeedsManifestTokensForCompilerGeneratedBody(MethodDesc method)
             {
-                if (!method.IsCompilerGeneratedILBodyForAsync())
+                if (method.IsCompilerGeneratedILBodyForAsync())
+                    return true;
+                return method.Context is CompilerTypeSystemContext context && context.IsSpecialUnboxingThunk(method);
+            }
+
+            void EnsureCompilerGeneratedThunkTokensAreAvailable(MethodDesc method)
+            {
+                if (!NeedsManifestTokensForCompilerGeneratedBody(method))
                     return;
                 MethodIL il = _methodILCache.ILProvider.GetMethodIL(method);
                 if (il is null)

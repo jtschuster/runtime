@@ -1,7 +1,8 @@
 // Test: Basic unboxing-stub emission in R2R
 // Validates that crossgen2 precompiles unboxing stubs ([UNBOX] entries) for non-generic
-// value-type virtual/interface instance methods, and that it does NOT emit them for the
-// out-of-scope cases (reference types, static methods, generic value types, generic methods).
+// value-type virtual/interface instance methods and for shared-generic (__Canon) value types,
+// and that it does NOT emit them for the out-of-scope cases (reference types, static methods,
+// exact-instantiated generic value types, generic methods).
 using System;
 
 public interface IUnboxValue
@@ -73,8 +74,11 @@ public struct StaticMethodControl
     public static int StaticControlMethod(int x) => x + 1;
 }
 
-// Out-of-scope: generic value type. The runtime synthesizes its unboxing stub; crossgen2 must not
-// precompile one for this slice.
+// Boundary case: a generic value type whose only hard instantiation is over a *value* type (int).
+// The exact GenericValueControl`1<int> instantiation is not shared, so crossgen2 does not precompile
+// a stub for it (the runtime synthesizes one on demand). crossgen2 still compiles the canonical
+// GenericValueControl`1<__Canon> body, which DOES get a precompiled shared-generic unboxing stub
+// (Phase 2). This pins down the exact-vs-canonical boundary.
 public struct GenericValueControl<T> : IUnboxValue
 {
     public int Field;
@@ -86,6 +90,20 @@ public struct GenericMethodControl
 {
     public int Field;
     public U GenericControlMethod<U>(U x) => x;
+}
+
+public interface IProduceValue<T>
+{
+    T ProduceValue();
+}
+
+// Shared-generic positive (Phase 2): a generic value type instantiated over a *reference* type
+// compiles to the canonical __Canon form, so crossgen2 precompiles a shared-generic unboxing stub
+// for its interface instance method.
+public struct SharedGenericStruct<T> : IProduceValue<T>
+{
+    public T Field;
+    public T ProduceValue() => Field;
 }
 
 // Driver: forces crossgen2 to compile the boxed/interface dispatch paths and the generic
@@ -116,6 +134,11 @@ public static class UnboxDriver
 
         var genericMethodHolder = new GenericMethodControl { Field = 6 };
         acc += genericMethodHolder.GenericControlMethod<int>(7);
+
+        // Shared-generic positive: a reference-type arg makes this the canonical __Canon form, which
+        // gets a precompiled shared-generic unboxing stub.
+        IProduceValue<string> sharedGeneric = new SharedGenericStruct<string> { Field = "shared" };
+        acc += sharedGeneric.ProduceValue().Length;
 
         var refControl = new ReferenceTypeControl { Field = 8 };
         acc += refControl.RefVirtualMethod();

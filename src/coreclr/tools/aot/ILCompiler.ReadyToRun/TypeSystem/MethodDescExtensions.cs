@@ -25,6 +25,13 @@ namespace ILCompiler.ReadyToRun.TypeSystem
             {
                 return method.GetTargetOfReturnDroppingAsyncThunk().GetPrimaryMethodDesc();
             }
+            // Shared-generic value-type unboxing thunks (GenericUnboxingThunk, possibly instantiated
+            // onto a canonical boxed type) are not matched by IsUnboxingThunk(); unwrap them to the
+            // underlying value-type method so callers (e.g. metadata token emission) see an EcmaMethod.
+            if (method.Context is CompilerTypeSystemContext context && context.IsSpecialUnboxingThunk(method))
+            {
+                return context.GetTargetOfSpecialUnboxingThunk(method).GetPrimaryMethodDesc();
+            }
             return method switch
             {
                 PInvokeTargetNativeMethod pinvokeTarget => pinvokeTarget.Target,

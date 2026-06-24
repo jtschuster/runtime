@@ -433,7 +433,9 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             bool isInstantiatingStub)
         {
             uint flags = 0;
-            if (method.Unboxing || method.Method.IsUnboxingThunk())
+            if (method.Unboxing
+                || method.Method.IsUnboxingThunk()
+                || (method.Method.Context is CompilerTypeSystemContext unboxingContext && unboxingContext.IsSpecialUnboxingThunk(method.Method)))
             {
                 flags |= (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_UnboxingStub;
             }

@@ -54,6 +54,7 @@
     <Compile Include="..\..\Common\TypeSystem\CodeGen\INonEmittableType.cs" Link="TypeSystem\CodeGen\INonEmittableType.cs" />
     <Compile Include="Compiler\BoxedValueType.cs" />
     <Compile Include="Compiler\UnboxingStubMethod.cs" />
+    <Compile Include="Compiler\GenericUnboxingThunk.cs" />
     <Compile Include="Compiler\CompilerTypeSystemContext.BoxedTypes.cs" />
     <Compile Include="..\..\Common\TypeSystem\IL\Stubs\ComparerIntrinsics.cs" Link="IL\Stubs\ComparerIntrinsics.cs" />
     <Compile Include="..\..\Common\TypeSystem\IL\Stubs\InterlockedIntrinsics.cs" Link="IL\Stubs\InterlockedIntrinsics.cs" />

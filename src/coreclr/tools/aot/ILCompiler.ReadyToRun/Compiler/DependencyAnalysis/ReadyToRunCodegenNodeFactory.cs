@@ -533,11 +533,25 @@ namespace ILCompiler.DependencyAnalysis
                 {
                     // Precompile the unboxing stub body (modeled as an instance method on a
                     // boxed-layout reference type) and route the import at it so the runtime
-                    // can use the precompiled stub instead of synthesizing one. Restricted to
-                    // non-generic value types for now; other unboxing/instantiating stubs keep
+                    // can use the precompiled stub instead of synthesizing one. This branch
+                    // handles non-generic value types; other unboxing/instantiating stubs keep
                     // falling back to runtime synthesis.
                     MethodDesc unboxingThunk = TypeSystemContext.GetUnboxingThunk(compilableMethod);
                     methodWithGCInfo = CompiledMethodNode(unboxingThunk);
+                }
+                else if (method.Unboxing
+                    && compilableMethod.OwningType.IsValueType
+                    && !compilableMethod.Signature.IsStatic
+                    && !compilableMethod.HasInstantiation
+                    && compilableMethod.OwningType.HasInstantiation
+                    && compilableMethod.IsSharedByGenericInstantiations)
+                {
+                    // Shared-generic value type: route the import at the dedicated generic unboxing
+                    // thunk (owned by a generic boxed-layout reference type). Its body loads the
+                    // hidden generic context from the boxed object before dispatching to the
+                    // canonical target.
+                    MethodDesc genericUnboxingThunk = TypeSystemContext.GetGenericUnboxingThunk(compilableMethod);
+                    methodWithGCInfo = CompiledMethodNode(genericUnboxingThunk);
                 }
                 else
                 {

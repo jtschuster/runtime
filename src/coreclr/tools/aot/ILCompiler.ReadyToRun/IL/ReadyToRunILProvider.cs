@@ -272,6 +272,10 @@ namespace Internal.IL
             {
                 return usm.EmitIL();
             }
+            else if (method is GenericUnboxingThunk gut)
+            {
+                return gut.EmitIL();
+            }
             else
             {
                 return null;

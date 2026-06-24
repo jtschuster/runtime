@@ -348,12 +348,19 @@ namespace Internal.JitInterface
             if (methodWithToken == null)
                 return false;
 
+            // Compare the *computed* OwningTypeNotDerivedFromToken rather than the raw
+            // _forceOwningTypeNotDerivedFromToken input. The mangled name and the emitted signature
+            // depend only on the computed flag plus OwningType; the raw force-bit is merely one way to
+            // arrive at the computed value. Two tokens that mangle/encode identically (same OwningType,
+            // same computed flag) must compare equal so the import-node cache deduplicates them --
+            // otherwise a method reached both via a stripped-instantiation IL stub (forced) and via a
+            // natural not-derived-from-token path produces two distinct nodes with the same symbol name.
             bool equals = Method == methodWithToken.Method
                 && Token.Equals(methodWithToken.Token)
                 && OwningType == methodWithToken.OwningType
                 && ConstrainedType == methodWithToken.ConstrainedType
                 && Unboxing == methodWithToken.Unboxing
-                && _forceOwningTypeNotDerivedFromToken == methodWithToken._forceOwningTypeNotDerivedFromToken;
+                && OwningTypeNotDerivedFromToken == methodWithToken.OwningTypeNotDerivedFromToken;
 
             return equals;
         }
@@ -429,7 +436,7 @@ namespace Internal.JitInterface
             if (result != 0)
                 return result;
 
-            result = _forceOwningTypeNotDerivedFromToken.CompareTo(other._forceOwningTypeNotDerivedFromToken);
+            result = OwningTypeNotDerivedFromToken.CompareTo(other.OwningTypeNotDerivedFromToken);
             if (result != 0)
                 return result;
 
@@ -3019,11 +3026,21 @@ namespace Internal.JitInterface
 
         private MethodDesc getUnboxingThunk(MethodDesc method)
         {
-            // For non-generic value types we precompile the unboxing stub body and use a single
-            // storable thunk (UnboxingStubMethod, a MethodDelegator) as BOTH the call-site identity
-            // and the compiled body. Generic value-type unboxing stubs are not yet precompiled, so
-            // keep returning the transient call-site marker for them (synthesized at runtime).
-            if (!method.OwningType.HasInstantiation && !method.HasInstantiation)
+            // For NON-generic value types we precompile the unboxing stub body and use a single storable
+            // thunk (UnboxingStubMethod, a MethodDelegator) as BOTH the call-site identity and the
+            // compiled body, since it early-outs of the JIT's generic resolution machinery harmlessly.
+            //
+            // For shared-generic value types the storable stub cannot be the call-site identity: it
+            // masquerades as a method on the canonical instantiated type (Foo<__Canon>) with no valid
+            // typical definition on the open Foo<T>, so the JIT's virtual/generic resolution faults when
+            // it inspects it as a call target. So we keep returning the transient call-site marker for
+            // those (the proven, long-standing behavior). Their stub *body* is still precompiled and
+            // emitted separately via the rooting paths (MethodWithGCInfo / CreateMethodEntrypoint), and
+            // the runtime matches body to call site by hash + the READYTORUN_METHOD_SIG_UnboxingStub flag
+            // (mirroring how NativeAOT keeps a transient call-site marker separate from the stub node).
+            //
+            // Generic *methods* on value types are not precompiled at all yet (synthesized at runtime).
+            if (!method.HasInstantiation && !method.OwningType.HasInstantiation)
                 return _compilation.TypeSystemContext.GetUnboxingThunk(method);
 
             return _unboxingThunkFactory.GetUnboxingMethod(method);

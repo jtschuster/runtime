@@ -139,7 +139,21 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
                 EntryPointVertex entryPointVertex = new EntryPointWithBlobVertex((uint)methodIndex, fixupBlob, signatureBlob);
                 hashtableSection.Place(entryPointVertex);
-                vertexHashtable.Append(unchecked((uint)method.Method.GetHashCode()), entryPointVertex);
+
+                // Shared-generic value-type unboxing thunks (GenericUnboxingThunk wrapped in a
+                // MethodForInstantiatedType) compute their hash from the synthetic boxed owning type and the
+                // "_Unbox"-suffixed name. That does NOT match the runtime's version-resilient hash of the
+                // unboxing-stub MethodDesc (which hashes the real value type and the underlying method name),
+                // so key the bucket by the underlying method instead. The runtime then finds this entry and
+                // disambiguates it from the real method's entry (same bucket) via the unboxing signature flag.
+                // The non-generic UnboxingStubMethod already matches via its own ComputeHashCode override, so
+                // it is intentionally left untouched here.
+                MethodDesc hashableMethod = method.Method;
+                if (hashableMethod.Context is CompilerTypeSystemContext unboxingContext && unboxingContext.IsSpecialUnboxingThunk(hashableMethod))
+                {
+                    hashableMethod = hashableMethod.GetPrimaryMethodDesc();
+                }
+                vertexHashtable.Append(unchecked((uint)hashableMethod.GetHashCode()), entryPointVertex);
             }
 
             MemoryStream hashtableContent = new MemoryStream();

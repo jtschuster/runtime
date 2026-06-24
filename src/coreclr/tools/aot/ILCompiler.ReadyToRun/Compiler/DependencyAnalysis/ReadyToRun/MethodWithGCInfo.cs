@@ -300,6 +300,16 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                 MethodDesc unboxingThunk = factory.TypeSystemContext.GetUnboxingThunk(method);
                 dependencyList.Add(factory.CompiledMethodNode(unboxingThunk), "Unboxing stub for value type virtual method");
             }
+            else if (method.IsVirtual
+                && !method.Signature.IsStatic
+                && method.OwningType.IsValueType
+                && !method.HasInstantiation
+                && method.OwningType.HasInstantiation
+                && method.IsSharedByGenericInstantiations)
+            {
+                MethodDesc genericUnboxingThunk = factory.TypeSystemContext.GetGenericUnboxingThunk(method);
+                dependencyList.Add(factory.CompiledMethodNode(genericUnboxingThunk), "Unboxing stub for shared-generic value type virtual method");
+            }
 
             return dependencyList;
         }

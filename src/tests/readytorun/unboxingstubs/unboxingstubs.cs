@@ -7,7 +7,9 @@
 // wrong `this` adjustment (e.g. not skipping the MethodTable*) would read garbage and fail the
 // checks. Covers the riskiest shapes: boxed virtual override, implicit + explicit interface
 // dispatch, a return-buffer-returning interface method (retbuf vs `this` register ordering), and a
-// closed delegate over a value-type instance method.
+// closed delegate over a value-type instance method, and a shared-generic value type (instantiated
+// over a reference type, so dispatch flows through a shared-generic unboxing stub that also loads the
+// generic context from the boxed object).
 using System;
 using System.Runtime.CompilerServices;
 
@@ -55,6 +57,26 @@ public struct BigStruct : IBigReturner
     public BigResult ComputeBig() => new BigResult { A = Seed, B = Seed + 1, C = Seed + 2, D = Seed + 3 };
 }
 
+public interface IGenericValue<T>
+{
+    T Produce();
+    string Describe();
+}
+
+// Shared-generic value type: instantiated over a reference-type argument (string) it compiles to the
+// canonical __Canon form, so boxed dispatch goes through a *shared-generic* unboxing stub
+// (GenericUnboxingThunk). Produce() returns T; Describe() reads typeof(T), which forces the stub to
+// load the generic context from the boxed object (RequiresInstMethodTableArg) — exercising the
+// context-loading path, not just the plain `this` adjustment.
+public struct GenericStruct<T> : IGenericValue<T>
+{
+    public T Field;
+    public int Tag;
+
+    public T Produce() => Field;
+    public string Describe() => $"GS<{typeof(T).Name}>:{Tag}";
+}
+
 public static class UnboxingStubsTest
 {
     private static bool s_failed;
@@ -89,6 +111,12 @@ public static class UnboxingStubsTest
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static BigResult CallBig(IBigReturner b) => b.ComputeBig();
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static string CallGenericProduce(IGenericValue<string> g) => g.Produce();
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static string CallGenericDescribe(IGenericValue<string> g) => g.Describe();
+
     public static int Main()
     {
         var vs = new ValueStruct { X = 3, Y = 4 };
@@ -115,6 +143,11 @@ public static class UnboxingStubsTest
         // Closed delegate over a value-type instance method (target is a boxed copy).
         Func<int> getter = new ValueStruct { X = 5, Y = 6 }.GetValue;
         Check("Delegate", 56, getter());
+
+        // Shared-generic value-type unboxing stubs (reference-type arg => __Canon shared code).
+        IGenericValue<string> gv = new GenericStruct<string> { Field = "hello", Tag = 7 };
+        Check("Generic.Produce", "hello", CallGenericProduce(gv));
+        Check("Generic.Describe", "GS<String>:7", CallGenericDescribe(gv));
 
         if (s_failed)
         {
