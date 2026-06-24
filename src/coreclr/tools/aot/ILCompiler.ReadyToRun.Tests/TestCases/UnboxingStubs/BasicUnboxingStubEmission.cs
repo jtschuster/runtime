@@ -74,11 +74,12 @@ public struct StaticMethodControl
     public static int StaticControlMethod(int x) => x + 1;
 }
 
-// Boundary case: a generic value type whose only hard instantiation is over a *value* type (int).
-// The exact GenericValueControl`1<int> instantiation is not shared, so crossgen2 does not precompile
-// a stub for it (the runtime synthesizes one on demand). crossgen2 still compiles the canonical
-// GenericValueControl`1<__Canon> body, which DOES get a precompiled shared-generic unboxing stub
-// (Phase 2). This pins down the exact-vs-canonical boundary.
+// Exact-generic positive (Phase 3): a generic value type whose only hard instantiation is over a
+// *value* type (int). The exact GenericValueControl`1<int> instantiation is not shared, so its
+// receiver's MethodTable already carries the full generic context and crossgen2 precompiles a simple
+// unboxing stub for it (dispatching directly, like the non-generic case). crossgen2 ALSO compiles the
+// canonical GenericValueControl`1<__Canon> body, which gets its own shared-generic unboxing stub
+// (Phase 2). Both the exact and canonical stubs are emitted.
 public struct GenericValueControl<T> : IUnboxValue
 {
     public int Field;

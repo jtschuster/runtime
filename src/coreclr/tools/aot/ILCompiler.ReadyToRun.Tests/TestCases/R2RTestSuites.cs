@@ -439,16 +439,17 @@ public class R2RTestSuites
             // type compiles to the canonical __Canon form and gets a precompiled shared-generic
             // unboxing stub.
             Assert.True(R2RAssert.HasUnboxingStub(reader, "SharedGenericStruct", out diag), diag);
-            // Even when the only hard instantiation is over a value type (GenericValueControl`1<int>),
-            // crossgen2 still compiles the canonical __Canon body and emits its shared-generic stub.
             Assert.True(R2RAssert.HasUnboxingStub(reader, "GenericValueControl`1<__Canon>", out diag), diag);
+            // Exact-generic positive (Phase 3): an *exact* value-type instantiation of a generic value
+            // type (GenericValueControl`1<int>) gets its own simple precompiled unboxing stub — the
+            // receiver's MethodTable already carries the full generic context, so it dispatches directly
+            // like the non-generic case (distinct from the __Canon body above).
+            Assert.True(R2RAssert.HasUnboxingStub(reader, "GenericValueControl`1<int>", out diag), diag);
 
-            // Negatives (feature boundary): reference types, static methods, the *exact* (non-shared)
-            // value-type instantiation of a generic value type, and generic methods must NOT get
-            // precompiled unboxing stubs.
+            // Negatives (feature boundary): reference types, static methods, and generic *methods*
+            // must NOT get precompiled unboxing stubs.
             Assert.True(R2RAssert.HasNoUnboxingStub(reader, "ReferenceTypeControl", out diag), diag);
             Assert.True(R2RAssert.HasNoUnboxingStub(reader, "StaticControlMethod", out diag), diag);
-            Assert.True(R2RAssert.HasNoUnboxingStub(reader, "GenericValueControl`1<int>", out diag), diag);
             Assert.True(R2RAssert.HasNoUnboxingStub(reader, "GenericControlMethod", out diag), diag);
         }
     }

@@ -10,9 +10,9 @@ using Internal.TypeSystem;
 
 namespace ILCompiler
 {
-    // PROTOTYPE (Option C v2): a single storable unboxing-thunk MethodDesc that serves BOTH as the
-    // call-site identity (returned by getUnboxingThunk for non-generic value types) AND as the
-    // compiled stub body emitted into the R2R image.
+    // A single storable unboxing-thunk MethodDesc that serves BOTH as the call-site identity
+    // (returned by getUnboxingThunk for non-generic value types) AND as the compiled stub body
+    // emitted into the R2R image.
     //
     // Modeled as a MethodDelegator so it is *transparently* the underlying value-type method
     // everywhere callers observe it: OwningType -> the real value type, and Signature / IsVirtual /
@@ -26,21 +26,23 @@ namespace ILCompiler
     // type otherwise. The BoxedValueType modeling is ported from the NativeAOT BoxedTypes infrastructure.
     //
     // Contrast with Internal.JitInterface.UnboxingMethodDesc: that is the transient (never stored)
-    // call-site marker still used for *generic* value types, whose unboxing stubs are not yet
-    // precompiled and continue to be synthesized at runtime.
+    // call-site marker still used for *shared-generic* value types, whose unboxing stubs masquerade as
+    // methods on the canonical Foo<__Canon> and are emitted via the dedicated GenericUnboxingThunk.
     //
-    // Restricted to non-generic value types for now.
+    // Used for non-generic value types and *exact* (non-shared) generic value-type instantiations. For
+    // the exact-generic case the boxed-`this` type is an instantiated boxed-layout type (Boxed_Foo<int>),
+    // so _boxedType is a TypeDesc rather than a bare BoxedValueType.
     internal sealed class UnboxingStubMethod : MethodDelegator, IPrefixMangledMethod, IMethodWithBoxedThis
     {
-        private readonly BoxedValueType _boxedType;
+        private readonly TypeDesc _boxedType;
 
-        internal UnboxingStubMethod(BoxedValueType boxedType, MethodDesc targetMethod)
+        internal UnboxingStubMethod(TypeDesc boxedType, MethodDesc targetMethod)
             : base(targetMethod)
         {
             System.Diagnostics.Debug.Assert(targetMethod.OwningType.IsValueType);
             System.Diagnostics.Debug.Assert(!targetMethod.Signature.IsStatic);
             System.Diagnostics.Debug.Assert(!targetMethod.HasInstantiation);
-            System.Diagnostics.Debug.Assert(!targetMethod.OwningType.HasInstantiation);
+            System.Diagnostics.Debug.Assert(!targetMethod.IsSharedByGenericInstantiations);
 
             _boxedType = boxedType;
         }
@@ -57,9 +59,11 @@ namespace ILCompiler
 
         protected override int ComputeHashCode() => _wrappedMethod.GetHashCode();
 
-        // Non-generic only: canonicalization / definition / instantiation collapse to `this`.
-        // (GetCanonMethodTarget is abstract on MethodDelegator and MUST be overridden; returning
-        // `this` keeps the body node's identity reference-equal to MethodBeingCompiled.)
+        // Canonicalization / definition / instantiation collapse to `this`: the stub is used only for
+        // non-generic and *exact* (non-shared) generic value-type instantiations, both of which are
+        // their own canonical form. (GetCanonMethodTarget is abstract on MethodDelegator and MUST be
+        // overridden; returning `this` keeps the body node's identity reference-equal to
+        // MethodBeingCompiled.)
         public override MethodDesc GetCanonMethodTarget(CanonicalFormKind kind) => this;
         public override MethodDesc GetMethodDefinition() => this;
         public override MethodDesc GetTypicalMethodDefinition() => this;
@@ -72,7 +76,7 @@ namespace ILCompiler
 
         public MethodIL EmitIL()
         {
-            if (_boxedType.ValueTypeRepresented.IsByRefLike)
+            if (_wrappedMethod.OwningType.IsByRefLike)
             {
                 // ByRef-like types cannot be boxed, so this thunk is unreachable. Emit a
                 // body that throws to keep the pointer-extraction mechanism uniform.

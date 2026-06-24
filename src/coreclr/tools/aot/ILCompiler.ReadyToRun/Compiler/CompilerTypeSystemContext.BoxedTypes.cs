@@ -15,17 +15,32 @@ namespace ILCompiler
         /// Gets a compilable method that represents the unboxing entrypoint of an instance
         /// method on a value type. The returned method, when given a boxed value type as its
         /// 'this' pointer, extracts a byref to the value and dispatches to <paramref name="targetMethod"/>.
-        /// Restricted to non-generic value types for now.
+        /// Handles non-generic value types and <em>exact</em> (non-shared) generic value-type
+        /// instantiations (e.g. <c>Foo&lt;int&gt;</c>) — both dispatch directly, since the receiver's
+        /// MethodTable already carries the full generic context. Shared-generic instantiations
+        /// (<c>Foo&lt;__Canon&gt;</c>) instead use <see cref="GetGenericUnboxingThunk"/>, which threads
+        /// the hidden generic context.
         /// </summary>
         public MethodDesc GetUnboxingThunk(MethodDesc targetMethod)
         {
             Debug.Assert(targetMethod.OwningType.IsValueType);
             Debug.Assert(!targetMethod.Signature.IsStatic);
             Debug.Assert(!targetMethod.HasInstantiation);
-            Debug.Assert(!targetMethod.OwningType.HasInstantiation);
+            Debug.Assert(!targetMethod.IsSharedByGenericInstantiations);
 
-            var valueType = (MetadataType)targetMethod.OwningType;
-            BoxedValueType boxedType = _boxedValueTypeHashtable.GetOrCreateValue(valueType);
+            TypeDesc owningType = targetMethod.OwningType;
+            var owningTypeDefinition = (MetadataType)owningType.GetTypeDefinition();
+
+            // A reference type with the same layout as the boxed value type, built on the type definition.
+            BoxedValueType boxedTypeDefinition = _boxedValueTypeHashtable.GetOrCreateValue(owningTypeDefinition);
+
+            // For an exact generic instantiation (e.g. Foo<int>), instantiate the boxed-layout type to
+            // match (Boxed_Foo<int>) so the JIT-reported boxed `this` carries the exact MethodTable. A
+            // non-generic value type's definition is already the closed type.
+            TypeDesc boxedType = owningType.HasInstantiation
+                ? boxedTypeDefinition.MakeInstantiatedType(owningType.Instantiation)
+                : boxedTypeDefinition;
+
             return _unboxingStubHashtable.GetOrCreateValue(new UnboxingStubKey(targetMethod, boxedType));
         }
 
@@ -111,9 +126,9 @@ namespace ILCompiler
         private struct UnboxingStubKey
         {
             public readonly MethodDesc TargetMethod;
-            public readonly BoxedValueType OwningType;
+            public readonly TypeDesc OwningType;
 
-            public UnboxingStubKey(MethodDesc targetMethod, BoxedValueType owningType)
+            public UnboxingStubKey(MethodDesc targetMethod, TypeDesc owningType)
             {
                 TargetMethod = targetMethod;
                 OwningType = owningType;
