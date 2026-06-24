@@ -6232,6 +6232,17 @@ void Lowering::LowerStoreSingleRegCallStruct(GenTreeBlk* store)
             regType = call->TypeGet();
         }
 #endif
+
+#if defined(TARGET_WASM)
+        CORINFO_CLASS_HANDLE clsHnd = layout->GetClassHandle();
+        if (clsHnd != NO_CLASS_HANDLE)
+        {
+            CorInfoWasmType wasmAbiType = m_compiler->info.compCompHnd->getWasmLowering(clsHnd);
+            assert(wasmAbiType != CORINFO_WASM_TYPE_VOID);
+            regType = WasmClassifier::ToJitType(wasmAbiType);
+        }
+#endif // TARGET_WASM
+
         store->ChangeType(regType);
         store->SetOper(GT_STOREIND);
         LowerStoreIndirCommon(store->AsStoreInd());
@@ -8098,16 +8109,14 @@ bool Lowering::TryLowerConstIntUDivOrUMod(GenTreeOp* divMod)
 {
     assert(divMod->OperIs(GT_UDIV, GT_UMOD));
 
-#if defined(USE_HELPERS_FOR_INT_DIV)
-    if (!varTypeIsIntegral(divMod->TypeGet()))
-    {
-        assert(!"unreachable: integral GT_UDIV/GT_UMOD should get morphed into helper calls");
-    }
-    assert(varTypeIsFloating(divMod->TypeGet()));
+#if USE_HELPERS_FOR_INT_DIV
+    assert(varTypeIsFloating(divMod->TypeGet()) &&
+           "unreachable: integral GT_UDIV/GT_UMOD should get morphed into helper calls");
 #endif // USE_HELPERS_FOR_INT_DIV
-#if defined(TARGET_ARM64)
+
+#if defined(TARGET_ARMARCH)
     assert(!divMod->OperIs(GT_UMOD));
-#endif // TARGET_ARM64
+#endif // TARGET_ARMARCH
 
     GenTree* dividend = divMod->gtGetOp1();
     GenTree* divisor  = divMod->gtGetOp2();
@@ -8415,9 +8424,10 @@ bool Lowering::TryLowerConstIntDivOrMod(GenTree* node, GenTree** nextNode)
     const var_types type = divMod->TypeGet();
     assert((type == TYP_INT) || (type == TYP_LONG));
 
-#if defined(USE_HELPERS_FOR_INT_DIV)
+#if USE_HELPERS_FOR_INT_DIV
     assert(!"unreachable: integral GT_DIV/GT_MOD should get morphed into helper calls");
 #endif // USE_HELPERS_FOR_INT_DIV
+
 #if defined(TARGET_ARM64)
     if (divMod->OperIs(GT_MOD) && divisor->IsIntegralConstPow2())
     {
@@ -8425,8 +8435,11 @@ bool Lowering::TryLowerConstIntDivOrMod(GenTree* node, GenTree** nextNode)
         *nextNode = node->gtNext;
         return true;
     }
-    assert(!node->OperIs(GT_MOD));
 #endif // TARGET_ARM64
+
+#if defined(TARGET_ARMARCH)
+    assert(!node->OperIs(GT_MOD));
+#endif // TARGET_ARMARCH
 
 #if defined(TARGET_WASM)
     // TODO-Wasm: evaluate if this is worth doing for Wasm, since some cases will increase
@@ -9234,7 +9247,7 @@ void Lowering::FindInducedParameterRegisterLocals()
             // accesses larger to generate smaller code.
 
 #ifdef TARGET_WASM
-            var_types fullWidthType = TYP_LONG;
+            var_types fullWidthType = genActualType(regSegment->GetRegisterType());
 #else
             var_types fullWidthType = TYP_I_IMPL;
 #endif
@@ -9490,6 +9503,7 @@ void Lowering::CheckNode(Compiler* compiler, GenTree* node)
         {
             const GenTreeLclVarCommon* lclVarAddr = node->AsLclVarCommon();
             const LclVarDsc*           varDsc     = compiler->lvaGetDesc(lclVarAddr);
+#if !defined(TARGET_WASM)
             if (((lclVarAddr->gtFlags & GTF_VAR_DEF) != 0) && varDsc->HasGCPtr())
             {
                 // Emitter does not correctly handle live updates for LCL_ADDR
@@ -9502,6 +9516,7 @@ void Lowering::CheckNode(Compiler* compiler, GenTree* node)
                 assert(lclVarAddr->isContained() || !varDsc->lvTracked || varTypeIsStruct(varDsc));
                 // TODO: support this assert for uses, see https://github.com/dotnet/runtime/issues/51900.
             }
+#endif // !TARGET_WASM
 
             assert(varDsc->lvDoNotEnregister);
             break;
