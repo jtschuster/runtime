@@ -184,23 +184,13 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
         {
             // An unboxing stub's boxed-`this` type (BoxedValueType) is reported to the JIT only via
             // getMethodClass and has no metadata token. If it leaks into a type fixup (e.g. a
-            // compClassHnd MethodTable load emitted inside the stub body), encode the underlying
-            // value type instead: a boxed value type's object header points at the value type's own
-            // MethodTable, so the fixup resolves to the identical MethodTable at runtime.
-            if (typeDesc is BoxedValueType boxedValueType)
+            // compClassHnd MethodTable load emitted inside the stub body) or is used as the stub's
+            // owner-type signature, encode the underlying value type instead. This covers both the bare
+            // BoxedValueType and the InstantiatedType-over-BoxedValueType owner of a shared-generic
+            // GenericUnboxingThunk; see BoxedValueTypeExtensions.GetUnboxedValueType for the rationale.
+            if (typeDesc.IsBoxedValueType())
             {
-                typeDesc = boxedValueType.ValueTypeRepresented;
-            }
-            else if (typeDesc is InstantiatedType boxedInstantiation && boxedInstantiation.GetTypeDefinition() is BoxedValueType boxedDefinition)
-            {
-                // A shared-generic GenericUnboxingThunk is owned by an InstantiatedType whose definition
-                // is the BoxedValueType (e.g. Boxed_GHolder`1<__Canon>). Re-form it as the corresponding
-                // instantiation of the underlying value type (GHolder`1<__Canon>) so the module override
-                // (ELEMENT_TYPE_MODULE_ZAPSIG, in composite R2R) is emitted at the generic-instantiation
-                // level -- exactly matching the regular method-body owner-type signature. Without this the
-                // override is emitted inside the GENERICINST instead, and the runtime owner-type compare in
-                // SigMatchesMethodDesc rejects the stub, falling back to runtime stub synthesis.
-                typeDesc = boxedDefinition.ValueTypeRepresented.MakeInstantiatedType(boxedInstantiation.Instantiation);
+                typeDesc = typeDesc.GetUnboxedValueType();
             }
 
             if (typeDesc is RuntimeDeterminedType runtimeDeterminedType)

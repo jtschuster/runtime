@@ -101,4 +101,40 @@ namespace ILCompiler
             return comparer.Compare(ValueTypeRepresented, ((BoxedValueType)other).ValueTypeRepresented);
         }
     }
+
+    internal static class BoxedValueTypeExtensions
+    {
+        /// <summary>
+        /// Returns true if <paramref name="type"/> is a synthetic boxed value type: either the bare
+        /// <see cref="BoxedValueType"/> definition (e.g. Boxed_Foo) or an instantiation of one
+        /// (e.g. Boxed_GHolder`1&lt;__Canon&gt;, the owner of a shared-generic GenericUnboxingThunk).
+        /// </summary>
+        public static bool IsBoxedValueType(this TypeDesc type)
+        {
+            return type.GetTypeDefinition() is BoxedValueType;
+        }
+
+        /// <summary>
+        /// For a boxed value type (see <see cref="IsBoxedValueType"/>), returns the underlying value type it
+        /// represents, preserving any instantiation. A boxed value type's object header points at the value
+        /// type's own MethodTable, so the unboxed type resolves to the identical runtime MethodTable. Re-forming
+        /// the instantiation of the real value type (rather than leaving the BoxedValueType definition in place)
+        /// also ensures the cross-module override (ELEMENT_TYPE_MODULE_ZAPSIG, in composite R2R) is emitted at the
+        /// generic-instantiation level when this type is encoded as an unboxing stub's owner -- exactly matching
+        /// the regular method-body owner-type signature the runtime owner-type compare expects.
+        /// </summary>
+        public static TypeDesc GetUnboxedValueType(this TypeDesc type)
+        {
+            Debug.Assert(type.IsBoxedValueType());
+
+            if (type is BoxedValueType boxedValueType)
+            {
+                return boxedValueType.ValueTypeRepresented;
+            }
+
+            var boxedInstantiation = (InstantiatedType)type;
+            var boxedDefinition = (BoxedValueType)boxedInstantiation.GetTypeDefinition();
+            return boxedDefinition.ValueTypeRepresented.MakeInstantiatedType(boxedInstantiation.Instantiation);
+        }
+    }
 }
