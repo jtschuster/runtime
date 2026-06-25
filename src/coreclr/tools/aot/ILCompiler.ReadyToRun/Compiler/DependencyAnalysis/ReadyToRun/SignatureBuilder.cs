@@ -188,7 +188,20 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             // value type instead: a boxed value type's object header points at the value type's own
             // MethodTable, so the fixup resolves to the identical MethodTable at runtime.
             if (typeDesc is BoxedValueType boxedValueType)
+            {
                 typeDesc = boxedValueType.ValueTypeRepresented;
+            }
+            else if (typeDesc is InstantiatedType boxedInstantiation && boxedInstantiation.GetTypeDefinition() is BoxedValueType boxedDefinition)
+            {
+                // A shared-generic GenericUnboxingThunk is owned by an InstantiatedType whose definition
+                // is the BoxedValueType (e.g. Boxed_GHolder`1<__Canon>). Re-form it as the corresponding
+                // instantiation of the underlying value type (GHolder`1<__Canon>) so the module override
+                // (ELEMENT_TYPE_MODULE_ZAPSIG, in composite R2R) is emitted at the generic-instantiation
+                // level -- exactly matching the regular method-body owner-type signature. Without this the
+                // override is emitted inside the GENERICINST instead, and the runtime owner-type compare in
+                // SigMatchesMethodDesc rejects the stub, falling back to runtime stub synthesis.
+                typeDesc = boxedDefinition.ValueTypeRepresented.MakeInstantiatedType(boxedInstantiation.Instantiation);
+            }
 
             if (typeDesc is RuntimeDeterminedType runtimeDeterminedType)
             {
