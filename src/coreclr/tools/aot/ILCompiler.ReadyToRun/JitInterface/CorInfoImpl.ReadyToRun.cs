@@ -3032,23 +3032,17 @@ namespace Internal.JitInterface
 
         private MethodDesc getUnboxingThunk(MethodDesc method)
         {
-            // For NON-generic value types we precompile the unboxing stub body and use a single storable
-            // thunk (UnboxingStubMethod, a MethodDelegator) as BOTH the call-site identity and the
-            // compiled body, since it early-outs of the JIT's generic resolution machinery harmlessly.
+            // Return the transient JIT-EE call-site marker (UnboxingMethodDesc) for every value type,
+            // matching NativeAOT (CorInfoImpl.RyuJit.cs). This marker is never stored: it is unwrapped
+            // to its target method plus the `unboxing` bool at the call site (getCallInfo) before any
+            // MethodWithToken is built, so the call-site identity is uniform across non-generic,
+            // exact-generic (Foo<int>), and shared-generic (Foo<__Canon>) value types.
             //
-            // For shared-generic value types the storable stub cannot be the call-site identity: it
-            // masquerades as a method on the canonical instantiated type (Foo<__Canon>) with no valid
-            // typical definition on the open Foo<T>, so the JIT's virtual/generic resolution faults when
-            // it inspects it as a call target. So we keep returning the transient call-site marker for
-            // those (the proven, long-standing behavior). Their stub *body* is still precompiled and
-            // emitted separately via the rooting paths (MethodWithGCInfo / CreateMethodEntrypoint), and
-            // the runtime matches body to call site by hash + the READYTORUN_METHOD_SIG_UnboxingStub flag
-            // (mirroring how NativeAOT keeps a transient call-site marker separate from the stub node).
-            //
-            // Generic *methods* on value types are not precompiled at all yet (synthesized at runtime).
-            if (!method.HasInstantiation && !method.OwningType.HasInstantiation)
-                return _compilation.TypeSystemContext.GetUnboxingThunk(method);
-
+            // The precompiled stub *body* is emitted separately by the node-emission layer
+            // (MethodWithGCInfo / ReadyToRunCodegenNodeFactory.CreateMethodEntrypoint), which substitutes
+            // the real UnboxingStubMethod / GenericUnboxingThunk based on the MethodWithToken.Unboxing
+            // flag. The runtime matches that emitted body to the call site by hash plus the
+            // READYTORUN_METHOD_SIG_UnboxingStub flag.
             return _unboxingThunkFactory.GetUnboxingMethod(method);
         }
 
