@@ -786,7 +786,7 @@ namespace ILCompiler
             {
                 if (method.IsCompilerGeneratedILBodyForAsync())
                     return true;
-                return method.Context is CompilerTypeSystemContext context && context.IsSpecialUnboxingThunk(method);
+                return method.IsSpecialUnboxingThunk();
             }
 
             void EnsureCompilerGeneratedThunkTokensAreAvailable(MethodDesc method)

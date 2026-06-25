@@ -83,14 +83,6 @@ namespace ILCompiler
         }
 
         /// <summary>
-        /// Does a method represent a (shared-generic) special unboxing thunk?
-        /// </summary>
-        public bool IsSpecialUnboxingThunk(MethodDesc method)
-        {
-            return method.GetTypicalMethodDefinition().GetType() == typeof(GenericUnboxingThunk);
-        }
-
-        /// <summary>
         /// Convert from a special unboxing thunk to the actual target method it dispatches to.
         /// </summary>
         public MethodDesc GetTargetOfSpecialUnboxingThunk(MethodDesc method)

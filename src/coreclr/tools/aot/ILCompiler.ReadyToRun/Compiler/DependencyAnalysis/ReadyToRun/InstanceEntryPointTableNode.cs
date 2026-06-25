@@ -149,7 +149,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                 // The non-generic UnboxingStubMethod already matches via its own ComputeHashCode override, so
                 // it is intentionally left untouched here.
                 MethodDesc hashableMethod = method.Method;
-                if (hashableMethod.Context is CompilerTypeSystemContext unboxingContext && unboxingContext.IsSpecialUnboxingThunk(hashableMethod))
+                if (hashableMethod.IsSpecialUnboxingThunk())
                 {
                     hashableMethod = hashableMethod.GetPrimaryMethodDesc();
                 }

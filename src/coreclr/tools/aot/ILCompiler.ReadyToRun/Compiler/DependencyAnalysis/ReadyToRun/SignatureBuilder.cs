@@ -438,7 +438,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
             uint flags = 0;
             if (method.Unboxing
                 || method.Method.IsUnboxingThunk()
-                || (method.Method.Context is CompilerTypeSystemContext unboxingContext && unboxingContext.IsSpecialUnboxingThunk(method.Method)))
+                || method.Method.IsSpecialUnboxingThunk())
             {
                 flags |= (uint)ReadyToRunMethodSigFlags.READYTORUN_METHOD_SIG_UnboxingStub;
             }

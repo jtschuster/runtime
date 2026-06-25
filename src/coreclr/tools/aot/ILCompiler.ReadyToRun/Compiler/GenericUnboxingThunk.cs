@@ -131,4 +131,15 @@ namespace ILCompiler
             return comparer.Compare(_targetMethod, ((GenericUnboxingThunk)other)._targetMethod);
         }
     }
+
+    internal static class GenericUnboxingThunkExtensions
+    {
+        /// <summary>
+        /// Does a method represent a (shared-generic) special unboxing thunk?
+        /// </summary>
+        public static bool IsSpecialUnboxingThunk(this MethodDesc method)
+        {
+            return method.GetTypicalMethodDefinition() is GenericUnboxingThunk;
+        }
+    }
 }

@@ -28,9 +28,9 @@ namespace ILCompiler.ReadyToRun.TypeSystem
             // Shared-generic value-type unboxing thunks (GenericUnboxingThunk, possibly instantiated
             // onto a canonical boxed type) are not matched by IsUnboxingThunk(); unwrap them to the
             // underlying value-type method so callers (e.g. metadata token emission) see an EcmaMethod.
-            if (method.Context is CompilerTypeSystemContext context && context.IsSpecialUnboxingThunk(method))
+            if (method.IsSpecialUnboxingThunk())
             {
-                return context.GetTargetOfSpecialUnboxingThunk(method).GetPrimaryMethodDesc();
+                return ((CompilerTypeSystemContext)method.Context).GetTargetOfSpecialUnboxingThunk(method).GetPrimaryMethodDesc();
             }
             return method switch
             {
