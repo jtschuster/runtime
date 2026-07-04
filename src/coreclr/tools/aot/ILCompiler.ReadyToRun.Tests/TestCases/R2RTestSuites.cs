@@ -434,6 +434,56 @@ public class R2RTestSuites
     }
 
     /// <summary>
+    /// PR #120519 / issue #120160: valid duplicate ExternalTypeMap entries with different trim targets
+    /// must collapse to one emitted key in the ReadyToRun ExternalTypeMaps section. crossgen2 does not
+    /// apply trim-target-based removal here, so this test validates section emission, target resolution,
+    /// and duplicate-key collapsing while linker and NativeAOT tests cover the trim-target filtering paths.
+    /// </summary>
+    [Fact]
+    public void TypeMapExternalMapDuplicateTrimTargets()
+    {
+        var duplicateTrimTargets = new CompiledAssembly
+        {
+            AssemblyName = nameof(TypeMapExternalMapDuplicateTrimTargets),
+            SourceResourceNames = ["TypeMap/DuplicateTrimTargets.cs"],
+        };
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(TypeMapExternalMapDuplicateTrimTargets),
+            [
+                new(nameof(TypeMapExternalMapDuplicateTrimTargets), [new CrossgenAssembly(duplicateTrimTargets)])
+                {
+                    Validate = Validate,
+                },
+            ]));
+
+        static void Validate(ReadyToRunReader reader)
+        {
+            const string GroupTypeName = "DuplicateTrimTargetsGroup";
+
+            string diag;
+            Assert.True(R2RAssert.HasExternalTypeMapSection(reader, out diag), diag);
+
+            Assert.True(R2RAssert.ExternalTypeMapHasEntry(reader, GroupTypeName, "DuplicateAllTrimTargetsKept", "DuplicateTarget", out diag), diag);
+            Assert.True(R2RAssert.ExternalTypeMapKeyIsUnique(reader, GroupTypeName, "DuplicateAllTrimTargetsKept", out diag), diag);
+
+            Assert.True(R2RAssert.ExternalTypeMapHasEntry(reader, GroupTypeName, "DuplicateSingleReferencedTrimTarget", "DuplicateSingleTarget", out diag), diag);
+            Assert.True(R2RAssert.ExternalTypeMapKeyIsUnique(reader, GroupTypeName, "DuplicateSingleReferencedTrimTarget", out diag), diag);
+
+            // ReadyToRun emission keeps this entry even though no trim targets are referenced; crossgen2 does
+            // not run the NativeAOT-style conditional dependency analysis that removes unmarked trim-target entries.
+            Assert.True(R2RAssert.ExternalTypeMapHasEntry(reader, GroupTypeName, "DuplicateAllTrimTargetsUnreferenced", "DuplicateUnreferencedTarget", out diag), diag);
+            Assert.True(R2RAssert.ExternalTypeMapKeyIsUnique(reader, GroupTypeName, "DuplicateAllTrimTargetsUnreferenced", out diag), diag);
+
+            Assert.True(R2RAssert.ExternalTypeMapHasEntry(reader, GroupTypeName, "DuplicateUnconditionalFirst", "DuplicateUnconditionalFirstTarget", out diag), diag);
+            Assert.True(R2RAssert.ExternalTypeMapKeyIsUnique(reader, GroupTypeName, "DuplicateUnconditionalFirst", out diag), diag);
+
+            Assert.True(R2RAssert.ExternalTypeMapHasEntry(reader, GroupTypeName, "DuplicateUnconditionalSecond", "DuplicateUnconditionalSecondTarget", out diag), diag);
+            Assert.True(R2RAssert.ExternalTypeMapKeyIsUnique(reader, GroupTypeName, "DuplicateUnconditionalSecond", out diag), diag);
+        }
+    }
+
+    /// <summary>
     /// #129813 / PR #129884: crossgen2 --strip-il-bodies must preserve the IL of non-async
     /// Task/ValueTask-returning methods, which is needed to compile the runtime-async variant.
     /// </summary>

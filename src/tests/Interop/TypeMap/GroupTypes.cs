@@ -27,4 +27,6 @@ public class MultipleTypeMapAssemblies { }
 
 public class DuplicateTypeMapEntriesAcrossAssemblies { }
 
+public class ValidDuplicateTypeMapEntriesAcrossAssemblies { }
+
 public class UnknownAssemblyReference { }

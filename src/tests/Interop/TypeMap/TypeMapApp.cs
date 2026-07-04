@@ -18,6 +18,8 @@ using DupType_MapString = Lib.AliasedName;
 
 [assembly: TypeMapAssemblyTarget<DuplicateTypeMapEntriesAcrossAssemblies>("TypeMapLib3")]
 
+[assembly: TypeMapAssemblyTarget<ValidDuplicateTypeMapEntriesAcrossAssemblies>("TypeMapLib3")]
+
 [assembly: TypeMapAssemblyTarget<UnknownAssemblyReference>("DoesNotExist")]
 
 [assembly: TypeMap<TypicalUseCase>("1", typeof(C1))]
@@ -71,6 +73,10 @@ using DupType_MapString = Lib.AliasedName;
 [assembly: TypeMap<InvalidDuplicateTypeNameKey>("1", typeof(string))]
 
 [assembly: TypeMap<DuplicateTypeMapEntriesAcrossAssemblies>("1", typeof(object))]
+
+// This app-level entry combines with the duplicate entries in Lib3.cs so MergePendingMap must
+// replay every trim target for the same key instead of dropping later duplicates.
+[assembly: TypeMap<ValidDuplicateTypeMapEntriesAcrossAssemblies>("1", typeof(object), typeof(int))]
 
 [assembly: TypeMapAssociation<InvalidDuplicateTypeNameKey>(typeof(DupType_MapObject), typeof(object))]
 [assembly: TypeMapAssociation<InvalidDuplicateTypeNameKey>(typeof(DupType_MapString), typeof(string))]
@@ -202,8 +208,26 @@ public class TypeMap
         Console.WriteLine(nameof(Validate_ExternalTypeMapping_ValidDuplicateTypeKey));
 
         var mapping = TypeMapping.GetOrCreateExternalTypeMapping<ValidDuplicateTypeNameKey>();
+        Assert.True(mapping.TryGetValue("1", out Type? duplicatedTarget));
+        Assert.Equal(typeof(object), duplicatedTarget);
         Assert.Equal(typeof(object), mapping["1"]);
     }
+
+    /// <summary>
+    /// Validates the PR #120519 duplicate-key merge path across assemblies: Lib3 contributes two
+    /// additional trim targets for the same key, and the merged external map must still resolve to one target type.
+    /// </summary>
+    [Fact]
+    public static void Validate_ExternalTypeMapping_ValidDuplicateTypeKeyAcrossAssemblies()
+    {
+        Console.WriteLine(nameof(Validate_ExternalTypeMapping_ValidDuplicateTypeKeyAcrossAssemblies));
+
+        IReadOnlyDictionary<string, Type> mapping = TypeMapping.GetOrCreateExternalTypeMapping<ValidDuplicateTypeMapEntriesAcrossAssemblies>();
+        Assert.True(mapping.TryGetValue("1", out Type? duplicatedTarget));
+        Assert.Equal(typeof(object), duplicatedTarget);
+        Assert.Equal(typeof(object), mapping["1"]);
+    }
+
     [Fact]
     public static void Validate_ProxyTypeMapping_DuplicateTypeKey()
     {
