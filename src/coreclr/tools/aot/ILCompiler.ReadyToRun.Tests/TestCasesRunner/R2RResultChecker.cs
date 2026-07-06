@@ -150,6 +150,90 @@ internal static class R2RAssert
         return failures.Count == 0;
     }
 
+    /// <summary>
+    /// Returns true if the R2R image contains a non-empty ExternalTypeMaps section.
+    /// </summary>
+    public static bool HasExternalTypeMapSection(ReadyToRunReader reader, out string diagnostic)
+    {
+        if (!ExternalTypeMapSection.TryGet(reader, out ExternalTypeMapSection? section))
+        {
+            diagnostic = "Expected ExternalTypeMaps section not found in R2R image.";
+            return false;
+        }
+
+        int validGroupCount = section.Groups.Count(group => group.IsValid);
+        int entryCount = section.Groups.Where(group => group.IsValid).Sum(group => group.RawKeys.Count);
+        if (entryCount == 0)
+        {
+            diagnostic = "ExternalTypeMaps section is present but contains no valid entries.";
+            return false;
+        }
+
+        diagnostic = $"ExternalTypeMaps contains {entryCount} entries across {validGroupCount} valid group(s).";
+        return true;
+    }
+
+    /// <summary>
+    /// Returns true if the given group contains the specified external type map entry and it resolves to the expected target type.
+    /// </summary>
+    public static bool ExternalTypeMapHasEntry(ReadyToRunReader reader, string groupTypeName, string key, string expectedTargetTypeName, out string diagnostic)
+    {
+        if (!TryGetExternalTypeMapGroup(reader, groupTypeName, out ExternalTypeMapSection.GroupEntry group, out diagnostic))
+            return false;
+
+        if (!group.Entries.TryGetValue(key, out string? actualTargetTypeName))
+        {
+            diagnostic = $"Expected ExternalTypeMaps entry '{groupTypeName}[\"{key}\"]' was not found. Present keys: [{string.Join(", ", group.RawKeys)}]";
+            return false;
+        }
+
+        if (!string.Equals(actualTargetTypeName, expectedTargetTypeName, StringComparison.Ordinal))
+        {
+            diagnostic = $"Expected ExternalTypeMaps entry '{groupTypeName}[\"{key}\"]' to resolve to '{expectedTargetTypeName}', but found '{actualTargetTypeName}'.";
+            return false;
+        }
+
+        diagnostic = $"Found ExternalTypeMaps entry '{groupTypeName}[\"{key}\"]' -> '{actualTargetTypeName}'.";
+        return true;
+    }
+
+    /// <summary>
+    /// Returns true if the given group does not contain the specified external type map entry.
+    /// </summary>
+    public static bool ExternalTypeMapEntryMissing(ReadyToRunReader reader, string groupTypeName, string key, out string diagnostic)
+    {
+        if (!TryGetExternalTypeMapGroup(reader, groupTypeName, out ExternalTypeMapSection.GroupEntry group, out diagnostic))
+            return false;
+
+        if (group.Entries.ContainsKey(key))
+        {
+            diagnostic = $"Expected ExternalTypeMaps entry '{groupTypeName}[\"{key}\"]' to be absent, but it resolves to '{group.Entries[key]}'.";
+            return false;
+        }
+
+        diagnostic = $"Confirmed ExternalTypeMaps entry '{groupTypeName}[\"{key}\"]' is absent.";
+        return true;
+    }
+
+    /// <summary>
+    /// Returns true if the specified key is emitted exactly once for the given group in the ExternalTypeMaps section.
+    /// </summary>
+    public static bool ExternalTypeMapKeyIsUnique(ReadyToRunReader reader, string groupTypeName, string key, out string diagnostic)
+    {
+        if (!TryGetExternalTypeMapGroup(reader, groupTypeName, out ExternalTypeMapSection.GroupEntry group, out diagnostic))
+            return false;
+
+        int occurrenceCount = group.RawKeys.Count(existingKey => string.Equals(existingKey, key, StringComparison.Ordinal));
+        if (occurrenceCount != 1)
+        {
+            diagnostic = $"Expected ExternalTypeMaps key '{groupTypeName}[\"{key}\"]' to be emitted exactly once, but found {occurrenceCount} occurrence(s). Raw keys: [{string.Join(", ", group.RawKeys)}]";
+            return false;
+        }
+
+        diagnostic = $"Confirmed ExternalTypeMaps key '{groupTypeName}[\"{key}\"]' is emitted exactly once.";
+        return true;
+    }
+
     private static bool SectionRVAIsEven(ReadyToRunReader reader, ReadyToRunSectionType sectionType, List<string> failures)
     {
         if (!reader.ReadyToRunHeader.Sections.TryGetValue(sectionType, out ReadyToRunSection section))
@@ -172,6 +256,31 @@ internal static class R2RAssert
         }
 
         return result;
+    }
+
+    private static bool TryGetExternalTypeMapGroup(ReadyToRunReader reader, string groupTypeName, out ExternalTypeMapSection.GroupEntry group, out string diagnostic)
+    {
+        if (!ExternalTypeMapSection.TryGet(reader, out ExternalTypeMapSection? section))
+        {
+            group = null!;
+            diagnostic = "Expected ExternalTypeMaps section not found in R2R image.";
+            return false;
+        }
+
+        if (!section.TryGetGroup(groupTypeName, out group))
+        {
+            diagnostic = $"Expected ExternalTypeMaps group '{groupTypeName}' was not found. Present groups: [{string.Join(", ", section.Groups.Select(existingGroup => existingGroup.GroupTypeName))}]";
+            return false;
+        }
+
+        if (!group.IsValid)
+        {
+            diagnostic = $"ExternalTypeMaps group '{groupTypeName}' is present but marked invalid.";
+            return false;
+        }
+
+        diagnostic = string.Empty;
+        return true;
     }
 
     private static bool ExceptionInfoMethodRVAsAreEven(ReadyToRunReader reader, List<string> failures)

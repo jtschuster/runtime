@@ -30,6 +30,12 @@ using Mono.Linker.Tests.Cases.Reflection.Dependencies.Library;
 [assembly: TypeMap<UsedTypeMap>("TrimTargetIsAllocatedNoTypeCheckNoBoxStruct", typeof(ConstructedNoTypeCheckOrBoxTarget), typeof(ConstructedNoTypeCheckNoBoxStruct))]
 [assembly: TypeMap<UsedTypeMap>("TrimTargetIsUsedArrayType", typeof(ArrayTypeTrimTargetTarget), typeof(ArrayTypeTrimTargetClass[]))]
 [assembly: TypeMap<UsedTypeMap>("TrimTargetIsUnusedArrayType", typeof(ArrayTypeTrimTargetUnusedTarget), typeof(ArrayTypeTrimTargetUnusedClass[]))]
+// PR #120519 changed duplicate-key handling so one referenced trim target is enough to keep the merged entry.
+[assembly: TypeMap<UsedTypeMap>("DuplicateMappingWithOneReferencedTrimTarget", typeof(DuplicateReferencedTarget), typeof(DuplicateReferencedTrimTarget))]
+[assembly: TypeMap<UsedTypeMap>("DuplicateMappingWithOneReferencedTrimTarget", typeof(DuplicateReferencedTarget), typeof(DuplicateRemovedTrimTarget))]
+// These duplicate entries must stay because the unconditional overload contributes a null trim target.
+[assembly: TypeMap<UsedTypeMap>("DuplicateMappingWithUnconditionalEntry", typeof(DuplicateUnconditionalTarget))]
+[assembly: TypeMap<UsedTypeMap>("DuplicateMappingWithUnconditionalEntry", typeof(DuplicateUnconditionalTarget), typeof(DuplicateConditionalTrimTarget))]
 [assembly: KeptAttributeAttribute(typeof(TypeMapAttribute<UsedTypeMap>), "TrimTargetIsTarget", typeof(TargetAndTrimTarget), typeof(TargetAndTrimTarget))]
 [assembly: KeptAttributeAttribute(typeof(TypeMapAttribute<UsedTypeMap>), "TrimTargetIsUnrelated", typeof(TargetType), typeof(TrimTarget))]
 [assembly: KeptAttributeAttribute(typeof(TypeMapAttribute<UsedTypeMap>), nameof(AllocatedNoTypeCheckClassTarget), typeof(AllocatedNoTypeCheckClassTarget), typeof(AllocatedNoTypeCheckClass))]
@@ -44,6 +50,8 @@ using Mono.Linker.Tests.Cases.Reflection.Dependencies.Library;
 [assembly: KeptAttributeAttribute(typeof(TypeMapAttribute<UsedTypeMap>), "ArrayElement", typeof(ArrayElementTarget), typeof(ArrayElement))]
 [assembly: KeptAttributeAttribute(typeof(TypeMapAttribute<UsedTypeMap>), "TrimTargetIsAllocatedNoTypeCheckNoBoxStruct", typeof(ConstructedNoTypeCheckOrBoxTarget), typeof(ConstructedNoTypeCheckNoBoxStruct))]
 [assembly: KeptAttributeAttribute(typeof(TypeMapAttribute<UsedTypeMap>), "TrimTargetIsUsedArrayType", typeof(ArrayTypeTrimTargetTarget), typeof(ArrayTypeTrimTargetClass[]))]
+[assembly: KeptAttributeAttribute(typeof(TypeMapAttribute<UsedTypeMap>), "DuplicateMappingWithOneReferencedTrimTarget", typeof(DuplicateReferencedTarget), typeof(DuplicateReferencedTrimTarget))]
+[assembly: KeptAttributeAttribute(typeof(TypeMapAttribute<UsedTypeMap>), "DuplicateMappingWithUnconditionalEntry", typeof(DuplicateUnconditionalTarget))]
 
 // The TypeMap Universes are kept separate such that Proxy attributes shouldn't be kept if only the External type map is needed.
 [assembly: TypeMap<UsedExternalTypeMap>("UsedOnlyForExternalTypeMap", typeof(UsedExternalTarget), typeof(UsedTrimTarget))] // Kept
@@ -156,6 +164,8 @@ namespace Mono.Linker.Tests.Cases.Reflection
     [RemovedTypeInAssembly("library2.dll", typeof(Mono.Linker.Tests.Cases.Reflection.Dependencies.Library2.TrimTarget2))]
     [RemovedTypeInAssembly("test", typeof(ArrayTypeTrimTargetUnusedClass))]
     [RemovedTypeInAssembly("test", typeof(ArrayTypeTrimTargetUnusedTarget))]
+    [RemovedTypeInAssembly("test", typeof(DuplicateRemovedTrimTarget))]
+    [RemovedTypeInAssembly("test", typeof(DuplicateConditionalTrimTarget))]
     class TypeMap
     {
         [Kept]
@@ -165,6 +175,7 @@ namespace Mono.Linker.Tests.Cases.Reflection
             object t = Activator.CreateInstance(Type.GetType(args[1]));
             CheckTargetAndTrimTarget(t);
             CheckTrimTarget(t);
+            CheckDuplicateReferencedTrimTarget(t);
             CheckTypeCheckOnlyClass(t);
             Unbox(t);
             if (t is IInterfaceWithDynamicImpl d)
@@ -328,6 +339,15 @@ namespace Mono.Linker.Tests.Cases.Reflection
             if (o is TrimTarget)
             {
                 Console.WriteLine("Type deriving from TrimTarget instantiated.");
+            }
+        }
+
+        [Kept]
+        private static void CheckDuplicateReferencedTrimTarget(object o)
+        {
+            if (o is DuplicateReferencedTrimTarget)
+            {
+                Console.WriteLine("Type deriving from DuplicateReferencedTrimTarget instantiated.");
             }
         }
 
@@ -606,6 +626,23 @@ namespace Mono.Linker.Tests.Cases.Reflection
     class ArrayTypeTrimTargetUnusedTarget;
 
     class ArrayTypeTrimTargetUnusedClass;
+
+    // The entry must survive when one duplicate trim target is marked, while the unreferenced duplicate
+    // trim target should still be removable. Without PR #120519 the second attribute is rejected up-front.
+    [Kept]
+    class DuplicateReferencedTarget;
+
+    [Kept]
+    class DuplicateReferencedTrimTarget;
+
+    class DuplicateRemovedTrimTarget;
+
+    // The unconditional overload contributes a null trim target, so the merged entry stays even though
+    // the conditional trim target is removable. Without PR #120519 the unconditional + conditional pair conflicts.
+    [Kept]
+    class DuplicateUnconditionalTarget;
+
+    class DuplicateConditionalTrimTarget;
 
     [Kept]
     [KeptMember(".ctor()")]
