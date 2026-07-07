@@ -2903,8 +2903,6 @@ void CodeGen::genCallInstruction(GenTreeCall* call)
         // Generate a direct call to a non-virtual user defined or helper method
         assert(call->IsHelperCall() || (call->gtCallType == CT_USER_FUNC));
 
-        assert(call->gtEntryPoint.addr == NULL);
-
         if (call->IsHelperCall())
         {
             assert(!call->IsFastTailCall());
@@ -2916,7 +2914,9 @@ void CodeGen::genCallInstruction(GenTreeCall* call)
         }
         else
         {
-            // Direct call to a non-virtual user function.
+            // Direct call to a non-virtual user function. Lowering has already
+            // resolved the (possibly R2R) entry point into gtDirectCallAddress.
+            assert(call->gtDirectCallAddress != nullptr);
             params.addr = call->gtDirectCallAddress;
         }
 
