@@ -81,6 +81,9 @@ extends:
             unifiedArtifactsName: Checked_CoreCLR_$(osGroup)$(osSubgroup)_$(archType)_$(_BuildConfig)
 
       # Outerloop testing in non-composite mode
+      # These platforms (linux_arm, osx_arm64) are NOT covered by the
+      # runtime-coreclr outerloop pipeline's (ci.yml) R2R_CG2 job, so run them
+      # on every trigger (scheduled and manual).
       - template: /eng/pipelines/common/platform-matrix.yml
         parameters:
           jobTemplate: /eng/pipelines/common/templates/runtimes/run-test-job.yml
@@ -88,19 +91,37 @@ extends:
           buildConfig: checked
           platforms:
           - linux_arm
-          - linux_arm64
-          - linux_x64
-          - osx_x64
           - osx_arm64
-          - windows_arm64
-          - windows_x64
-          - windows_x86
           jobParameters:
             testGroup: outerloop
             readyToRun: true
             displayNameArgs: R2R
             liveLibrariesBuildConfig: Release
             unifiedArtifactsName: Checked_CoreCLR_$(osGroup)$(osSubgroup)_$(archType)_$(_BuildConfig)
+
+      # These platforms overlap with the runtime-coreclr outerloop pipeline's
+      # (ci.yml) R2R_CG2 job, which runs them 3x/day on main. To avoid redundant
+      # work, only run them here on manual invocations (full coverage for
+      # validating a change), not on scheduled runs.
+      - ${{ if ne(variables['Build.Reason'], 'Schedule') }}:
+        - template: /eng/pipelines/common/platform-matrix.yml
+          parameters:
+            jobTemplate: /eng/pipelines/common/templates/runtimes/run-test-job.yml
+            helixQueuesTemplate: /eng/pipelines/coreclr/templates/helix-queues-setup.yml
+            buildConfig: checked
+            platforms:
+            - linux_arm64
+            - linux_x64
+            - osx_x64
+            - windows_x64
+            - windows_x86
+            - windows_arm64
+            jobParameters:
+              testGroup: outerloop
+              readyToRun: true
+              displayNameArgs: R2R
+              liveLibrariesBuildConfig: Release
+              unifiedArtifactsName: Checked_CoreCLR_$(osGroup)$(osSubgroup)_$(archType)_$(_BuildConfig)
 
       # Build release CoreCLR for Crossgen2 baseline generation
       - template: /eng/pipelines/common/platform-matrix.yml
