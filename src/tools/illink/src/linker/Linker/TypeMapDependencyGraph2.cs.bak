@@ -1,0 +1,228 @@
+
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using ILCompiler.DependencyAnalysisFramework;
+using Mono.Cecil;
+using Mono.Linker.Steps;
+
+using CustomAttributeWithOrigin = (Mono.Cecil.CustomAttribute Attribute, Mono.Cecil.AssemblyDefinition Origin);
+
+namespace Mono.Linker
+{
+    sealed class TypeMapNodeFactory(MarkStep _markStep, LinkContext _context)
+    {
+
+        internal MarkStep MarkStep => _markStep;
+        internal LinkContext Context => _context;
+        Dictionary<CustomAttribute, TypeMapAttributeKeptNode> _typeMapAttributeKeptNodes = new();
+        internal TypeMapAttributeKeptNode GetTypeMapAttributeKeptNode(CustomAttribute attr)
+        {
+            ref var value = ref CollectionsMarshal.GetValueRefOrAddDefault(_typeMapAttributeKeptNodes, attr, out bool exists);
+            if (!exists)
+                value = new TypeMapAttributeKeptNode(attr);
+
+
+        }
+
+        internal RequiresExternalTrimTargetNode GetRequiresExternalTrimTargetNode(TypeMapAttributeKeptNode typeMapAttributeKeptNode, TypeReference trimTarget) => throw new NotImplementedException();
+        internal DependencyNodeCore<TypeMapNodeFactory> GetExternalTrimTargetNode(TypeReference trimTarget) => throw new NotImplementedException();
+        internal DependencyNodeCore<TypeMapNodeFactory> GetExternalTypeMapUniverse(TypeReference typeMapUniverse) => throw new NotImplementedException();
+        internal DependencyNodeCore<TypeMapNodeFactory> GetPendingExternalTrimTargetNode(DependencyNodeCore<TypeMapNodeFactory> attributeKeptNode, DependencyNodeCore<TypeMapNodeFactory> trimTargetNode) => throw new NotImplementedException();
+    }
+
+    sealed class TypeMapDependencyGraph2
+    {
+        public static void Asdf() {}
+    }
+
+    internal abstract class TypeMapUniverseNode : DependencyNodeCore<TypeMapNodeFactory>
+    {
+        protected TypeDefinition _type;
+
+        public TypeMapUniverseNode(TypeDefinition type)
+        {
+            _type = type;
+        }
+
+        public override bool InterestingForDynamicDependencyAnalysis => false;
+
+        public override bool HasDynamicDependencies => false;
+
+        public override bool HasConditionalStaticDependencies => false;
+
+        public override bool StaticDependenciesAreComputed => true;
+
+        public override IEnumerable<CombinedDependencyListEntry>? GetConditionalStaticDependencies(TypeMapNodeFactory context)
+        {
+            return null!;
+        }
+
+        public override IEnumerable<DependencyListEntry>? GetStaticDependencies(TypeMapNodeFactory context) => null!;
+        public override IEnumerable<CombinedDependencyListEntry>? SearchDynamicDependencies(List<DependencyNodeCore<TypeMapNodeFactory>> markedNodes, int firstNode, TypeMapNodeFactory context) => null;
+    }
+
+    sealed class ProxyTypeMapUniverseNode : TypeMapUniverseNode
+    {
+        public ProxyTypeMapUniverseNode(TypeDefinition _type) : base(_type)
+        {
+        }
+
+        protected override string GetName(TypeMapNodeFactory context) => $"ProxyTypeUniverse: {_type.GetDisplayName()}";
+    }
+
+    sealed class ExternalTypeMapUniverseNode : TypeMapUniverseNode
+    {
+        public ExternalTypeMapUniverseNode(TypeDefinition _type) : base(_type)
+        {
+        }
+
+        protected override string GetName(TypeMapNodeFactory context) => $"ExternalTypeUniverse: {_type.GetDisplayName()}";
+    }
+
+    sealed class AssemblyHasTypeMapAttributeNode: DependencyNodeCore<TypeMapNodeFactory>
+    {
+        AssemblyDefinition _assembly;
+        public AssemblyHasTypeMapAttributeNode(AssemblyDefinition assembly)
+        {
+            _assembly = assembly;
+        }
+
+        public override bool InterestingForDynamicDependencyAnalysis => false;
+
+        public override bool HasDynamicDependencies => false;
+
+        public override bool HasConditionalStaticDependencies => false;
+
+        public override bool StaticDependenciesAreComputed => true;
+
+        public override IEnumerable<CombinedDependencyListEntry>? GetConditionalStaticDependencies(TypeMapNodeFactory context) => null;
+        public override IEnumerable<DependencyListEntry>? GetStaticDependencies(TypeMapNodeFactory context) => null;
+        public override IEnumerable<CombinedDependencyListEntry>? SearchDynamicDependencies(List<DependencyNodeCore<TypeMapNodeFactory>> markedNodes, int firstNode, TypeMapNodeFactory context) => null;
+        protected override string GetName(TypeMapNodeFactory context) => "AssemblyTypeMapInformation: "+ _assembly.FullName;
+    }
+    public class ExternalTypeMapTrimTargetNode {}
+    public class ProxyTypeMapTrimTargetNode {}
+    public class TypeMapAttributeKeptNode : DependencyNodeCore<TypeMapNodeFactory>
+    {
+        // OnMarked: Mark the attribute in the trimmer.
+    }
+
+    internal abstract class RequiresTrimTargetNodeBase : DependencyNodeCore<TypeMapNodeFactory>
+    {
+        public RequiresTrimTargetNodeBase(DependencyNodeCore<TypeMapNodeFactory> attributeKeptNode, DependencyNodeCore<TypeMapNodeFactory> trimTarget)
+        {
+            _trimTarget = trimTarget;
+            _attributeKeptNode = attributeKeptNode;
+        }
+        DependencyNodeCore<TypeMapNodeFactory> _trimTarget;
+        DependencyNodeCore<TypeMapNodeFactory> _attributeKeptNode;
+
+        public override bool InterestingForDynamicDependencyAnalysis => false;
+
+        public override bool HasDynamicDependencies => false;
+
+        public override bool HasConditionalStaticDependencies => true;
+
+        public override bool StaticDependenciesAreComputed => true;
+
+        public override IEnumerable<CombinedDependencyListEntry> GetConditionalStaticDependencies(TypeMapNodeFactory context)
+        {
+            return [new CombinedDependencyListEntry(_attributeKeptNode, _trimTarget, "TrimTargetKept")];
+        }
+
+        public override IEnumerable<DependencyListEntry> GetStaticDependencies(TypeMapNodeFactory context) => null!;
+        public override IEnumerable<CombinedDependencyListEntry> SearchDynamicDependencies(List<DependencyNodeCore<TypeMapNodeFactory>> markedNodes, int firstNode, TypeMapNodeFactory context) => null!;
+    }
+    internal class RequiresExternalTrimTargetNode : RequiresTrimTargetNodeBase
+    {
+        public RequiresExternalTrimTargetNode(DependencyNodeCore<TypeMapNodeFactory> attributeKeptNode, DependencyNodeCore<TypeMapNodeFactory> trimTarget) : base(attributeKeptNode, trimTarget)
+        {
+        }
+
+        protected override string GetName(TypeMapNodeFactory context) => "RequiresExternalTrimTarget";
+    }
+    internal class RequiresProxyTrimTargetNode : RequiresTrimTargetNodeBase
+    {
+        public RequiresProxyTrimTargetNode(DependencyNodeCore<TypeMapNodeFactory> attributeKept, DependencyNodeCore<TypeMapNodeFactory> trimTarget) : base(attributeKept, trimTarget)
+        {
+        }
+        protected override string GetName(TypeMapNodeFactory context) => "RequiresProxyTrimTarget";
+    }
+
+    internal abstract class TypeMapAttributeFoundNodeBase : DependencyNodeCore<TypeMapNodeFactory>
+    {
+        protected CustomAttribute _attribute;
+
+        public TypeMapAttributeFoundNodeBase(CustomAttribute attr)
+        {
+            _attribute = attr;
+        }
+
+        public override bool InterestingForDynamicDependencyAnalysis => false;
+
+        public override bool HasDynamicDependencies => false;
+
+        public override bool HasConditionalStaticDependencies
+        {
+            get
+            {
+                return true;
+            }
+        }
+
+        public override bool StaticDependenciesAreComputed => true;
+
+        public abstract DependencyNodeCore<TypeMapNodeFactory> GetTypeMapUniverseNode(TypeMapNodeFactory context, TypeReference typeMapUniverse);
+        public abstract DependencyNodeCore<TypeMapNodeFactory> GetTrimTargetNode(TypeMapNodeFactory context, TypeReference trimTarget);
+        public abstract DependencyNodeCore<TypeMapNodeFactory> GetPendingTrimTargetNode(TypeMapNodeFactory context, DependencyNodeCore<TypeMapNodeFactory> attributeKeptNode, DependencyNodeCore<TypeMapNodeFactory> trimTargetNode);
+
+        public override IEnumerable<CombinedDependencyListEntry>? GetConditionalStaticDependencies(TypeMapNodeFactory context)
+        {
+            DependencyNodeCore<TypeMapNodeFactory> typeMapUniverseNode = GetTypeMapUniverseNode(context);
+
+            var attributeKeptNode = context.GetTypeMapAttributeKeptNode(_attribute);
+            if (_attribute.ConstructorArguments.Count != 3)
+            {
+                return [new CombinedDependencyListEntry(attributeKeptNode, typeMapUniverseNode, "TypeMapUniverseMarked")];
+            }
+            else
+            {
+                TypeReference trimTarget = (TypeReference)_attribute.ConstructorArguments[2].Value;
+                DependencyNodeCore<TypeMapNodeFactory> trimTargetNode = GetTrimTargetNode(context, trimTarget);
+                var i = GetPendingTrimTargetNode(context, attributeKeptNode, trimTargetNode);
+                return [new CombinedDependencyListEntry(i, typeMapUniverseNode, "asdf")];
+            }
+        }
+
+        public override IEnumerable<DependencyListEntry> GetStaticDependencies(TypeMapNodeFactory context) => null!;
+        public override IEnumerable<CombinedDependencyListEntry> SearchDynamicDependencies(List<DependencyNodeCore<TypeMapNodeFactory>> markedNodes, int firstNode, TypeMapNodeFactory context) => null!;
+        protected override string GetName(TypeMapNodeFactory context) => "NotImplementedYet!";
+    }
+
+    internal class ExternalTypeMapAttributeFoundNode : TypeMapAttributeFoundNodeBase
+    {
+        public ExternalTypeMapAttributeFoundNode(CustomAttribute attr) : base(attr)
+        {
+        }
+
+        public override DependencyNodeCore<TypeMapNodeFactory> GetTypeMapUniverseNode(TypeMapNodeFactory context, TypeReference typeMapUniverse)
+        {
+            return context.GetExternalTypeMapUniverse(typeMapUniverse);
+        }
+
+        public override DependencyNodeCore<TypeMapNodeFactory> GetTrimTargetNode(TypeMapNodeFactory context, TypeReference trimTarget)
+        {
+            return context.GetExternalTrimTargetNode(trimTarget);
+        }
+
+        public override DependencyNodeCore<TypeMapNodeFactory> GetPendingTrimTargetNode(TypeMapNodeFactory context, DependencyNodeCore<TypeMapNodeFactory> attributeKeptNode, DependencyNodeCore<TypeMapNodeFactory> trimTargetNode)
+        {
+            return context.GetPendingExternalTrimTargetNode(attributeKeptNode, trimTargetNode);
+        }
+    }
+}
