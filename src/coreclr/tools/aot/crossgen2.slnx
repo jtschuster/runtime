@@ -7,6 +7,14 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
+  <Folder Name="/ILCompiler/" />
+  <Folder Name="/ILCompiler/reproZero/">
+    <Project Path="ILCompiler/reproZero/reproZero.csproj">
+      <Platform Solution="*|Any CPU" Project="x64" />
+      <Platform Solution="*|x64" Project="x64" />
+      <Platform Solution="*|x86" Project="x86" />
+    </Project>
+  </Folder>
   <Project Path="../../../tools/illink/src/ILLink.CodeFix/ILLink.CodeFixProvider.csproj">
     <BuildType Solution="Checked|*" Project="Debug" />
   </Project>
