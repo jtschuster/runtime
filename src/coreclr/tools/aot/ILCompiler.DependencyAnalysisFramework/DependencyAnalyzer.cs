@@ -1,6 +1,10 @@
 // Licensed to the .NET Foundation under one or more agreements.
 // The .NET Foundation licenses this file to you under the MIT license.
 
+#if ILLINK
+#nullable disable
+#endif
+
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -293,7 +297,17 @@ namespace ILCompiler.DependencyAnalysisFramework
             } while (_markStack.Count != 0);
         }
 
-        public override void ComputeMarkedNodes()
+        public override void ComputeMarkedNodes() => ComputeMarkedNodes(finalize: true);
+
+        internal void ComputeMarkedNodesIncrementally()
+        {
+            if (_markingCompleted)
+                throw new InvalidOperationException();
+
+            ComputeMarkedNodes(finalize: false);
+        }
+
+        private void ComputeMarkedNodes(bool finalize)
         {
             using (PerfEventSource.StartStopEvents.GraphProcessingEvents())
             {
@@ -341,8 +355,15 @@ namespace ILCompiler.DependencyAnalysisFramework
                     }
                 } while ((_markStack.Count != 0) || (_deferredStaticDependencies.Count != 0));
 
+                if (!finalize)
+                    return;
+
                 if (_resultSorter != null)
+#if ILLINK
+                    _markedNodes.Sort(_resultSorter);
+#else
                     _markedNodes.MergeSortAllowDuplicates(_resultSorter);
+#endif
 
                 _markedNodesFinal = _markedNodes.ToImmutableArray();
                 _markedNodes = null;

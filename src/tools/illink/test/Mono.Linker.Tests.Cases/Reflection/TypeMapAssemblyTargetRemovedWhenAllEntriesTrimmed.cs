@@ -13,6 +13,9 @@ using Mono.Linker.Tests.Cases.Reflection.Dependencies;
 // (No KeptAttributeAttribute here - the test framework verifies the attribute is NOT in the linked output.)
 [assembly: TypeMapAssemblyTarget<AllConditionalGroupType>("conditional")]
 
+[assembly: KeptAttributeAttribute(typeof(TypeMapAssemblyTargetAttribute<TransitiveTypeMapGroup>))]
+[assembly: TypeMapAssemblyTarget<TransitiveTypeMapGroup>("transitivebridge")]
+
 namespace Mono.Linker.Tests.Cases.Reflection
 {
     // Compile the group-type assembly first so both the test assembly and conditional.dll can reference it.
@@ -21,9 +24,18 @@ namespace Mono.Linker.Tests.Cases.Reflection
     [SetupCompileBefore("allconditionalgroup.dll", new[] { "Dependencies/TypeMapAllConditionalGroupDep.cs" })]
     [SetupCompileBefore("conditional.dll", new[] { "Dependencies/TypeMapAllConditionalEntriesDep.cs" },
         references: new[] { "allconditionalgroup.dll" }, addAsReference: false)]
+    [SetupCompileBefore("transitiveleaf.dll", new[] { "Dependencies/TypeMapTransitiveLeafDep.cs" },
+        references: new[] { "allconditionalgroup.dll" }, addAsReference: false)]
+    [SetupCompileBefore("transitivebridge.dll", new[] { "Dependencies/TypeMapTransitiveBridgeDep.cs" },
+        references: new[] { "allconditionalgroup.dll" }, addAsReference: false)]
     [SetupLinkerAction("link", "System.Private.CoreLib")] // Needed to apply embedded XML (RemoveAttributeInstances)
     [SetupLinkerArgument("--ignore-link-attributes", "false")]
     [Kept]
+    [RemovedAssembly("conditional.dll")]
+    [KeptAssembly("transitivebridge.dll")]
+    [KeptAssembly("transitiveleaf.dll")]
+    [KeptAttributeInAssembly("transitivebridge.dll", typeof(TypeMapAssemblyTargetAttribute<TransitiveTypeMapGroup>))]
+    [KeptAttributeInAssembly("transitiveleaf.dll", typeof(TypeMapAttribute<TransitiveTypeMapGroup>))]
     class TypeMapAssemblyTargetRemovedWhenAllEntriesTrimmed
     {
         [Kept]
@@ -31,6 +43,8 @@ namespace Mono.Linker.Tests.Cases.Reflection
         {
             // Use the group so the trimmer processes the TypeMapAssemblyTarget attribute.
             _ = TypeMapping.GetOrCreateExternalTypeMapping<AllConditionalGroupType>();
+            _ = TypeMapping.GetOrCreateExternalTypeMapping<TransitiveTypeMapGroup>();
+            _ = new TransitiveTrimTarget();
         }
     }
 }

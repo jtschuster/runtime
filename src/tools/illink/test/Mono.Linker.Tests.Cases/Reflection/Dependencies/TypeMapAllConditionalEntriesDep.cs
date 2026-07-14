@@ -14,4 +14,5 @@ namespace Mono.Linker.Tests.Cases.Reflection.Dependencies
 {
     public class AllConditionalTarget;
     public class AllConditionalTrimTarget;
+    public class UnrelatedType;
 }

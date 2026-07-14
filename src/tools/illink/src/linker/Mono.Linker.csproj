@@ -78,6 +78,15 @@
     <AdditionalFiles Include="BannedSymbols.txt" />
     <Compile Remove="ref\**\*.cs" />
     <Compile Include="$(LibrariesProjectRoot)\Common\src\System\Text\ValueStringBuilder.cs" />
+    <Compile Include="$(CoreClrProjectRoot)tools\aot\ILCompiler.DependencyAnalysisFramework\DependencyAnalyzer.cs" Link="DependencyAnalysisFramework\DependencyAnalyzer.cs" />
+    <Compile Include="$(CoreClrProjectRoot)tools\aot\ILCompiler.DependencyAnalysisFramework\DependencyAnalyzerBase.cs" Link="DependencyAnalysisFramework\DependencyAnalyzerBase.cs" />
+    <Compile Include="$(CoreClrProjectRoot)tools\aot\ILCompiler.DependencyAnalysisFramework\DependencyNode.cs" Link="DependencyAnalysisFramework\DependencyNode.cs" />
+    <Compile Include="$(CoreClrProjectRoot)tools\aot\ILCompiler.DependencyAnalysisFramework\DependencyNodeCore.cs" Link="DependencyAnalysisFramework\DependencyNodeCore.cs" />
+    <Compile Include="$(CoreClrProjectRoot)tools\aot\ILCompiler.DependencyAnalysisFramework\IDependencyAnalysisMarkStrategy.cs" Link="DependencyAnalysisFramework\IDependencyAnalysisMarkStrategy.cs" />
+    <Compile Include="$(CoreClrProjectRoot)tools\aot\ILCompiler.DependencyAnalysisFramework\IDependencyAnalyzerLogEdgeVisitor.cs" Link="DependencyAnalysisFramework\IDependencyAnalyzerLogEdgeVisitor.cs" />
+    <Compile Include="$(CoreClrProjectRoot)tools\aot\ILCompiler.DependencyAnalysisFramework\IDependencyAnalyzerLogNodeVisitor.cs" Link="DependencyAnalysisFramework\IDependencyAnalyzerLogNodeVisitor.cs" />
+    <Compile Include="$(CoreClrProjectRoot)tools\aot\ILCompiler.DependencyAnalysisFramework\IDependencyNode.cs" Link="DependencyAnalysisFramework\IDependencyNode.cs" />
+    <Compile Include="$(CoreClrProjectRoot)tools\aot\ILCompiler.DependencyAnalysisFramework\PerfEventSource.cs" Link="DependencyAnalysisFramework\PerfEventSource.cs" />
   </ItemGroup>
 
   <ItemGroup>

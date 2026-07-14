@@ -7,4 +7,7 @@ namespace Mono.Linker.Tests.Cases.Reflection.Dependencies
     // Lives in its own assembly so the test assembly's TypeMapAssemblyTarget<AllConditionalGroupType>
     // generic argument does not create a compile-time reference to the conditional.dll dependency.
     public class AllConditionalGroupType;
+
+    public class TransitiveTypeMapGroup;
+    public class TransitiveTrimTarget;
 }
