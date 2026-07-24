@@ -170,7 +170,6 @@ namespace ILCompiler.ObjectWriter
             writer.WriteULEB128((ulong)signatureSymbol.Index);
         }
 
-        private int _numImports;
         /// <summary>
         /// Writes the given import entry, including its prefix (module/name/kind) and body (external ref).
         /// </summary>
@@ -190,7 +189,6 @@ namespace ILCompiler.ObjectWriter
             Debug.Assert(bytesWritten == encodeSize);
             writer.Buffer.Advance((int)bytesWritten);
 
-            _numImports++;
             return writer;
         }
 
@@ -1099,7 +1097,7 @@ namespace ILCompiler.ObjectWriter
 
             // TODO-WASM: Handle exports better (e.g., only export public methods, etc.)
             IEnumerable<WasmSymbol> functionSymbols = _wasmSymbolManager.GetDefinitions(WasmIndexSpace.Function);
-            foreach (WasmSymbol symbol in functionSymbols.OrderBy(symbol => symbol.Name.ToString()))
+            foreach (WasmSymbol symbol in functionSymbols.OrderBy(symbol => symbol.Name))
             {
                 WriteFunctionExport(symbol.Name.ToString(), symbol.Index);
             }
