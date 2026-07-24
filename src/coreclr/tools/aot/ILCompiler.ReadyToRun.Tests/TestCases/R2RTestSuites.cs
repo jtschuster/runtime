@@ -133,13 +133,7 @@ public class R2RTestSuites
                 new(nameof(WasmSimdModule), [new CrossgenAssembly(wasmSimdModule)])
                 {
                     OutputFileExtension = ".wasm",
-                    AdditionalArgs =
-                    {
-                        "--targetarch",
-                        "wasm",
-                        "--targetos",
-                        "browser",
-                    },
+                    TargetRid = TargetRid.BrowserWasm,
                     Validate = Validate,
                 },
             ]));
