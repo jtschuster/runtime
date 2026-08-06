@@ -4,6 +4,8 @@
     <Optimize>False</Optimize>
     <!-- Tracking issue: https://github.com/dotnet/runtime/issues/46622 -->
     <DisableProjectBuild Condition="'$(RuntimeVariant)' == 'monointerpreter' or '$(MonoForceInterpreter)' == 'true'">true</DisableProjectBuild>
+    <!-- Crossgen2 OOM on x86 due to 32-bit address space: https://github.com/dotnet/runtime/issues/128531 -->
+    <CrossGenTest Condition="'$(TargetArchitecture)' == 'x86'">false</CrossGenTest>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="HugeArray1.cs" />
