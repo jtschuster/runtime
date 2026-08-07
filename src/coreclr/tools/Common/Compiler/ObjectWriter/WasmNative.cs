@@ -37,6 +37,37 @@ namespace ILCompiler.ObjectWriter
         Tag = 13,
     }
 
+    internal enum WasmRelocationKind : byte
+    {
+        FunctionIndexLeb,
+        TableIndexSleb,
+        TableIndexI32,
+        MemoryAddressLeb,
+        MemoryAddressSleb,
+        MemoryAddressI32,
+        TypeIndexLeb,
+        GlobalIndexLeb,
+        FunctionOffsetI32,
+        SectionOffsetI32,
+        TagIndexLeb,
+        MemoryAddressRelativeSleb,
+        TableIndexRelativeSleb,
+        GlobalIndexI32,
+        MemoryAddressLeb64,
+        MemoryAddressSleb64,
+        MemoryAddressI64,
+        MemoryAddressRelativeSleb64,
+        TableIndexSleb64,
+        TableIndexI64,
+        TableNumberLeb,
+        MemoryAddressTlsSleb,
+        FunctionOffsetI64,
+        MemoryAddressLocRelativeI32,
+        TableIndexRelativeSleb64,
+        MemoryAddressTlsSleb64,
+        FunctionIndexI32,
+    }
+
     public static class PlaceholderValues
     {
         // Wasm function signature for (func (params i32) (result i32))
@@ -103,6 +134,27 @@ namespace ILCompiler.ObjectWriter
 
         public override int EncodeSize() => 2;
         public override int EncodeRelocationCount() => 0;
+        public override int EncodeRelocations(Span<Relocation> buffer) => 0;
+    }
+
+    internal sealed class WasmFunctionImportType : WasmImportType
+    {
+        private readonly int _typeIndex;
+
+        public WasmFunctionImportType(int typeIndex)
+            : base(WasmExternalKind.Function)
+        {
+            _typeIndex = typeIndex;
+        }
+
+        public override int Encode(Span<byte> buffer) =>
+            DwarfHelper.WriteULEB128(buffer, (ulong)_typeIndex);
+
+        public override int EncodeSize() =>
+            (int)DwarfHelper.SizeOfULEB128((ulong)_typeIndex);
+
+        public override int EncodeRelocationCount() => 0;
+
         public override int EncodeRelocations(Span<Relocation> buffer) => 0;
     }
 

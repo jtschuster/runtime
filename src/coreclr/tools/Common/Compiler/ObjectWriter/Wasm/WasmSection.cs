@@ -116,6 +116,39 @@ namespace ILCompiler.ObjectWriter
         }
     }
 
+    internal class WasmCustomSection : WasmSection
+    {
+        protected virtual int CustomPayloadPrefixSize => 0;
+
+        protected virtual int EncodeCustomPayloadPrefix(Span<byte> destination) => 0;
+
+        protected override int ContentPrefixSize =>
+            (int)DwarfHelper.SizeOfULEB128((ulong)SectionName.Length) + SectionName.Length + CustomPayloadPrefixSize;
+
+        protected override int EncodeContentPrefix(Span<byte> destination)
+        {
+            int bytesWritten = DwarfHelper.WriteULEB128(destination, (ulong)SectionName.Length);
+            SectionName.AsSpan().CopyTo(destination.Slice(bytesWritten));
+            bytesWritten += SectionName.Length;
+            return bytesWritten + EncodeCustomPayloadPrefix(destination.Slice(bytesWritten));
+        }
+
+        public void WriteSubsection(SectionWriter writer, IWasmEmittable subsection)
+        {
+            Debug.Assert(writer.SectionIndex == SectionIndex);
+
+            using MemoryStream encodedSubsection = new(subsection.EncodedSize());
+            int bytesWritten = subsection.EmitToStream(encodedSubsection);
+            Debug.Assert(bytesWritten == subsection.EncodedSize());
+            writer.Write(encodedSubsection.GetBuffer().AsSpan(0, bytesWritten));
+        }
+
+        public WasmCustomSection(Stream stream, Utf8String name, int sectionIndex)
+            : base(WasmSectionType.Custom, stream, name, sectionIndex)
+        {
+        }
+    }
+
     internal abstract class WasmVectorSection : WasmSection
     {
         public int EntryCount { get; protected set; }

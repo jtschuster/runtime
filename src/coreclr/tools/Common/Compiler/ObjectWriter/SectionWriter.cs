@@ -153,6 +153,12 @@ namespace ILCompiler.ObjectWriter
             WriteUtf8StringNoNull(value);
         }
 
+        public readonly void WriteUtf8WithLength(Utf8String value)
+        {
+            WriteULEB128((ulong)value.Length);
+            Write(value.AsSpan());
+        }
+
         public readonly void WritePadding(int size) => _sectionData.AppendPadding(size);
 
         public readonly long Position => _sectionData.Length;

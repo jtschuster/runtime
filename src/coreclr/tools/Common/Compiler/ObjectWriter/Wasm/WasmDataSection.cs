@@ -13,10 +13,10 @@ namespace ILCompiler.ObjectWriter
 {
     internal class WasmDataSection : IWasmEmittable, IWasmSection
     {
-        private List<WasmDataSegment> _segments;
-        public List<WasmDataSegment> Segments => _segments;
-        private int _contentAlign = 1;
-        public WasmDataSection(List<WasmDataSegment> segments, Utf8String name, int contentAlign = 1)
+        private readonly List<WebCilDataSegment> _segments;
+        public List<WebCilDataSegment> Segments => _segments;
+        private readonly int _contentAlign;
+        public WasmDataSection(List<WebCilDataSegment> segments, Utf8String name, int contentAlign = 1)
         {
             _segments = segments;
             _contentAlign = contentAlign;
@@ -30,9 +30,9 @@ namespace ILCompiler.ObjectWriter
             {
                 int size = 0;
                 size += (int)DwarfHelper.SizeOfULEB128((ulong)_segments.Count);
-                foreach (WasmDataSegment segment in _segments)
+                foreach (WebCilDataSegment segment in _segments)
                 {
-                    size += segment.EncodeSize();
+                    size += segment.EncodedSize();
                 }
 
                 return size;
@@ -72,10 +72,11 @@ namespace ILCompiler.ObjectWriter
             int countSize = DwarfHelper.WriteULEB128(countBuffer, (ulong)_segments.Count);
             outputFileStream.Write(countBuffer.Slice(0, countSize));
             size += countSize;
+            long contentStart = headerPosition + HeaderSize;
 
             for (int i = 0; i < _segments.Count; i++)
             {
-                WasmDataSegment segment = _segments[i];
+                WebCilDataSegment segment = _segments[i];
                 // Do we have a next segment?
                 if ((i + 1) < _segments.Count)
                 {
@@ -89,7 +90,8 @@ namespace ILCompiler.ObjectWriter
                 {
                     segment.Padding = 0;
                 }
-                size += segment.Emit(outputFileStream);
+                segment.ContentOffset = checked((uint)(outputFileStream.Position - contentStart + segment.HeaderSize));
+                size += segment.EmitToStream(outputFileStream);
             }
 
             // Write the header (this must be done second because we first need to determine inter-segment padding based on file placement)

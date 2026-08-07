@@ -567,6 +567,7 @@ namespace ILCompiler.ObjectWriter
                     }
 
                     Utf8String relocSymbolName = GetMangledName(relocTarget);
+                    RecordRelocationTarget(relocTarget, relocSymbolName, reloc.RelocType);
 
                     EmitOrResolveRelocation(
                         blockToRelocate.SectionIndex,
@@ -628,6 +629,13 @@ namespace ILCompiler.ObjectWriter
         }
 
         private protected virtual void RecordWellKnownSymbol(Utf8String currentSymbolName, SortableDependencyNode.ObjectNodeOrder classCode)
+        {
+        }
+
+        private protected virtual void RecordRelocationTarget(
+            ISymbolNode relocTarget,
+            Utf8String relocSymbolName,
+            RelocType relocType)
         {
         }
 
@@ -710,13 +718,25 @@ namespace ILCompiler.ObjectWriter
         {
             var stopwatch = Stopwatch.StartNew();
 
-            ObjectWriter objectWriter =
-                factory.Target.IsApplePlatform ? new MachObjectWriter(factory, options) :
-                factory.Target.OperatingSystem == TargetOS.Windows ? new CoffObjectWriter(factory, options) :
+            ObjectWriter objectWriter;
+            if (factory.Target.IsApplePlatform)
+            {
+                objectWriter = new MachObjectWriter(factory, options);
+            }
+            else if (factory.Target.OperatingSystem == TargetOS.Windows)
+            {
+                objectWriter = new CoffObjectWriter(factory, options);
+            }
 #if !READYTORUN
-                factory.Target.Architecture == TargetArchitecture.Wasm32 ? new WasmRelocatableObjectWriter(factory, options) :
+            else if (factory.Target.Architecture == TargetArchitecture.Wasm32)
+            {
+                objectWriter = new WasmRelocatableObjectWriter(factory, options);
+            }
 #endif
-                new ElfObjectWriter(factory, options);
+            else
+            {
+                objectWriter = new ElfObjectWriter(factory, options);
+            }
 
             using Stream outputFileStream = new FileStream(objectFilePath, FileMode.Create);
             objectWriter.EmitObject(outputFileStream, nodes, dumper, logger);

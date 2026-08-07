@@ -44,7 +44,8 @@
       <ReproResponseLines Include="-O" Condition="'$(Optimize)' == 'true'" />
       <ReproResponseLines Include="--systemmodule:reproZero" />
       <ReproResponseLines Include="--dehydrate" />
-      <ReproResponseLines Include="--stacktracedata:lines" />
+      <ReproResponseLines Include="--stacktracedata:lines" Condition="'$(Platform)' != 'wasm'" />
+      <ReproResponseLines Include="--stacktracedata:none" Condition="'$(Platform)' == 'wasm'" />
       <ReproResponseLines Include="--scanreflection" />
       <ReproResponseLines Include="--feature:System.Runtime.Serialization.EnableUnsafeBinaryFormatterSerialization=false" />
       <ReproResponseLines Include="--feature:System.Diagnostics.Tracing.EventSource.IsSupported=false" />

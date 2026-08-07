@@ -98,7 +98,7 @@ namespace ILCompiler.ObjectWriter
         WasmInstructionGroup GetImageFunctionPointerBaseOffset(int offset)
         {
             return new WasmInstructionGroup([
-                Global.Get(TableBaseGlobalIndex),
+                Global.Get(WasmGlobalImports.TableBaseGlobalIndex),
                 I32.Const(offset),
                 I32.Add,
             ]);
@@ -145,7 +145,7 @@ namespace ILCompiler.ObjectWriter
         WasmFunctionBody FillWebcilTable(int tableSize) => new WasmFunctionBody(
             new WasmFuncType(new([]), new([])), // (func)
                 [
-                    Global.Get(WebCilObjectWriter.TableBaseGlobalIndex),
+                    Global.Get(WasmGlobalImports.TableBaseGlobalIndex),
                     I32.Const(0),
                     I32.Const(tableSize),
                     Table.Init(0, 0)
@@ -164,7 +164,7 @@ namespace ILCompiler.ObjectWriter
                     I32.Ge_s,
                     Block.If(WasmBlockType.Empty),
                     Local.Get(0), // (local.get $d)
-                    Global.Get(WebCilObjectWriter.TableBaseGlobalIndex), // (global.get $tableBase)
+                    Global.Get(WasmGlobalImports.TableBaseGlobalIndex), // (global.get $tableBase)
                     I32.Store((ulong)WebcilEncoder.TableBaseOffset), // i32.store offset=TableBaseOffset
                     Block.End
                 ]
@@ -385,7 +385,7 @@ namespace ILCompiler.ObjectWriter
                         originalStream.CopyTo(stream);
                         ResolveRelocations(index, stream, relocations, sectionStart: 0);
                         section.ContentReadStream = stream;
-                        // originalStream may be disposed, section.Stream now points to resolved stream
+                        // originalStream may be disposed, section.ContentReadStream now points to resolved stream
                     }
                 }
 
@@ -438,12 +438,20 @@ namespace ILCompiler.ObjectWriter
             BinaryPrimitives.WriteUInt32LittleEndian(lengthBuffer, (uint)_webcilSegment.GetFlatMappedSize());
             BinaryPrimitives.WriteUInt32LittleEndian(lengthBuffer.AsSpan().Slice(4), (uint)MethodCount);
             MemoryStream webcilSizeSegmentStream = new MemoryStream(lengthBuffer);
-            WasmDataSegment webcilSizeSegment = new WasmDataSegment(webcilSizeSegmentStream, new Utf8String("webcilCount"),
-                WasmDataSegmentType.Passive, null);
+            WebCilDataSegment webcilSizeSegment = new WebCilDataSegment(
+                webcilSizeSegmentStream,
+                new Utf8String("webcilCount"),
+                sectionIndex: -1,
+                WasmDataSegmentType.Passive,
+                null);
 
             // Passive data segment for webcil payload contents
-            WasmDataSegment webcilContentsSegment = new WasmDataSegment(webcilStream, new Utf8String("webcilPayload"),
-                WasmDataSegmentType.Passive, null);
+            WebCilDataSegment webcilContentsSegment = new WebCilDataSegment(
+                webcilStream,
+                new Utf8String("webcilPayload"),
+                sectionIndex: -1,
+                WasmDataSegmentType.Passive,
+                null);
 
             // Create combined data section and emit
             WasmDataSection dataSection = new WasmDataSection([webcilSizeSegment, webcilContentsSegment], new Utf8String("data"), contentAlign: 4);
@@ -700,21 +708,16 @@ namespace ILCompiler.ObjectWriter
             new([]),
             new([]));
 
-        internal const int StackPointerGlobalIndex = 0;
-        internal const int ImageBaseGlobalIndex = 1;
-        internal const int TableBaseGlobalIndex = 2;
-        internal const int AsyncContinuationGlobalIndex = 3;
-
         private WasmImport[] CreateDefaultGlobalImports()
         {
             int rtlRestoreContextTagTypeIndex = RegisterSignature(RtlRestoreContextTagSignature);
 
             return
             [
-                new WasmImport("webcil", WasmWellKnownGlobalSymbolNode.StackPointerName, import: new WasmGlobalImportType(WasmValueType.I32, WasmMutabilityType.Mut), index: StackPointerGlobalIndex),
-                new WasmImport("webcil", WasmWellKnownGlobalSymbolNode.ImageBaseName, import: new WasmGlobalImportType(WasmValueType.I32, WasmMutabilityType.Const), index: ImageBaseGlobalIndex),
-                new WasmImport("webcil", WasmWellKnownGlobalSymbolNode.TableBaseName, import: new WasmGlobalImportType(WasmValueType.I32, WasmMutabilityType.Const), index: TableBaseGlobalIndex),
-                new WasmImport("webcil", WasmWellKnownGlobalSymbolNode.AsyncContinuationName, import: new WasmGlobalImportType(WasmValueType.I32, WasmMutabilityType.Mut), index: AsyncContinuationGlobalIndex),
+                new WasmImport("webcil", WasmWellKnownGlobalSymbolNode.StackPointerName, import: new WasmGlobalImportType(WasmValueType.I32, WasmMutabilityType.Mut), index: WasmGlobalImports.StackPointerGlobalIndex),
+                new WasmImport("webcil", WasmWellKnownGlobalSymbolNode.ImageBaseName, import: new WasmGlobalImportType(WasmValueType.I32, WasmMutabilityType.Const), index: WasmGlobalImports.ImageBaseGlobalIndex),
+                new WasmImport("webcil", WasmWellKnownGlobalSymbolNode.TableBaseName, import: new WasmGlobalImportType(WasmValueType.I32, WasmMutabilityType.Const), index: WasmGlobalImports.TableBaseGlobalIndex),
+                new WasmImport("webcil", WasmWellKnownGlobalSymbolNode.AsyncContinuationName, import: new WasmGlobalImportType(WasmValueType.I32, WasmMutabilityType.Mut), index: WasmGlobalImports.AsyncContinuationGlobalIndex),
                 new WasmImport("webcil", "table", import: new WasmTableImportType(), index: 0),
                 new WasmImport("webcil", RtlRestoreContextTagName.ToString(), import: new WasmTagImportType(rtlRestoreContextTagTypeIndex), index: RtlRestoreContextTagIndex),
             ];

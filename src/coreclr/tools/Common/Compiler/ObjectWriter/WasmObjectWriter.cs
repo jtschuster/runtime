@@ -51,6 +51,7 @@ namespace ILCompiler.ObjectWriter
         ];
 
         private protected readonly Dictionary<string, WasmGlobal> _definedGlobals = new();
+        private protected readonly Dictionary<Utf8String, int> _functionTypeIndices = new();
         private protected readonly WasmSections _sections = new();
         private protected readonly WasmSymbolManager _wasmSymbolManager = new();
         /// <summary>
@@ -138,21 +139,11 @@ namespace ILCompiler.ObjectWriter
 
         private protected override void RecordMethodDeclaration(INodeWithTypeSignature node)
         {
-            WasmLowering.LoweringFlags flags = WasmLowering.LoweringFlags.None;
-            if (node.HasGenericContextArg)
-            {
-                flags |= WasmLowering.LoweringFlags.HasGenericContextArg;
-            }
-            if (node.IsAsyncCall)
-            {
-                flags |= WasmLowering.LoweringFlags.IsAsyncCall;
-            }
-            if (node.IsUnmanagedCallersOnly)
-            {
-                flags |= WasmLowering.LoweringFlags.IsUnmanagedCallersOnly;
-            }
-            WriteSignatureIndexForFunction(node.Signature, flags, node);
-            RegisterFunctionSymbol(new Utf8String(node.GetMangledName(_nodeFactory.NameMangler)));
+            Utf8String name = new(node.GetMangledName(_nodeFactory.NameMangler));
+            int signatureIndex = RegisterFunctionSignature(node);
+            WriteFunctionEntry(signatureIndex);
+            RegisterFunctionSymbol(name);
+            _functionTypeIndices.Add(name, signatureIndex);
             if (node is INodeWithFunclets nodeWithFunclets)
             {
                 RecordFunclets(nodeWithFunclets);
@@ -173,8 +164,10 @@ namespace ILCompiler.ObjectWriter
             for (int i = 0; i < funcletKinds.Length; i++)
             {
                 WasmFuncType funcletSignature = GetFuncletType(funcletKinds[i], pointerType);
-                RegisterFunctionSymbol(new Utf8String($"{mangledNodeName}_funclet_{i}"));
-                RegisterStubIndexAndSignature(funcletSignature);
+                Utf8String name = new($"{mangledNodeName}_funclet_{i}");
+                RegisterFunctionSymbol(name);
+                int signatureIndex = RegisterStubIndexAndSignature(funcletSignature);
+                _functionTypeIndices.Add(name, signatureIndex);
             }
         }
 
@@ -196,19 +189,55 @@ namespace ILCompiler.ObjectWriter
             section.WriteEntry(writer, signatureIndex);
         }
 
-        private void WriteSignatureIndexForFunction(
-            MethodSignature managedSignature,
-            WasmLowering.LoweringFlags flags,
-            ISymbolNode node)
+        private protected int RegisterFunctionSignature(INodeWithTypeSignature node)
         {
-            WasmFuncType signature = WasmLowering.GetSignature(managedSignature, flags).FuncType;
+            WasmFuncType signature = GetFunctionSignature(node);
             Utf8String key = signature.GetMangledName(_nodeFactory.NameMangler);
             if (!_wasmSymbolManager.TryGetSymbol(key, out WasmSymbol signatureSymbol))
             {
                 throw new InvalidOperationException($"Signature index of {key} not found for function: {node.ToString()}");
             }
 
-            WriteFunctionEntry(signatureSymbol.Index);
+            return signatureSymbol.Index;
+        }
+
+        private protected static WasmFuncType GetFunctionSignature(INodeWithTypeSignature node)
+        {
+            WasmLowering.LoweringFlags flags = WasmLowering.LoweringFlags.None;
+            if (node.HasGenericContextArg)
+            {
+                flags |= WasmLowering.LoweringFlags.HasGenericContextArg;
+            }
+            if (node.IsAsyncCall)
+            {
+                flags |= WasmLowering.LoweringFlags.IsAsyncCall;
+            }
+            if (node.IsUnmanagedCallersOnly)
+            {
+                flags |= WasmLowering.LoweringFlags.IsUnmanagedCallersOnly;
+            }
+
+            return WasmLowering.GetSignature(node.Signature, flags).FuncType;
+        }
+
+        private protected static WasmFuncType GetFunctionSignature(IMethodNode node)
+        {
+            MethodDesc method = node.Method;
+            WasmLowering.LoweringFlags flags = WasmLowering.LoweringFlags.None;
+            if (method.RequiresInstMethodDescArg() || method.RequiresInstMethodTableArg())
+            {
+                flags |= WasmLowering.LoweringFlags.HasGenericContextArg;
+            }
+            if (method.IsAsyncCall())
+            {
+                flags |= WasmLowering.LoweringFlags.IsAsyncCall;
+            }
+            if (method.IsUnmanagedCallersOnly)
+            {
+                flags |= WasmLowering.LoweringFlags.IsUnmanagedCallersOnly;
+            }
+
+            return WasmLowering.GetSignature(method.Signature, flags).FuncType;
         }
 
         /// <summary>
@@ -327,10 +356,11 @@ namespace ILCompiler.ObjectWriter
         // This effectively recreates the logic of RecordMethodBody/RecordMethodDeclaration, but for manually inserted stubs that are not
         // represented by nodes in the dependency graph.
         // TODO-Wasm: for maintability, we should try and push some of this into the dependency graph when we do more stub generation.
-        private protected void RegisterStubIndexAndSignature(WasmFuncType signature)
+        private protected int RegisterStubIndexAndSignature(WasmFuncType signature)
         {
             int signatureIndex = RegisterSignature(signature);
             WriteFunctionEntry(signatureIndex);
+            return signatureIndex;
         }
 
         private protected void InsertWasmStub(Utf8String name, WasmFunctionBody body)
@@ -345,7 +375,8 @@ namespace ILCompiler.ObjectWriter
             codeWriter.EmitData(data);
 
             RegisterFunctionSymbol(name);
-            RegisterStubIndexAndSignature(body.Signature);
+            int signatureIndex = RegisterStubIndexAndSignature(body.Signature);
+            _functionTypeIndices.Add(name, signatureIndex);
         }
 
         private protected int RegisterSignature(WasmFuncType signature)
@@ -393,12 +424,18 @@ namespace ILCompiler.ObjectWriter
                 .SetEntryCount(MethodCount);
 
             Debug.Assert(_sections.GetSection<WasmFunctionSection>(WasmObjectNodeSection.FunctionSection.Name).EntryCount == MethodCount);
-            Debug.Assert(_sections.GetSection<WasmImportSection>(WasmObjectNodeSection.ImportSection.Name).EntryCount == _wasmSymbolManager.GetImportCount());
-            Debug.Assert(_sections.GetSection<WasmGlobalSection>(WasmObjectNodeSection.GlobalSection.Name).EntryCount == _wasmSymbolManager.GetDefinitionCount(WasmIndexSpace.Global));
+            if (_sections.Contains(WasmObjectNodeSection.ImportSection.Name))
+            {
+                Debug.Assert(_sections.GetSection<WasmImportSection>(WasmObjectNodeSection.ImportSection.Name).EntryCount == _wasmSymbolManager.GetImportCount());
+            }
+            if (_sections.Contains(WasmObjectNodeSection.GlobalSection.Name))
+            {
+                Debug.Assert(_sections.GetSection<WasmGlobalSection>(WasmObjectNodeSection.GlobalSection.Name).EntryCount == _wasmSymbolManager.GetDefinitionCount(WasmIndexSpace.Global));
+            }
         }
     }
 
-    internal static class WasmObjectNodeSection
+    internal partial static class WasmObjectNodeSection
     {
         // TODO-WASM: Consider alignment needs for data sections
         public static readonly ObjectNodeSection DataSection = new("wasm.data", SectionType.Writeable, needsAlign: false);

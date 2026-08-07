@@ -16,7 +16,7 @@ namespace ILCompiler.Compiler.Tests
 {
     public class WasmSingleMethodTests
     {
-        private const string ExportName = "ILCompiler_Compiler_Tests_Assets_SwitchTest__TestEntryPoint";
+        private const string ExportName = "ILCompiler_Compiler_Tests_Assets_WasmSingleMethodTestAsset__TestEntryPoint";
         private static readonly byte[] WasmHeader = [0x00, 0x61, 0x73, 0x6D, 0x01, 0x00, 0x00, 0x00];
 
         public static bool IsWasmCompilationSupported =>
@@ -27,6 +27,7 @@ namespace ILCompiler.Compiler.Tests
 
         public static bool IsWasmExecutionSupported =>
             IsWasmCompilationSupported &&
+            RunProcess("wasm-ld", ["--version"], throwOnError: false).ExitCode == 0 &&
             RunProcess(
                 "node",
                 ["-e", "process.exit(typeof WebAssembly.Tag === 'function' ? 0 : 1)"],
@@ -35,12 +36,16 @@ namespace ILCompiler.Compiler.Tests
         [ConditionalFact(nameof(IsWasmCompilationSupported))]
         public void NativeAotWasmSingleMethodCompiles()
         {
-            string outputPath = CompileSwitchTest();
+            string outputPath = CompileObject();
             try
             {
                 byte[] output = File.ReadAllBytes(outputPath);
                 Assert.True(output.Length >= WasmHeader.Length);
                 Assert.Equal(WasmHeader, output.AsSpan(0, WasmHeader.Length).ToArray());
+                Assert.True(output.AsSpan().IndexOf("linking"u8) >= 0);
+                Assert.True(output.AsSpan().IndexOf("name"u8) >= 0);
+                Assert.True(output.AsSpan().IndexOf("reloc.CODE"u8) >= 0);
+                Assert.True(output.AsSpan().IndexOf("reloc.DATA"u8) >= 0);
             }
             finally
             {
@@ -51,10 +56,22 @@ namespace ILCompiler.Compiler.Tests
         [ConditionalFact(nameof(IsWasmExecutionSupported))]
         public void NativeAotWasmSingleMethodExecutes()
         {
-            string outputPath = CompileSwitchTest();
+            string objectPath = CompileObject();
+            string outputPath = Path.ChangeExtension(objectPath, ".wasm");
             string scriptPath = Path.ChangeExtension(outputPath, ".js");
             try
             {
+                RunProcess(
+                    "wasm-ld",
+                    [
+                        "--no-entry",
+                        $"--export={ExportName}",
+                        "-o",
+                        outputPath,
+                        objectPath,
+                    ],
+                    throwOnError: true);
+
                 File.WriteAllText(scriptPath,
                     $$"""
                     const fs = require("fs");
@@ -62,19 +79,10 @@ namespace ILCompiler.Compiler.Tests
                     if (!WebAssembly.validate(bytes)) {
                         throw new Error("NativeAOT produced an invalid WebAssembly module.");
                     }
-                    const webcil = {
-                        stackPointer: new WebAssembly.Global({ value: "i32", mutable: true }, 65000),
-                        imageBase: new WebAssembly.Global({ value: "i32", mutable: false }, 0),
-                        tableBase: new WebAssembly.Global({ value: "i32", mutable: false }, 0),
-                        asyncContinuation: new WebAssembly.Global({ value: "i32", mutable: true }, 0),
-                        table: new WebAssembly.Table({ initial: 4096, element: "anyfunc" }),
-                        rtlRestoreContextTag: new WebAssembly.Tag({ parameters: [] }),
-                        memory: new WebAssembly.Memory({ initial: 16 }),
-                    };
-                    WebAssembly.instantiate(bytes, { webcil }).then(({ instance }) => {
+                    WebAssembly.instantiate(bytes).then(({ instance }) => {
                         const result = instance.exports.{{ExportName}}(65000, 0);
-                        if (result !== 100) {
-                            throw new Error(`Expected 100, got ${result}.`);
+                        if (result !== 249) {
+                            throw new Error(`Expected 249, got ${result}.`);
                         }
                     });
                     """);
@@ -86,10 +94,11 @@ namespace ILCompiler.Compiler.Tests
             {
                 File.Delete(scriptPath);
                 File.Delete(outputPath);
+                File.Delete(objectPath);
             }
         }
 
-        private static string CompileSwitchTest()
+        private static string CompileObject()
         {
             string coreClrArtifactsDir = Assert.IsType<string>(AppContext.GetData("NativeAotWasmTest.CoreCLRArtifactsDir"));
             string buildArchitecture = Assert.IsType<string>(AppContext.GetData("NativeAotWasmTest.BuildArchitecture"));
@@ -111,13 +120,13 @@ namespace ILCompiler.Compiler.Tests
 
             Assert.True(File.Exists(jitPath), $"WASM JIT not found at '{jitPath}'.");
 
-            string outputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.wasm");
+            string outputPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.o");
             try
             {
                 RunProcess(
                     ilcPath,
                     [
-                        "--singlemethodtypename", "SwitchTest, ILCompiler.Compiler.Tests.Assets",
+                        "--singlemethodtypename", "WasmSingleMethodTestAsset, ILCompiler.Compiler.Tests.Assets",
                         "--singlemethodname", "TestEntryPoint",
                         Path.Combine(AppContext.BaseDirectory, "ILCompiler.Compiler.Tests.Assets.dll"),
                         $"-r:{Path.Combine(AppContext.BaseDirectory, "Test.CoreLib.dll")}",
