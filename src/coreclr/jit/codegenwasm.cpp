@@ -3307,24 +3307,27 @@ void CodeGen::genEmitHelperCall(unsigned helper, int argSize, emitAttr retSize, 
 
     params.wasmSignature = m_compiler->info.compCompHnd->getWasmTypeSymbol(types, typeCount);
 
-    if (helperIsManaged)
+    if (m_compiler->opts.jitFlags->IsSet(JitFlags::JIT_FLAG_PORTABLE_ENTRY_POINTS))
     {
-        // Push PEP onto the stack because we are calling a managed helper that expects it as the last parameter.
-        // The helper function address is the address of an indirection cell, so we load from the cell to get the PEP
-        // address to push.
-        assert(helperFunction.accessType == IAT_PVALUE);
-        GetEmitter()->emitAddressConstant(helperFunction.addr);
-        GetEmitter()->emitIns_I(INS_I_load, EA_PTRSIZE, 0);
-    }
+        if (helperIsManaged)
+        {
+            GetEmitter()->emitAddressConstant(helperFunction.addr);
 
-    if (params.callType == EC_INDIR_R)
-    {
-        // Push the call target onto the wasm evaluation stack by dereferencing the indirection cell
-        // and then the PEP pointed to by the indirection cell.
-        assert(helperFunction.accessType == IAT_PVALUE);
-        GetEmitter()->emitAddressConstant(helperFunction.addr);
-        GetEmitter()->emitIns_I(INS_I_load, EA_PTRSIZE, 0);
-        GetEmitter()->emitIns_I(INS_I_load, EA_PTRSIZE, 0);
+            // Push PEP onto the stack because we are calling a managed helper that expects it as the last parameter.
+            // The helper function address is the address of an indirection cell, so load the PEP from it.
+            assert(helperFunction.accessType == IAT_PVALUE);
+            GetEmitter()->emitIns_I(INS_I_load, EA_PTRSIZE, 0);
+        }
+
+        if (params.callType == EC_INDIR_R)
+        {
+            // Push the call target onto the wasm evaluation stack by dereferencing the indirection cell
+            // and then the PEP pointed to by the indirection cell.
+            assert(helperFunction.accessType == IAT_PVALUE);
+            GetEmitter()->emitAddressConstant(helperFunction.addr);
+            GetEmitter()->emitIns_I(INS_I_load, EA_PTRSIZE, 0);
+            GetEmitter()->emitIns_I(INS_I_load, EA_PTRSIZE, 0);
+        }
     }
 
     genEmitCallWithCurrentGC(params);
