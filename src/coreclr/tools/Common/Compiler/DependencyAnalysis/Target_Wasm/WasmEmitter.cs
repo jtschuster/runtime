@@ -13,26 +13,14 @@ using ILCompiler.ObjectWriter.WasmInstructions;
 
 namespace ILCompiler.DependencyAnalysis.Wasm
 {
-    public struct WasmEmitter
+    public struct WasmEmitter(NodeFactory factory, bool relocsOnly)
     {
 #if READYTORUN
         public WasmFunctionBody FunctionBody = null;
 #endif
 
-        private readonly NodeFactory _factory;
-        private readonly bool _relocsOnly;
-
-        public WasmEmitter(NodeFactory factory, bool relocsOnly)
-        {
-            _factory = factory;
-            _relocsOnly = relocsOnly;
-#if READYTORUN
-            FunctionBody = null;
-#endif
-        }
-
-        public bool Is64Bit => _factory.Target.PointerSize == 8;
-        public bool RelocsOnly => _relocsOnly;
+        public bool Is64Bit => factory.Target.PointerSize == 8;
+        public bool RelocsOnly => relocsOnly;
 
         public ObjectNode.ObjectData Encode(ISymbolDefinitionNode symbolDefinitionNode)
         {
@@ -45,7 +33,7 @@ namespace ILCompiler.DependencyAnalysis.Wasm
     
             return new ObjectNode.ObjectData(encodedThunk, relocs, 1, new ISymbolDefinitionNode[] { symbolDefinitionNode });
 #else
-            throw new PlatformNotSupportedException("NativeAOT WebAssembly assembly stubs are not supported.");
+            return default(ObjectNode.ObjectData);
 #endif
         }
     }

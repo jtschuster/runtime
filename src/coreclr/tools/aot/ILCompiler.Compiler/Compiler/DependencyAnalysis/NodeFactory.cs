@@ -11,7 +11,6 @@ using ILCompiler.DependencyAnalysis.Wasm;
 using ILCompiler.DependencyAnalysisFramework;
 
 using Internal.IL;
-using Internal.JitInterface;
 using Internal.NativeFormat;
 using Internal.Runtime;
 using Internal.Text;
@@ -1619,14 +1618,9 @@ namespace ILCompiler.DependencyAnalysis
         // memory efficiency on lookup
         public WasmTypeNode WasmTypeNode(MethodDesc desc)
         {
-            WasmFuncType funcType = WasmLowering.GetSignature(desc).FuncType;
-            return _wasmTypeNodes.GetOrAdd(funcType);
-        }
-
-        public WasmTypeNode WasmTypeNode(CorInfoWasmType[] types)
-        {
-            WasmFuncType funcType = WasmFuncType.FromCorInfoSignature(types);
-            return _wasmTypeNodes.GetOrAdd(funcType);
+            // TODO-Wasm: Construct proper function type based on the passed in MethodDesc
+            // once we have defined lowering rules for signatures in NativeAOT.
+            throw new NotImplementedException("NAOT wasm type signature lowering not yet implemented");
         }
 
         /// <summary>
