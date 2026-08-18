@@ -81,6 +81,7 @@ namespace ILCompiler.ObjectWriter
                 fixed (byte* pData = ReadRelocToDataSpan(reloc, relocScratchBuffer, sectionStart))
                 {
                     long addend = Relocation.ReadValue(reloc.Type, pData);
+                    Debug.Assert(addend == reloc.Addend);
                     int relocLength = Relocation.GetSize(reloc.Type);
 
                     switch (reloc.Type)
