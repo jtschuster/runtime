@@ -118,6 +118,9 @@ namespace ILCompiler
                 if (node is not TokenWriterNode tokenNode)
                     continue;
 
+                if (factory.Settings.CalculateAssemblyAction(tokenNode.Module.Assembly.GetName().Name) == Mono.Linker.AssemblyAction.Copy)
+                    continue;
+
                 if (!moduleToTokenList.TryGetValue(tokenNode.Module, out List<TokenWriterNode> list))
                 {
                     list = new List<TokenWriterNode>();

@@ -15,6 +15,7 @@ using System.Xml;
 using Internal.TypeSystem.Ecma;
 
 using CodeOptimizations = Mono.Linker.CodeOptimizations;
+using AssemblyAction = Mono.Linker.AssemblyAction;
 
 namespace ILCompiler.DependencyAnalysis
 {
@@ -38,9 +39,13 @@ namespace ILCompiler.DependencyAnalysis
             if (resource.Implementation.IsNil)
             {
                 string resourceName = _module.MetadataReader.GetString(resource.Name);
-                if (resourceName == "ILLink.Descriptors.xml")
+                string assemblyName = _module.Assembly.GetName().Name;
+                AssemblyAction assemblyAction = factory.Settings.CalculateAssemblyAction(assemblyName);
+                bool isDescriptorResource = IsDescriptorResource(resourceName, assemblyName);
+
+                if (isDescriptorResource &&
+                    (assemblyAction == AssemblyAction.Link || assemblyAction == AssemblyAction.Copy))
                 {
-                    string assemblyName = _module.Assembly.GetName().Name;
                     bool removeDescriptors = factory.Settings.Optimizations.IsEnabled(CodeOptimizations.RemoveDescriptors, assemblyName);
 
                     if (removeDescriptors || !factory.Settings.IgnoreDescriptors)
@@ -56,7 +61,7 @@ namespace ILCompiler.DependencyAnalysis
                         }
 
                         bool isLinkerDescriptor = IsLinkerDescriptor(ms);
-                        _skipWritingResource = removeDescriptors && isLinkerDescriptor;
+                        _skipWritingResource = removeDescriptors && assemblyAction == AssemblyAction.Link && isLinkerDescriptor;
 
                         if (isLinkerDescriptor && !factory.Settings.IgnoreDescriptors)
                         {
@@ -133,6 +138,18 @@ namespace ILCompiler.DependencyAnalysis
                 builder.GetOrAddString(reader.GetString(resource.Name)),
                 implementation,
                 offset);
+        }
+
+        private static bool IsDescriptorResource(string resourceName, string assemblyName)
+        {
+            if (!resourceName.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (resourceName.Equals("ILLink.Descriptors.xml", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            int lastDot = resourceName.LastIndexOf('.');
+            return lastDot >= 0 && resourceName[..lastDot].Equals(assemblyName, StringComparison.Ordinal);
         }
 
         private static bool IsLinkerDescriptor(Stream resourceStream)

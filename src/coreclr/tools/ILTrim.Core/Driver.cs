@@ -130,6 +130,34 @@ namespace Mono.Linker
                 writer.Save(outputStream);
             });
 
+            foreach ((string assemblyName, string sourcePath) in tsContext.ReferenceFilePaths)
+            {
+                if (context.CalculateAssemblyAction(assemblyName) != AssemblyAction.Copy)
+                    continue;
+
+                string outputPath = Path.Combine(context.OutputDirectory, Path.GetFileName(sourcePath));
+                StringComparison pathComparison = OperatingSystem.IsWindows()
+                    ? StringComparison.OrdinalIgnoreCase
+                    : StringComparison.Ordinal;
+                if (!Path.GetFullPath(sourcePath).Equals(Path.GetFullPath(outputPath), pathComparison))
+                    File.Copy(sourcePath, outputPath, overwrite: true);
+
+                if (!context.LinkSymbols)
+                    continue;
+
+                string sourceSymbolsPath = Path.ChangeExtension(sourcePath, "pdb");
+                string outputSymbolsPath = Path.ChangeExtension(outputPath, "pdb");
+                if (File.Exists(sourceSymbolsPath) &&
+                    !Path.GetFullPath(sourceSymbolsPath).Equals(Path.GetFullPath(outputSymbolsPath), pathComparison))
+                    File.Copy(sourceSymbolsPath, outputSymbolsPath, overwrite: true);
+
+                string sourceMdbPath = sourcePath + ".mdb";
+                string outputMdbPath = outputPath + ".mdb";
+                if (File.Exists(sourceMdbPath) &&
+                    !Path.GetFullPath(sourceMdbPath).Equals(Path.GetFullPath(outputMdbPath), pathComparison))
+                    File.Copy(sourceMdbPath, outputMdbPath, overwrite: true);
+            }
+
             if (context.DependenciesFileName is not null)
             {
                 using var logStream = File.OpenWrite(context.DependenciesFileName);
