@@ -3,7 +3,6 @@
 
 #ifndef __NATIVE_CONTEXT_H__
 #define __NATIVE_CONTEXT_H__
-#ifndef HOST_WASM
 
 #if HAVE_UCONTEXT_H
 #include <ucontext.h>
@@ -132,7 +131,7 @@ struct NATIVE_CONTEXT
     void ForEachPossibleObjectRef(F lambda)
     {
     }
-    
+
 #elif defined(TARGET_ARM)
     uint64_t& Pc();
     uint64_t& Sp();
@@ -285,5 +284,4 @@ struct NATIVE_CONTEXT
     PORTABILITY_ASSERT("NATIVE_CONTEXT");
 #endif // TARGET_ARM
 };
-#endif // HOST_WASM
 #endif // __NATIVE_CONTEXT_H__

@@ -474,6 +474,7 @@ enum PInvokeTransitionFrameFlags
 #if defined(TARGET_X86)
     PTFF_RAX_IS_GCREF   = 0x00010000,   // used by hijack handler to report return value of hijacked method
     PTFF_RAX_IS_BYREF   = 0x00020000,
+    PTFF_RCX_IS_GCREF   = 0x00040000,
 #endif
 
     PTFF_THREAD_HIJACK  = 0x00100000,   // indicates that this is a frame for a hijacked call
@@ -489,11 +490,10 @@ class Thread;
 //in order to satisfy the runtime requirements of StackFrameIterator
 struct PInvokeTransitionFrame
 {
-#ifndef HOST_WASM
-    Thread*     m_pThread; // Cached so that GetThread is only called once per method
-    uint32_t    m_Flags; // PInvokeTransitionFrameFlags.
-    TgtPTR_Void m_RIP; // PInvokeTransitionFrameFlags.
-#endif // HOST_WASM
+    void*       m_RIP;
+    Thread*     m_pThread;  // unused by stack crawler, this is so GetThread is only called once per method
+                            // can be an invalid pointer in universal transition cases (which never need to call GetThread)
+    uint32_t    m_Flags;    // PInvokeTransitionFrameFlags
 };
 #else // FEATURE_PORTABLE_HELPERS
 struct PInvokeTransitionFrame
@@ -556,4 +556,3 @@ enum RhEHClauseKind
 };
 
 #define RH_EH_CLAUSE_TYPED_INDIRECT RH_EH_CLAUSE_UNUSED
-

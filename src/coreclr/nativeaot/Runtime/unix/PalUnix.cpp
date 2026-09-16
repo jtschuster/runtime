@@ -30,9 +30,7 @@
 #include <unistd.h>
 #include <sched.h>
 #include <sys/types.h>
-#ifndef TARGET_WASI // no dynamic linking in Wasi
 #include <dlfcn.h>
-#endif
 #include <dirent.h>
 #include <string.h>
 #include <ctype.h>
@@ -338,7 +336,7 @@ public:
             NanosecondsToTimeSpec(nanoseconds, &endTime);
             endNanoseconds = clock_gettime_nsec_np(CLOCK_UPTIME_RAW) + nanoseconds;
         }
-#elif HAVE_PTHREAD_CONDATTR_SETCLOCK || _WASI_EMULATED_PROCESS_CLOCKS
+#elif HAVE_PTHREAD_CONDATTR_SETCLOCK
         if (milliseconds != INFINITE)
         {
             clock_gettime(CLOCK_MONOTONIC, &endTime);

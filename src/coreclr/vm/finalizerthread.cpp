@@ -71,13 +71,9 @@ void FinalizerThread::EnableFinalization()
 
 #ifndef TARGET_WASM
     hEventFinalizer->Set();
-#else  // !TARGET_WASM
-#ifdef TARGET_BROWSER
+#elif defined(TARGET_BROWSER)
     SystemJS_ScheduleFinalization();
-#else
-    // WASI is not implemented yet
-#endif // TARGET_BROWSER
-#endif // !TARGET_WASM
+#endif
 }
 
 namespace
