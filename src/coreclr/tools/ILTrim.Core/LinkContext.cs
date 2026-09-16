@@ -31,6 +31,7 @@ namespace Mono.Linker
             MessageContainer? error = MessageContainer.CreateErrorMessage(origin, id, args);
             if (error.HasValue)
             {
+                ErrorsCount++;
                 _logger.WriteError(error.Value);
             }
         }

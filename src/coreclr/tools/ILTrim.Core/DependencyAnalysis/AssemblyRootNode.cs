@@ -22,6 +22,8 @@ namespace ILCompiler.DependencyAnalysis
         public AssemblyRootNode(string assemblyName, AssemblyRootMode mode)
             => (_assemblyName, _mode) = (assemblyName, mode);
 
+        internal string AssemblyName => _assemblyName;
+
         public override IEnumerable<DependencyListEntry> GetStaticDependencies(NodeFactory factory)
         {
             // TODO: what is the failure mode of illink here?

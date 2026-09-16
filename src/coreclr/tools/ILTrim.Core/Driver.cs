@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection.Metadata;
 using System.Threading.Tasks;
 
 using ILCompiler;
@@ -55,6 +56,49 @@ namespace Mono.Linker
                 disableGeneratedCodeHeuristics: context.DisableGeneratedCodeHeuristics);
 
             var factory = new NodeFactory(context, logger, ilProvider, tsContext);
+
+            if (!context.IgnoreUnresolved)
+            {
+                var resolvedAssemblies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var unresolvedAssemblies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var input in context.Inputs)
+                {
+                    if (input is AssemblyRootNode assemblyRoot)
+                        ValidateAssemblyReferences(assemblyRoot.AssemblyName);
+                }
+
+                void ValidateAssemblyReferences(string assemblyName)
+                {
+                    string simpleName = AssemblyNameInfo.Parse(assemblyName).Name;
+                    if (!resolvedAssemblies.Add(simpleName))
+                        return;
+
+                    EcmaModule module = tsContext.GetModuleForSimpleName(simpleName, throwIfNotFound: false);
+                    if (module is null)
+                        return;
+
+                    MetadataReader reader = module.MetadataReader;
+                    foreach (AssemblyReferenceHandle handle in reader.AssemblyReferences)
+                    {
+                        AssemblyReference reference = reader.GetAssemblyReference(handle);
+                        string referenceName = reader.GetString(reference.Name);
+                        EcmaModule referencedModule = tsContext.GetModuleForSimpleName(referenceName, throwIfNotFound: false);
+                        if (referencedModule is null)
+                        {
+                            if (unresolvedAssemblies.Add(referenceName))
+                                context.LogError(null, DiagnosticId.CouldNotFindAssemblyReference, referenceName);
+                        }
+                        else
+                        {
+                            ValidateAssemblyReferences(referenceName);
+                        }
+                    }
+                }
+            }
+
+            if (context.ErrorsCount > 0)
+                return 1;
 
             DependencyTrackingLevel trackingLevel = context.DependenciesFileName is not null
                 ? DependencyTrackingLevel.All
