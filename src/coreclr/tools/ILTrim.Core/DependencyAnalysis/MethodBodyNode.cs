@@ -126,7 +126,7 @@ namespace ILCompiler.DependencyAnalysis
                         MethodDesc method;
                         MethodDefinitionHandle? unresolvedGenericMethod = null;
                         if (opcode == ILOpcode.newobj || opcode == ILOpcode.call || opcode == ILOpcode.callvirt ||
-                            opcode == ILOpcode.ldvirtftn || opcode == ILOpcode.ldftn)
+                            opcode == ILOpcode.ldtoken || opcode == ILOpcode.ldvirtftn || opcode == ILOpcode.ldftn)
                         {
                             method = _module.TryGetMethod(token);
                             if (method is null && TryGetGenericMethodDefinition(token) is MethodDefinitionHandle genericMethodHandle)
@@ -175,6 +175,12 @@ namespace ILCompiler.DependencyAnalysis
                             HandleKind.StandaloneSignature => factory.StandaloneSignature(_module, (StandaloneSignatureHandle)token),
                             _ => throw new InvalidOperationException(token.Kind.ToString()),
                         }, "Instruction operand");
+
+                        if (method is not null &&
+                            (opcode == ILOpcode.ldtoken || opcode == ILOpcode.ldvirtftn || opcode == ILOpcode.ldftn))
+                        {
+                            _dependencies.Add(factory.ReflectedMethod(method), "Reflection-visible method operand");
+                        }
 
                         if (opcode == ILOpcode.ldtoken &&
                             _module.TryGetType(token) is TypeDesc type &&

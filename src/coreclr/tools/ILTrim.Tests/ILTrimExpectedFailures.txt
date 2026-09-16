@@ -329,7 +329,6 @@ Reflection.EventHanderTypeGetInvokeMethod
 Reflection.IsAssignableFrom
 Reflection.ObjectGetType
 Reflection.ObjectGetTypeLibraryMode
-Reflection.ParametersUsedViaReflection
 Reflection.TypeHierarchyLibraryModeSuppressions
 Reflection.TypeHierarchyReflectionWarnings
 Reflection.TypeMap
