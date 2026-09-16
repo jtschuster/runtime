@@ -114,6 +114,18 @@ namespace ILCompiler.DependencyAnalysis
             if (constructor is null)
                 return dependencies;
 
+            if (!hasUnresolvedValue)
+            {
+                TypeSystemEntity originEntity = GetAttributeTargetGenericContext(customAttribute.Parent) ?? _module;
+                DependencyList dataflowDependencies = new AttributeDataFlow(
+                    factory.Logger,
+                    factory,
+                    factory.FlowAnnotations,
+                    new MessageOrigin(originEntity)).ProcessAttributeDataflow(constructor, decodedValue);
+                if (dataflowDependencies is not null)
+                    dependencies.AddRange(dataflowDependencies);
+            }
+
             bool[] unresolvedFixedArguments = GetUnresolvedFixedArguments(customAttribute, constructor, out HashSet<string> unresolvedNamedArguments);
             AddGenericArgumentDataFlowDependencies(ref dependencies, factory, customAttribute.Parent, constructor.OwningType);
             ProcessConstructorArgumentDataFlow(
