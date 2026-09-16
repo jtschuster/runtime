@@ -11,6 +11,7 @@ namespace Mono.Linker.Tests.Cases.Statics
         {
             C.Foo();
             CEmpty.Foo();
+            CNoFields.Foo();
         }
 
         static class C
@@ -42,6 +43,20 @@ namespace Mono.Linker.Tests.Cases.Statics
 
             [Kept]
             static int count;
+        }
+
+        static class CNoFields
+        {
+            static CNoFields()
+            {
+            }
+
+            [Kept]
+            public static void Foo()
+            {
+            }
+
+            static int unused;
         }
     }
 }

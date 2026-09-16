@@ -362,7 +362,6 @@ Serialization.DataContractJsonSerialization
 Serialization.DataContractSerialization
 Serialization.SerializationTypeRecursion
 Serialization.XmlSerialization
-Statics.ExplicitStaticCtor
 Substitutions.EmbeddedMethodSubstitutionsInReferencedAssembly
 Substitutions.EmbeddedSubstitutions
 Substitutions.EmbeddedSubstitutionsKept

@@ -4,7 +4,9 @@
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Metadata;
+using System.Reflection.Metadata.Ecma335;
 
+using Internal.IL;
 using Internal.TypeSystem.Ecma;
 using Mono.Linker;
 
@@ -70,7 +72,8 @@ namespace ILCompiler.DependencyAnalysis
                 CodeOptimizations.BeforeFieldInit,
                 _module.Assembly.GetName().Name);
             if ((!type.IsBeforeFieldInit || preserveBeforeFieldInit) &&
-                type.GetStaticConstructor() is EcmaMethod cctor)
+                type.GetStaticConstructor() is EcmaMethod cctor &&
+                IsNonEmptyStaticConstructor(cctor))
             {
                 dependencies.Add(factory.MethodDefinition(_module, cctor.Handle), "Static constructor");
             }
@@ -101,6 +104,20 @@ namespace ILCompiler.DependencyAnalysis
             }
 
             return dependencies;
+        }
+
+        private bool IsNonEmptyStaticConstructor(EcmaMethod cctor)
+        {
+            MethodDefinition methodDef = _module.MetadataReader.GetMethodDefinition(cctor.Handle);
+            int rva = methodDef.RelativeVirtualAddress;
+            if (rva == 0)
+                return true;
+
+            BlobReader ilReader = _module.PEReader.GetMethodBody(rva).GetILReader();
+            if (ilReader.Length != 1)
+                return true;
+
+            return ilReader.ReadByte() != (byte)ILOpcode.ret;
         }
 
         public override bool HasConditionalStaticDependencies
@@ -134,10 +151,14 @@ namespace ILCompiler.DependencyAnalysis
         {
             MetadataReader reader = _module.MetadataReader;
             TypeDefinition typeDef = reader.GetTypeDefinition(Handle);
+            EcmaType type = _module.GetType(Handle);
 
             var builder = writeContext.MetadataBuilder;
+            TypeAttributes typeAttributes = typeDef.Attributes;
+            if (ShouldAddBeforeFieldInit(writeContext.Factory, type, typeDef))
+                typeAttributes |= TypeAttributes.BeforeFieldInit;
 
-            TypeDefinitionHandle outputHandle = builder.AddTypeDefinition(typeDef.Attributes,
+            TypeDefinitionHandle outputHandle = builder.AddTypeDefinition(typeAttributes,
                 builder.GetOrAddString(reader.GetString(typeDef.Namespace)),
                 builder.GetOrAddString(reader.GetString(typeDef.Name)),
                 writeContext.TokenMap.MapToken(typeDef.BaseType),
@@ -179,6 +200,30 @@ namespace ILCompiler.DependencyAnalysis
             }
 
             return outputHandle;
+        }
+
+        private bool ShouldAddBeforeFieldInit(NodeFactory factory, EcmaType type, TypeDefinition typeDef)
+        {
+            if (type.IsBeforeFieldInit ||
+                type.IsEnum ||
+                !factory.Settings.Optimizations.IsEnabled(CodeOptimizations.BeforeFieldInit, _module.Assembly.GetName().Name) ||
+                !HasMarkedField(factory, typeDef))
+            {
+                return false;
+            }
+
+            return type.GetStaticConstructor() is not EcmaMethod cctor || !IsNonEmptyStaticConstructor(cctor);
+        }
+
+        private bool HasMarkedField(NodeFactory factory, TypeDefinition typeDef)
+        {
+            foreach (FieldDefinitionHandle fieldHandle in typeDef.GetFields())
+            {
+                if (factory.FieldDefinition(_module, fieldHandle).Marked)
+                    return true;
+            }
+
+            return false;
         }
 
         public override string ToString()
