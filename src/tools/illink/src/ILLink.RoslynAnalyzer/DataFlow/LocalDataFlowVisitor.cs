@@ -199,7 +199,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
 
         public override TValue VisitLocalReference(ILocalReferenceOperation operation, LocalDataFlowState<TValue, TContext, TValueLattice, TContextLattice> state)
         {
-            return GetLocal(operation.Local, state).GetScalarValue(TopValue);
+            return GetLocal(operation.Local, state).GetScalarValueOrTop(TopValue);
         }
 
         private TValue ProcessBinderCall(IOperation operation, string methodName, LocalDataFlowState<TValue, TContext, TValueLattice, TContextLattice> state)
@@ -430,7 +430,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 {
                     LocalValue<TValue> value = GetAssignmentLocalValue();
                     SetLocal(localRef.Local, value, state, merge);
-                    return value.GetScalarValue(TopValue);
+                    return value.GetScalarValueOrTop(TopValue);
                 }
                 case IDeclarationPatternOperation declPattern:
                 {
@@ -438,7 +438,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                         break;
                     LocalValue<TValue> value = GetAssignmentLocalValue();
                     SetLocal(declaredSymbol, value, state, merge);
-                    return value.GetScalarValue(TopValue);
+                    return value.GetScalarValueOrTop(TopValue);
                 }
                 case IArrayElementReferenceOperation arrayElementRef:
                 {
@@ -687,7 +687,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
             ITypeSymbol? sourceType = operation.Value.Type;
             IOperation source = UnwrapDeconstructionSource(operation.Value);
             LocalValue<TValue> sourceValue = VisitLocalValue(source, state);
-            TValue scalarSourceValue = sourceValue.GetScalarValue(TopValue);
+            TValue scalarSourceValue = sourceValue.GetScalarValueOrTop(TopValue);
 
             // Deconstruction evaluates all source values before assigning any target. Keeping these
             // phases separate is required for assignments such as (first, second) = (second, first).
@@ -735,7 +735,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                     return true;
                 }
 
-                TValue scalarSourceValue = sourceValue.GetScalarValue(TopValue);
+                TValue scalarSourceValue = sourceValue.GetScalarValueOrTop(TopValue);
                 value = new LocalValue<TValue>(
                     deconstructionInfo.Conversion is { MethodSymbol: IMethodSymbol conversionOperator }
                         ? GetConversionValue(conversionOperator, scalarSourceValue)
@@ -753,7 +753,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
 
             if (deconstructionInfo.Method is IMethodSymbol deconstructMethod)
             {
-                TValue scalarSourceValue = sourceValue.GetScalarValue(TopValue);
+                TValue scalarSourceValue = sourceValue.GetScalarValueOrTop(TopValue);
                 bool isExtensionMethod = deconstructMethod.IsExtensionMethod;
                 bool hasReceiverArgument = isExtensionMethod || deconstructMethod.HasExtensionParameterOnType();
                 int outputParameterOffset = isExtensionMethod ? 1 : 0;
@@ -903,7 +903,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
             target = UnwrapDeconstructionTarget(target);
             if (target is not ITupleOperation targetTuple)
             {
-                ProcessAssignment(target, value.GetScalarValue(TopValue), target, state, savedTargetValues);
+                ProcessAssignment(target, value.GetScalarValueOrTop(TopValue), target, state, savedTargetValues);
                 return;
             }
 
@@ -1097,7 +1097,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
         private TValue GetFlowCaptureValue(
             IFlowCaptureReferenceOperation operation,
             LocalDataFlowState<TValue, TContext, TValueLattice, TContextLattice> state) =>
-            GetFlowCaptureLocalValue(operation, state).GetScalarValue(TopValue);
+            GetFlowCaptureLocalValue(operation, state).GetScalarValueOrTop(TopValue);
 
         // Similar to VisitLocalReference
         public override TValue VisitFlowCaptureReference(IFlowCaptureReferenceOperation operation, LocalDataFlowState<TValue, TContext, TValueLattice, TContextLattice> state)
@@ -1212,7 +1212,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 }
 
                 state.Set(new LocalKey(operation.Id), capturedValue);
-                return capturedValue.GetScalarValue(TopValue);
+                return capturedValue.GetScalarValueOrTop(TopValue);
             }
         }
 

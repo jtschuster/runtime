@@ -97,7 +97,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
             return new LocalValue<TValue>(elements.MoveToImmutable());
         }
 
-        public TValue GetScalarValue(TValue topValue) =>
+        public TValue GetScalarValueOrTop(TValue topValue) =>
             Kind == LocalValueKind.Scalar ? ScalarValue : topValue;
     }
 
