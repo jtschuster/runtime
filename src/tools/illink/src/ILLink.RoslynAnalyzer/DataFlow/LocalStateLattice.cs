@@ -3,12 +3,139 @@
 
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using ILLink.Shared.DataFlow;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FlowAnalysis;
 
 namespace ILLink.RoslynAnalyzer.DataFlow
 {
+    public enum LocalValueKind
+    {
+        Top,
+        Scalar,
+        Tuple
+    }
+
+    public readonly struct LocalValue<TValue> : IEquatable<LocalValue<TValue>>, IDeepCopyValue<LocalValue<TValue>>
+        where TValue : IEquatable<TValue>
+    {
+        public LocalValueKind Kind { get; }
+
+        public TValue ScalarValue { get; }
+
+        public ImmutableArray<LocalValue<TValue>> Elements { get; }
+
+        public LocalValue(TValue value)
+        {
+            Kind = LocalValueKind.Scalar;
+            ScalarValue = value;
+            Elements = default;
+        }
+
+        public LocalValue(ImmutableArray<LocalValue<TValue>> elements)
+        {
+            Kind = LocalValueKind.Tuple;
+            ScalarValue = default!;
+            Elements = elements;
+        }
+
+        public bool Equals(LocalValue<TValue> other)
+        {
+            if (Kind != other.Kind)
+                return false;
+
+            if (Kind == LocalValueKind.Top)
+                return true;
+            if (Kind == LocalValueKind.Scalar)
+                return EqualityComparer<TValue>.Default.Equals(ScalarValue, other.ScalarValue);
+            if (Elements.Length != other.Elements.Length)
+                return false;
+
+            for (int i = 0; i < Elements.Length; i++)
+            {
+                if (!Elements[i].Equals(other.Elements[i]))
+                    return false;
+            }
+
+            return true;
+        }
+
+        public override bool Equals(object obj) => obj is LocalValue<TValue> other && Equals(other);
+
+        public override int GetHashCode()
+        {
+            int hashCode = (int)Kind;
+            if (Kind == LocalValueKind.Scalar)
+            {
+                hashCode = unchecked((hashCode * 31) + EqualityComparer<TValue>.Default.GetHashCode(ScalarValue));
+            }
+            else if (Kind == LocalValueKind.Tuple)
+            {
+                foreach (LocalValue<TValue> element in Elements)
+                    hashCode = unchecked((hashCode * 31) + element.GetHashCode());
+            }
+
+            return hashCode;
+        }
+
+        public LocalValue<TValue> DeepCopy()
+        {
+            if (Kind == LocalValueKind.Scalar)
+            {
+                return new LocalValue<TValue>(
+                    ScalarValue is IDeepCopyValue<TValue> copyValue ? copyValue.DeepCopy() : ScalarValue);
+            }
+
+            if (Kind != LocalValueKind.Tuple)
+                return default;
+
+            var elements = ImmutableArray.CreateBuilder<LocalValue<TValue>>(Elements.Length);
+            foreach (LocalValue<TValue> element in Elements)
+                elements.Add(element.DeepCopy());
+
+            return new LocalValue<TValue>(elements.MoveToImmutable());
+        }
+
+        public TValue GetScalarValue(TValue topValue) =>
+            Kind == LocalValueKind.Scalar ? ScalarValue : topValue;
+    }
+
+    public readonly struct LocalValueLattice<TValue, TValueLattice> : ILattice<LocalValue<TValue>>
+        where TValue : struct, IEquatable<TValue>
+        where TValueLattice : ILattice<TValue>
+    {
+        private readonly TValueLattice _valueLattice;
+
+        public LocalValueLattice(TValueLattice valueLattice) => _valueLattice = valueLattice;
+
+        public LocalValue<TValue> Top => default;
+
+        public LocalValue<TValue> Meet(LocalValue<TValue> left, LocalValue<TValue> right)
+        {
+            if (left.Kind == LocalValueKind.Top)
+                return right.DeepCopy();
+            if (right.Kind == LocalValueKind.Top)
+                return left.DeepCopy();
+
+            if (left.Kind == LocalValueKind.Scalar && right.Kind == LocalValueKind.Scalar)
+                return new LocalValue<TValue>(_valueLattice.Meet(left.ScalarValue, right.ScalarValue));
+
+            if (left.Kind != LocalValueKind.Tuple ||
+                right.Kind != LocalValueKind.Tuple ||
+                left.Elements.Length != right.Elements.Length)
+            {
+                return Top;
+            }
+
+            var elements = ImmutableArray.CreateBuilder<LocalValue<TValue>>(left.Elements.Length);
+            for (int i = 0; i < left.Elements.Length; i++)
+                elements.Add(Meet(left.Elements[i], right.Elements[i]));
+
+            return new LocalValue<TValue>(elements.MoveToImmutable());
+        }
+    }
+
     public readonly struct LocalKey : IEquatable<LocalKey>
     {
         private readonly ILocalSymbol? Local;
@@ -44,8 +171,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
 
         public bool Equals(CapturedTargetKey other) => Operation == other.Operation;
 
-        public override bool Equals(object obj)
-            => obj is CapturedTargetKey inst && Equals(inst);
+        public override bool Equals(object obj) => obj is CapturedTargetKey other && Equals(other);
 
         public override int GetHashCode() => Operation.GetHashCode();
     }
@@ -53,9 +179,9 @@ namespace ILLink.RoslynAnalyzer.DataFlow
     public readonly struct CapturedTargetValue<TValue> : IEquatable<CapturedTargetValue<TValue>>, IDeepCopyValue<CapturedTargetValue<TValue>>
         where TValue : IEquatable<TValue>
     {
-        public readonly bool HasValue;
+        public bool HasValue { get; }
 
-        public readonly TValue Value;
+        public TValue Value { get; }
 
         public CapturedTargetValue(TValue value) => (HasValue, Value) = (true, value);
 
@@ -63,8 +189,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
             HasValue == other.HasValue &&
             (!HasValue || EqualityComparer<TValue>.Default.Equals(Value, other.Value));
 
-        public override bool Equals(object obj)
-            => obj is CapturedTargetValue<TValue> inst && Equals(inst);
+        public override bool Equals(object obj) => obj is CapturedTargetValue<TValue> other && Equals(other);
 
         public override int GetHashCode() => HasValue ? EqualityComparer<TValue>.Default.GetHashCode(Value) : 0;
 
@@ -91,6 +216,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 return right.DeepCopy();
             if (!right.HasValue)
                 return left.DeepCopy();
+
             return new CapturedTargetValue<TValue>(_valueLattice.Meet(left.Value, right.Value));
         }
     }
@@ -98,7 +224,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
     public struct LocalState<TValue> : IEquatable<LocalState<TValue>>
         where TValue : IEquatable<TValue>
     {
-        public DefaultValueDictionary<LocalKey, TValue> Dictionary;
+        public DefaultValueDictionary<LocalKey, LocalValue<TValue>> Dictionary;
 
         // Stores any operations which are captured by reference in a FlowCaptureOperation.
         // Only stores captures which are assigned through. Captures of the values of operations
@@ -109,7 +235,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
         public DefaultValueDictionary<CapturedTargetKey, CapturedTargetValue<TValue>> CapturedTargetValues;
 
         public LocalState(
-            DefaultValueDictionary<LocalKey, TValue> dictionary,
+            DefaultValueDictionary<LocalKey, LocalValue<TValue>> dictionary,
             DefaultValueDictionary<CaptureId, ValueSet<CapturedReferenceValue>> capturedReferences,
             DefaultValueDictionary<CapturedTargetKey, CapturedTargetValue<TValue>> capturedTargetValues)
         {
@@ -118,7 +244,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
             CapturedTargetValues = capturedTargetValues;
         }
 
-        public LocalState(DefaultValueDictionary<LocalKey, TValue> dictionary)
+        public LocalState(DefaultValueDictionary<LocalKey, LocalValue<TValue>> dictionary)
             : this(
                 dictionary,
                 new DefaultValueDictionary<CaptureId, ValueSet<CapturedReferenceValue>>(default(ValueSet<CapturedReferenceValue>)),
@@ -134,13 +260,12 @@ namespace ILLink.RoslynAnalyzer.DataFlow
         public override bool Equals(object obj)
             => obj is LocalState<TValue> inst && Equals(inst);
 
-        public TValue Get(LocalKey key) => Dictionary.Get(key);
+        public LocalValue<TValue> Get(LocalKey key) => Dictionary.Get(key);
 
-        // Local dataflow states are mutable and should never be used as dictionary keys.
         public override int GetHashCode()
             => throw new NotImplementedException();
 
-        public void Set(LocalKey key, TValue value) => Dictionary.Set(key, value);
+        public void Set(LocalKey key, LocalValue<TValue> value) => Dictionary.Set(key, value);
 
         public override string ToString() => Dictionary.ToString();
     }
@@ -150,16 +275,19 @@ namespace ILLink.RoslynAnalyzer.DataFlow
         where TValue : struct, IEquatable<TValue>
         where TValueLattice : ILattice<TValue>
     {
-        public readonly DictionaryLattice<LocalKey, TValue, TValueLattice> Lattice;
+        public readonly DictionaryLattice<LocalKey, LocalValue<TValue>, LocalValueLattice<TValue, TValueLattice>> Lattice;
         public readonly DictionaryLattice<CaptureId, ValueSet<CapturedReferenceValue>, ValueSetLattice<CapturedReferenceValue>> CapturedReferenceLattice;
         public readonly DictionaryLattice<CapturedTargetKey, CapturedTargetValue<TValue>, CapturedTargetValueLattice<TValue, TValueLattice>> CapturedTargetValueLattice;
+        public readonly TValueLattice ValueLattice;
 
         public LocalStateLattice(TValueLattice valueLattice)
         {
-            Lattice = new DictionaryLattice<LocalKey, TValue, TValueLattice>(valueLattice);
+            Lattice = new DictionaryLattice<LocalKey, LocalValue<TValue>, LocalValueLattice<TValue, TValueLattice>>(
+                new LocalValueLattice<TValue, TValueLattice>(valueLattice));
             CapturedReferenceLattice = new DictionaryLattice<CaptureId, ValueSet<CapturedReferenceValue>, ValueSetLattice<CapturedReferenceValue>>(default(ValueSetLattice<CapturedReferenceValue>));
             CapturedTargetValueLattice = new DictionaryLattice<CapturedTargetKey, CapturedTargetValue<TValue>, CapturedTargetValueLattice<TValue, TValueLattice>>(
                 new CapturedTargetValueLattice<TValue, TValueLattice>(valueLattice));
+            ValueLattice = valueLattice;
             Top = new(Lattice.Top);
         }
 

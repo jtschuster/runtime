@@ -17,7 +17,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
         static Type GetUnannotatedType() => null;
 
         // Verify that tools which model tuple fields validate assignment to an annotated static field.
-        [ExpectedWarning("IL2074", nameof(GetUnannotatedType), Tool.Trimmer | Tool.NativeAot, "Analyzer cannot determine what compiles to ValueTuple or local variables.")]
+        [ExpectedWarning("IL2074", nameof(GetUnannotatedType))]
         public static void Main()
         {
             object other;

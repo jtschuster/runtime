@@ -237,7 +237,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 type.GetMethod(methodName);
             }
 
-            [ExpectedWarning("IL2070", Tool.Trimmer | Tool.NativeAot, "Analyzer cannot determine what compiles to ValueTuple or local variables.")]
+            [ExpectedWarning("IL2070")]
             static void DeconstructConditionalTupleUnannotated(bool condition, Type input)
             {
                 string methodName;
@@ -260,7 +260,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 type.GetMethod(methodName);
             }
 
-            [ExpectedWarning("IL2080", ".Item2")]
+            [ExpectedWarning("IL2080", Tool.Trimmer | Tool.NativeAot, ".Item2")]
             [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer, "Ref conditional produces one warning for each possible tuple reference.")]
             [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
             static void DeconstructRefConditionalTuple(bool condition)
@@ -276,8 +276,8 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 type.GetMethod(methodName);
             }
 
-            [ExpectedWarning("IL2069", "input1", nameof(annotatedfield), Tool.Trimmer | Tool.NativeAot, "Analyzer cannot determine what compiles to ValueTuple or local variables.")]
-            [ExpectedWarning("IL2069", "input2", nameof(annotatedfield), Tool.Trimmer | Tool.NativeAot, "Analyzer cannot determine what compiles to ValueTuple or local variables.")]
+            [ExpectedWarning("IL2069", "input1", nameof(annotatedfield))]
+            [ExpectedWarning("IL2069", "input2", nameof(annotatedfield))]
             static void DeconstructConditionalTupleToAnnotatedFieldUnannotated(
                 bool condition,
                 Type input1,
@@ -300,7 +300,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                     : (input2, new object());
             }
 
-            [ExpectedWarning("IL2080", ".Item2")]
+            [ExpectedWarning("IL2080", Tool.Trimmer | Tool.NativeAot, ".Item2")]
             static void DeconstructConditionalTupleLocal(bool condition)
             {
                 var tuple = condition
@@ -308,6 +308,22 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                     : (nameof(object.ToString), typeof(object));
                 var (methodName, type) = tuple;
                 type.GetMethod(methodName);
+            }
+
+            static void DeconstructCapturedTupleLocal(bool condition)
+            {
+                var tuple = condition
+                    ? (nameof(string.ToString), typeof(string))
+                    : (nameof(object.ToString), typeof(object));
+
+                Validate();
+
+                [ExpectedWarning("IL2080", Tool.Trimmer | Tool.NativeAot, ".Item2")]
+                void Validate()
+                {
+                    var (methodName, type) = tuple;
+                    type.GetMethod(methodName);
+                }
             }
 
             static void DeconstructNestedConditionalTuple(bool condition)
@@ -319,7 +335,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 type.GetMethod(methodName);
             }
 
-            [ExpectedWarning("IL2080", ".Item2")]
+            [ExpectedWarning("IL2080", Tool.Trimmer | Tool.NativeAot, ".Item2")]
             static void DeconstructNestedConditionalTupleLocal(bool condition)
             {
                 var tuple = condition
@@ -344,6 +360,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 type.GetMethod(methodName);
             }
 
+            [ExpectedWarning("IL2070", Tool.Analyzer, "")]
             [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer | Tool.NativeAot, "Analyzer cannot determine what compiles to ValueTuple or local variables.")]
             static void DeconstructSwitchTupleUnannotated(string value, Type input)
             {
@@ -631,6 +648,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 DeconstructConditionalTupleToAnnotatedFieldUnannotated(false, typeof(string), typeof(object));
                 DeconstructConditionalTupleToAnnotatedFieldAnnotated(false, typeof(string), typeof(object));
                 DeconstructConditionalTupleLocal(false);
+                DeconstructCapturedTupleLocal(false);
                 DeconstructNestedConditionalTuple(false);
                 DeconstructNestedConditionalTupleLocal(false);
                 DeconstructSwitchTuple("string");

@@ -24,7 +24,6 @@ namespace ILLink.RoslynAnalyzer.DataFlow
             LocalState.Equals(other.LocalState) && Context.Equals(other.Context);
 
         public override bool Equals(object? obj) => obj is LocalStateAndContext<TValue, TContext> other && Equals(other);
-
         // Local dataflow states are mutable and should never be used as dictionary keys.
         public override int GetHashCode() => throw new NotImplementedException();
     }
