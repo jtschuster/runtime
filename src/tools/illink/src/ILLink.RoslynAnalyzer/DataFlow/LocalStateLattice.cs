@@ -81,14 +81,14 @@ namespace ILLink.RoslynAnalyzer.DataFlow
 
         public LocalValue<TValue> DeepCopy()
         {
+            if (Kind == LocalValueKind.Top)
+                return default;
+
             if (Kind == LocalValueKind.Scalar)
             {
                 return new LocalValue<TValue>(
                     ScalarValue is IDeepCopyValue<TValue> copyValue ? copyValue.DeepCopy() : ScalarValue);
             }
-
-            if (Kind != LocalValueKind.Tuple)
-                return default;
 
             var elements = ImmutableArray.CreateBuilder<LocalValue<TValue>>(Elements.Length);
             foreach (LocalValue<TValue> element in Elements)
