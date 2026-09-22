@@ -407,6 +407,36 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 type.GetMethod(methodName);
             }
 
+            sealed class SwitchDeconstructable
+            {
+                public static implicit operator (string methodName, Type type)(SwitchDeconstructable value) =>
+                    (nameof(string.ToString), typeof(string));
+
+                public void Deconstruct(
+                    out string methodName,
+                    [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicMethods)] out Type type)
+                {
+                    methodName = nameof(string.ToString);
+                    type = typeof(string);
+                }
+            }
+
+            [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer | Tool.NativeAot, "Analyzer conservatively loses tuple shape after merging incompatible source values.")]
+            static void DeconstructSwitchOfTupleAndMethodSources(string value, Type input)
+            {
+                var tupleLocal = (nameof(object.ToString), typeof(object));
+                var deconstructableTypeInstance = new SwitchDeconstructable();
+
+                (string methodName, Type type) = value switch
+                {
+                    "tuple" => tupleLocal,
+                    "deconstruct" => deconstructableTypeInstance,
+                    "ITuple" => (nameof(string.ToString), input),
+                    _ => throw new NotImplementedException()
+                };
+                type.GetMethod(methodName);
+            }
+
             // The swap correctly propagates the annotation from typeWithMethods to first (via second),
             // so no warning is produced here.
             static void DeconstructTupleSwapSuccess(
@@ -655,6 +685,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 DeconstructSwitchTupleUnannotated("string", typeof(string));
                 DeconstructSwitchTupleWithThrow("string");
                 DeconstructSwitchOfMixedTupleSources("string");
+                DeconstructSwitchOfTupleAndMethodSources("tuple", typeof(string));
                 DeconstructTupleSwapSuccess(typeof(string), typeof(string));
                 DeconstructTupleSwap(typeof(string), typeof(string));
                 DeconstructPropertyTargetSideEffect(typeof(string), typeof(string));
