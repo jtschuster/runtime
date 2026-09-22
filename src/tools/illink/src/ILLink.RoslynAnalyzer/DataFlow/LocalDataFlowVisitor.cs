@@ -862,7 +862,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 tupleType.TupleElements.Length != targetTuple.Elements.Length)
             {
                 UnexpectedOperationHandler.Handle(operation.Value);
-                value = default;
+                value = LocalValue<TValue>.Unknown;
                 return true;
             }
 
