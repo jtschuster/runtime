@@ -732,7 +732,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 {
                     UnexpectedOperationHandler.Handle(target);
                     value = LocalValue<TValue>.Top;
-                    return true;
+                    return false;
                 }
 
                 TValue scalarSourceValue = sourceValue.GetScalarValueOrTop(TopValue);
@@ -748,7 +748,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
             {
                 UnexpectedOperationHandler.Handle(target);
                 value = LocalValue<TValue>.Top;
-                return true;
+                return false;
             }
 
             if (deconstructionInfo.Method is IMethodSymbol deconstructMethod)
@@ -762,7 +762,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 {
                     UnexpectedOperationHandler.Handle(operation);
                     value = LocalValue<TValue>.Top;
-                    return true;
+                    return false;
                 }
 
                 var arguments = ImmutableArray.CreateBuilder<TValue>(metadataParameterCount);
@@ -862,8 +862,8 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 tupleType.TupleElements.Length != targetTuple.Elements.Length)
             {
                 UnexpectedOperationHandler.Handle(operation.Value);
-                value = LocalValue<TValue>.Unknown;
-                return true;
+                value = LocalValue<TValue>.Top;
+                return false;
             }
 
             var tupleValues = ImmutableArray.CreateBuilder<LocalValue<TValue>>(targetTuple.Elements.Length);
