@@ -653,7 +653,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                     return GetFlowCaptureLocalValue(flowCaptureReference, state);
                 case IThrowOperation:
                     Visit(operation, state);
-                    return default;
+                    return LocalValue<TValue>.Top;
                 default:
                     return new LocalValue<TValue>(Visit(operation, state));
             }
@@ -731,7 +731,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 if (target is ITupleOperation)
                 {
                     UnexpectedOperationHandler.Handle(target);
-                    value = default;
+                    value = LocalValue<TValue>.Top;
                     return true;
                 }
 
@@ -747,7 +747,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 targetTuple.Elements.Length != deconstructionInfo.Nested.Length)
             {
                 UnexpectedOperationHandler.Handle(target);
-                value = default;
+                value = LocalValue<TValue>.Top;
                 return true;
             }
 
@@ -761,7 +761,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 if (metadataParameterCount != targetTuple.Elements.Length + (hasReceiverArgument ? 1 : 0))
                 {
                     UnexpectedOperationHandler.Handle(operation);
-                    value = default;
+                    value = LocalValue<TValue>.Top;
                     return true;
                 }
 
@@ -790,7 +790,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 if (deconstructMethod.TryGetAttribute(nameof(DoesNotReturnAttribute), out _))
                 {
                     state.Current = LocalStateAndContextLattice.Top;
-                    value = default;
+                    value = LocalValue<TValue>.Top;
                     return false;
                 }
 
@@ -814,7 +814,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                         state,
                         out LocalValue<TValue> nestedValue))
                     {
-                        value = default;
+                        value = LocalValue<TValue>.Top;
                         return false;
                     }
 
@@ -847,7 +847,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                         state,
                         out LocalValue<TValue> nestedValue))
                     {
-                        value = default;
+                        value = LocalValue<TValue>.Top;
                         return false;
                     }
 
@@ -875,14 +875,14 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                     source: null,
                     tupleElement.Type,
                     sourceValue.Kind is LocalValueKind.Top or LocalValueKind.Unknown
-                        ? default
+                        ? LocalValue<TValue>.Top
                         : new LocalValue<TValue>(GetTupleElementValue(tupleElement)),
                     deconstructionInfo.Nested[i],
                     operation,
                     state,
                     out LocalValue<TValue> tupleValue))
                 {
-                    value = default;
+                    value = LocalValue<TValue>.Top;
                     return false;
                 }
 
@@ -911,7 +911,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 targetTuple.Elements.Length != value.Elements.Length)
             {
                 foreach (IOperation element in targetTuple.Elements)
-                    AssignDeconstruction(element, default, operation, state, savedTargetValues);
+                    AssignDeconstruction(element, LocalValue<TValue>.Top, operation, state, savedTargetValues);
                 return;
             }
 
@@ -1192,7 +1192,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                     {
                         // If an r-value captures an l-value, we must dereference the l-value
                         // and copy out the value to capture.
-                        capturedValue = default;
+                        capturedValue = LocalValue<TValue>.Top;
                         var capturedReferences = state.Current.LocalState.CapturedReferences.Get(captureRef.Id);
                         Debug.Assert(!capturedReferences.IsUnknown());
                         foreach (var capturedReference in capturedReferences.GetKnownValues())

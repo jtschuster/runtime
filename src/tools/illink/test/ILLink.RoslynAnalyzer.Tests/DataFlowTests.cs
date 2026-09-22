@@ -38,8 +38,8 @@ namespace ILLink.RoslynAnalyzer.Tests
             LocalValue<TestValue> result = lattice.Meet(left, right);
 
             Assert.Equal(Tuple(Scalar(5), Tuple(Scalar(7), Scalar(7))), result);
-            Assert.Equal(left, lattice.Meet(default, left));
-            Assert.Equal(right, lattice.Meet(right, default));
+            Assert.Equal(left, lattice.Meet(LocalValue<TestValue>.Top, left));
+            Assert.Equal(right, lattice.Meet(right, LocalValue<TestValue>.Top));
         }
 
         [Fact]
@@ -64,7 +64,7 @@ namespace ILLink.RoslynAnalyzer.Tests
             LocalValueLattice<TestValue, TestValueLattice> lattice = new(default(TestValueLattice));
             LocalValue<TestValue>[] values =
             [
-                default,
+                LocalValue<TestValue>.Top,
                 Scalar(1),
                 Scalar(2),
                 Tuple(Scalar(1)),
