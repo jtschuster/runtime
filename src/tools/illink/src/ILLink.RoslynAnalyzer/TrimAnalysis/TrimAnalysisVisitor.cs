@@ -272,7 +272,6 @@ namespace ILLink.RoslynAnalyzer.TrimAnalysis
                 : operandValue;
         }
 
-
         public override MultiValue GetParameterTargetValue(IParameterSymbol parameter)
         {
             var parameterMethod = parameter.ContainingSymbol as IMethodSymbol ?? OwningSymbol as IMethodSymbol;
