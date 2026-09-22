@@ -170,7 +170,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 type.GetMethod(methodName);
             }
 
-            [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer | Tool.NativeAot, "The nested switch expression is materialized as a ValueTuple.")]
+            [ExpectedWarning("IL2080", ".Item2", Tool.All, "The nested switch expression is materialized as a ValueTuple.")]
             static void DeconstructTupleLiteralWithSwitchTupleElement(string value)
             {
                 ((string methodName, Type type), object instance) = (
@@ -300,7 +300,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                     : (input2, new object());
             }
 
-            [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer | Tool.NativeAot, "ValueTuple element warning")]
+            [ExpectedWarning("IL2080", ".Item2", Tool.All, "ValueTuple element warning")]
             static void DeconstructConditionalTupleLocal(bool condition)
             {
                 var tuple = condition
@@ -318,7 +318,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
 
                 Validate();
 
-                [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer | Tool.NativeAot, "ValueTuple element warning")]
+                [ExpectedWarning("IL2080", ".Item2", Tool.All, "ValueTuple element warning")]
                 void Validate()
                 {
                     var (methodName, type) = tuple;
@@ -335,7 +335,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 type.GetMethod(methodName);
             }
 
-            [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer | Tool.NativeAot, "ValueTuple element warning")]
+            [ExpectedWarning("IL2080", ".Item2", Tool.All, "ValueTuple element warning")]
             static void DeconstructNestedConditionalTupleLocal(bool condition)
             {
                 var tuple = condition
@@ -345,7 +345,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 type.GetMethod(methodName);
             }
 
-            [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer | Tool.NativeAot, "Analyzer cannot determine what compiles to ValueTuple or local variables.")]
+            [ExpectedWarning("IL2080", ".Item2", Tool.All, "Switch tuple merge is materialized as a ValueTuple.")]
             static void DeconstructSwitchTuple(string value)
             {
                 (string methodName, Type type) = value switch
@@ -360,8 +360,8 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 type.GetMethod(methodName);
             }
 
-            [ExpectedWarning("IL2070", Tool.Analyzer, "")]
-            [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer | Tool.NativeAot, "Analyzer cannot determine what compiles to ValueTuple or local variables.")]
+            [ExpectedWarning("IL2080", ".input", Tool.Analyzer, "Switch tuple merge preserves the tuple element name.")]
+            [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer | Tool.NativeAot, "Switch tuple merge is materialized as a ValueTuple.")]
             static void DeconstructSwitchTupleUnannotated(string value, Type input)
             {
                 string methodName;
@@ -378,7 +378,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 type.GetMethod(methodName);
             }
 
-            [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer | Tool.NativeAot, "Analyzer cannot determine what compiles to ValueTuple or local variables.")]
+            [ExpectedWarning("IL2080", ".Item2", Tool.All, "Switch tuple merge is materialized as a ValueTuple.")]
             static void DeconstructSwitchTupleWithThrow(string value)
             {
                 (string methodName, Type type) = value switch
@@ -391,7 +391,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 type.GetMethod(methodName);
             }
 
-            [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer | Tool.NativeAot, "Analyzer cannot determine what compiles to ValueTuple or local variables.")]
+            [ExpectedWarning("IL2080", ".Item2", Tool.All, "Switch tuple merge is materialized as a ValueTuple.")]
             static void DeconstructSwitchOfMixedTupleSources(string value)
             {
                 var objectTuple = (nameof(object.ToString), typeof(object));
@@ -421,7 +421,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 }
             }
 
-            [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer | Tool.NativeAot, "Analyzer conservatively loses tuple shape after merging incompatible source values.")]
+            [ExpectedWarning("IL2080", ".Item2", Tool.All, "Switch tuple merge is materialized as a ValueTuple.")]
             static void DeconstructSwitchOfTupleAndMethodSources(string value, Type input)
             {
                 var tupleLocal = (nameof(object.ToString), typeof(object));

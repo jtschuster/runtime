@@ -504,9 +504,15 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                     return new LocalValue<TValue>(precomputedValue.Value);
 
                 Debug.Assert(valueOperation is not null);
-                return valueOperation is null
+                if (valueOperation is null)
+                    return new LocalValue<TValue>(TopValue);
+
+                LocalValue<TValue> value = VisitLocalValue(valueOperation, state);
+                // Tuple merge expressions assigned to locals are materialized as ValueTuple values.
+                return value.Kind == LocalValueKind.Tuple &&
+                    valueOperation.Syntax is ConditionalExpressionSyntax or SwitchExpressionSyntax
                     ? new LocalValue<TValue>(TopValue)
-                    : VisitLocalValue(valueOperation, state);
+                    : value;
             }
         }
 
@@ -650,7 +656,14 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                     return GetLocal(localReference.Local, state);
                 case IFlowCaptureReferenceOperation flowCaptureReference
                     when IsRValueFlowCapture(flowCaptureReference.Id):
-                    return GetFlowCaptureLocalValue(flowCaptureReference, state);
+                {
+                    LocalValue<TValue> value = GetFlowCaptureLocalValue(flowCaptureReference, state);
+                    // A switch expression nested in a tuple literal is materialized before the outer deconstruction.
+                    return value.Kind == LocalValueKind.Tuple &&
+                        flowCaptureReference.Syntax.FirstAncestorOrSelf<SwitchExpressionSyntax>() is not null
+                        ? new LocalValue<TValue>(TopValue)
+                        : value;
+                }
                 case IThrowOperation:
                     Visit(operation, state);
                     return LocalValue<TValue>.Top;
@@ -687,6 +700,10 @@ namespace ILLink.RoslynAnalyzer.DataFlow
             ITypeSymbol? sourceType = operation.Value.Type;
             IOperation source = UnwrapDeconstructionSource(operation.Value);
             LocalValue<TValue> sourceValue = VisitLocalValue(source, state);
+            // Switch tuple expressions are materialized as ValueTuple values before deconstruction.
+            if (sourceType is INamedTypeSymbol { IsTupleType: true } &&
+                source.Syntax is SwitchExpressionSyntax)
+                sourceValue = new LocalValue<TValue>(TopValue);
             TValue scalarSourceValue = sourceValue.GetScalarValueOrTop(TopValue);
 
             // Deconstruction evaluates all source values before assigning any target. Keeping these
