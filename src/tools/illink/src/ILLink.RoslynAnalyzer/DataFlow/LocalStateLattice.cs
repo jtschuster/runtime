@@ -13,6 +13,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
     public enum LocalValueKind
     {
         Top,
+        // Bottom for this lattice: merging it with any value remains Unknown.
         Unknown,
         Scalar,
         Tuple
