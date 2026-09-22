@@ -13,6 +13,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
     public enum LocalValueKind
     {
         Top,
+        Unknown,
         Scalar,
         Tuple
     }
@@ -25,6 +26,15 @@ namespace ILLink.RoslynAnalyzer.DataFlow
         public TValue ScalarValue { get; }
 
         public ImmutableArray<LocalValue<TValue>> Elements { get; }
+
+        public static LocalValue<TValue> Unknown => new(LocalValueKind.Unknown);
+
+        private LocalValue(LocalValueKind kind)
+        {
+            Kind = kind;
+            ScalarValue = default!;
+            Elements = default;
+        }
 
         public LocalValue(TValue value)
         {
@@ -45,7 +55,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
             if (Kind != other.Kind)
                 return false;
 
-            if (Kind == LocalValueKind.Top)
+            if (Kind is LocalValueKind.Top or LocalValueKind.Unknown)
                 return true;
             if (Kind == LocalValueKind.Scalar)
                 return EqualityComparer<TValue>.Default.Equals(ScalarValue, other.ScalarValue);
@@ -84,6 +94,9 @@ namespace ILLink.RoslynAnalyzer.DataFlow
             if (Kind == LocalValueKind.Top)
                 return default;
 
+            if (Kind == LocalValueKind.Unknown)
+                return Unknown;
+
             if (Kind == LocalValueKind.Scalar)
             {
                 return new LocalValue<TValue>(
@@ -118,6 +131,9 @@ namespace ILLink.RoslynAnalyzer.DataFlow
             if (right.Kind == LocalValueKind.Top)
                 return left.DeepCopy();
 
+            if (left.Kind == LocalValueKind.Unknown || right.Kind == LocalValueKind.Unknown)
+                return LocalValue<TValue>.Unknown;
+
             if (left.Kind == LocalValueKind.Scalar && right.Kind == LocalValueKind.Scalar)
                 return new LocalValue<TValue>(_valueLattice.Meet(left.ScalarValue, right.ScalarValue));
 
@@ -125,7 +141,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                 right.Kind != LocalValueKind.Tuple ||
                 left.Elements.Length != right.Elements.Length)
             {
-                return Top;
+                return LocalValue<TValue>.Unknown;
             }
 
             var elements = ImmutableArray.CreateBuilder<LocalValue<TValue>>(left.Elements.Length);

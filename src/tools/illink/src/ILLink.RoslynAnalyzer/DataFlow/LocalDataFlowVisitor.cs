@@ -874,7 +874,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
                     targetTuple.Elements[i],
                     source: null,
                     tupleElement.Type,
-                    sourceValue.Kind == LocalValueKind.Top
+                    sourceValue.Kind is LocalValueKind.Top or LocalValueKind.Unknown
                         ? default
                         : new LocalValue<TValue>(GetTupleElementValue(tupleElement)),
                     deconstructionInfo.Nested[i],

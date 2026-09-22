@@ -47,15 +47,51 @@ namespace ILLink.RoslynAnalyzer.Tests
         {
             LocalValueLattice<TestValue, TestValueLattice> lattice = new(default(TestValueLattice));
 
-            Assert.Equal(LocalValueKind.Top, lattice.Meet(Scalar(1), Tuple(Scalar(1))).Kind);
+            Assert.Equal(LocalValue<TestValue>.Unknown, lattice.Meet(Scalar(1), Tuple(Scalar(1))));
             Assert.Equal(
-                LocalValueKind.Top,
-                lattice.Meet(Tuple(Scalar(1)), Tuple(Scalar(1), Scalar(2))).Kind);
+                LocalValue<TestValue>.Unknown,
+                lattice.Meet(Tuple(Scalar(1)), Tuple(Scalar(1), Scalar(2))));
             Assert.Equal(
-                Tuple(default(LocalValue<TestValue>), Scalar(3)),
+                Tuple(LocalValue<TestValue>.Unknown, Scalar(3)),
                 lattice.Meet(
                     Tuple(Scalar(1), Scalar(2)),
                     Tuple(Tuple(Scalar(1)), Scalar(3))));
+        }
+
+        [Fact]
+        public void StructuredLocalValueLatticeSatisfiesLatticeLawsWithShapeConflicts()
+        {
+            LocalValueLattice<TestValue, TestValueLattice> lattice = new(default(TestValueLattice));
+            LocalValue<TestValue>[] values =
+            [
+                default,
+                Scalar(1),
+                Scalar(2),
+                Tuple(Scalar(1)),
+                Tuple(Scalar(2)),
+                Tuple(Scalar(1), Scalar(2)),
+                Tuple(Tuple(Scalar(1)), Scalar(2))
+            ];
+
+            foreach (LocalValue<TestValue> left in values)
+            {
+                Assert.Equal(left, lattice.Meet(left, left));
+
+                foreach (LocalValue<TestValue> middle in values)
+                {
+                    Assert.Equal(lattice.Meet(left, middle), lattice.Meet(middle, left));
+
+                    foreach (LocalValue<TestValue> right in values)
+                    {
+                        LocalValue<TestValue> leftAssociative =
+                            lattice.Meet(lattice.Meet(left, middle), right);
+                        LocalValue<TestValue> rightAssociative =
+                            lattice.Meet(left, lattice.Meet(middle, right));
+
+                        Assert.Equal(leftAssociative, rightAssociative);
+                    }
+                }
+            }
         }
 
         [Fact]
