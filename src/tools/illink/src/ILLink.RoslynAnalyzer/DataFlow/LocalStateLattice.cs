@@ -179,9 +179,9 @@ namespace ILLink.RoslynAnalyzer.DataFlow
     public readonly struct CapturedTargetValue<TValue> : IEquatable<CapturedTargetValue<TValue>>, IDeepCopyValue<CapturedTargetValue<TValue>>
         where TValue : IEquatable<TValue>
     {
-        public bool HasValue { get; }
+        public readonly bool HasValue;
 
-        public TValue Value { get; }
+        public readonly TValue Value;
 
         public CapturedTargetValue(TValue value) => (HasValue, Value) = (true, value);
 
