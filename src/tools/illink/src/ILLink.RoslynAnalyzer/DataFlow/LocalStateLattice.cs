@@ -12,7 +12,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
 {
     public enum LocalValueKind
     {
-        Top,
+        Top = 0,
         Unknown,
         Scalar,
         Tuple
@@ -26,6 +26,8 @@ namespace ILLink.RoslynAnalyzer.DataFlow
         public TValue ScalarValue { get; }
 
         public ImmutableArray<LocalValue<TValue>> Elements { get; }
+
+        public static LocalValue<TValue> Top => default;
 
         public static LocalValue<TValue> Unknown => new(LocalValueKind.Unknown);
 
@@ -92,7 +94,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
         public LocalValue<TValue> DeepCopy()
         {
             if (Kind == LocalValueKind.Top)
-                return default;
+                return Top;
 
             if (Kind == LocalValueKind.Unknown)
                 return Unknown;
@@ -122,7 +124,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
 
         public LocalValueLattice(TValueLattice valueLattice) => _valueLattice = valueLattice;
 
-        public LocalValue<TValue> Top => default;
+        public LocalValue<TValue> Top => LocalValue<TValue>.Top;
 
         public LocalValue<TValue> Meet(LocalValue<TValue> left, LocalValue<TValue> right)
         {
