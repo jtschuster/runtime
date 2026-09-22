@@ -12,7 +12,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
 {
     public enum LocalValueKind
     {
-        Top = 0,
+        Top,
         Unknown,
         Scalar,
         Tuple
@@ -27,7 +27,7 @@ namespace ILLink.RoslynAnalyzer.DataFlow
 
         public ImmutableArray<LocalValue<TValue>> Elements { get; }
 
-        public static LocalValue<TValue> Top => default;
+        public static LocalValue<TValue> Top => new(LocalValueKind.Top);
 
         public static LocalValue<TValue> Unknown => new(LocalValueKind.Unknown);
 
