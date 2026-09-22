@@ -260,7 +260,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 type.GetMethod(methodName);
             }
 
-            [ExpectedWarning("IL2080", Tool.Trimmer | Tool.NativeAot, ".Item2")]
+            [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer | Tool.NativeAot, "ValueTuple element warning")]
             [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer, "Ref conditional produces one warning for each possible tuple reference.")]
             [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
             static void DeconstructRefConditionalTuple(bool condition)
@@ -300,7 +300,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                     : (input2, new object());
             }
 
-            [ExpectedWarning("IL2080", Tool.Trimmer | Tool.NativeAot, ".Item2")]
+            [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer | Tool.NativeAot, "ValueTuple element warning")]
             static void DeconstructConditionalTupleLocal(bool condition)
             {
                 var tuple = condition
@@ -318,7 +318,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
 
                 Validate();
 
-                [ExpectedWarning("IL2080", Tool.Trimmer | Tool.NativeAot, ".Item2")]
+                [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer | Tool.NativeAot, "ValueTuple element warning")]
                 void Validate()
                 {
                     var (methodName, type) = tuple;
@@ -335,7 +335,7 @@ namespace Mono.Linker.Tests.Cases.DataFlow
                 type.GetMethod(methodName);
             }
 
-            [ExpectedWarning("IL2080", Tool.Trimmer | Tool.NativeAot, ".Item2")]
+            [ExpectedWarning("IL2080", ".Item2", Tool.Trimmer | Tool.NativeAot, "ValueTuple element warning")]
             static void DeconstructNestedConditionalTupleLocal(bool condition)
             {
                 var tuple = condition
