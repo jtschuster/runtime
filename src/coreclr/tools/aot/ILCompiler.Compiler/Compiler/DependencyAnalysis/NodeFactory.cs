@@ -271,13 +271,13 @@ namespace ILCompiler.DependencyAnalysis
                 return new FieldRvaDataNode(key);
             });
 
-            _externFunctionSymbols = new NodeCache<Utf8String, ExternFunctionSymbolNode>((Utf8String name) =>
+            _externFunctionSymbols = new NodeCache<ExternFunctionKey, ExternFunctionSymbolNode>(static (ExternFunctionKey key) =>
             {
-                return new ExternFunctionSymbolNode(name);
+                return new ExternFunctionSymbolNode(key.Name, key.TypeSignature);
             });
             _externIndirectFunctionSymbols = new NodeCache<Utf8String, ExternFunctionSymbolNode>((Utf8String name) =>
             {
-                return new ExternFunctionSymbolNode(name, isIndirection: true);
+                return new ExternFunctionSymbolNode(name, typeSignature: null, isIndirection: true);
             });
             _externDataSymbols = new NodeCache<Utf8String, ExternDataSymbolNode>((Utf8String name) =>
             {
@@ -625,6 +625,9 @@ namespace ILCompiler.DependencyAnalysis
             {
                 return new AnalysisCharacteristicNode(c);
             });
+
+            _wasmFunctionImports = new NodeCache<Utf8String, WasmFunctionImportNode>((Utf8String name) =>
+                throw new InvalidOperationException($"Wasm function import '{name}' must be created from an extern function"));
 
             _wasmTypeNodes = new NodeCache<WasmFuncType, WasmTypeNode>(key =>
             {
@@ -994,11 +997,19 @@ namespace ILCompiler.DependencyAnalysis
             return _genericVariances.GetOrAdd(details);
         }
 
-        private NodeCache<Utf8String, ExternFunctionSymbolNode> _externFunctionSymbols;
+        private NodeCache<ExternFunctionKey, ExternFunctionSymbolNode> _externFunctionSymbols;
 
-        public ISortableSymbolNode ExternFunctionSymbol(Utf8String name)
+        /// <summary>
+        /// Gets the node for an extern function. Nodes are keyed by name alone, so every reference to the
+        /// same symbol (e.g. a JIT helper and a direct P/Invoke to the same native function) shares one node,
+        /// and all references must agree on its signature.
+        /// </summary>
+        private ExternFunctionSymbolNode ExternFunctionSymbol(Utf8String name, ExternalTypeSignature? typeSignature)
         {
-            return _externFunctionSymbols.GetOrAdd(name);
+            ExternFunctionSymbolNode node = _externFunctionSymbols.GetOrAdd(new ExternFunctionKey(name, typeSignature));
+            // The cache keys on the name only, so validate that the existing node's signature matches.
+            Debug.Assert(node.TypeSignature == typeSignature, $"Conflicting signatures for extern function '{name}'");
+            return node;
         }
 
         private NodeCache<Utf8String, ExternFunctionSymbolNode> _externIndirectFunctionSymbols;
@@ -1008,11 +1019,28 @@ namespace ILCompiler.DependencyAnalysis
             return _externIndirectFunctionSymbols.GetOrAdd(name);
         }
 
+        /// <summary>
+        /// Gets the node for the native target of a direct P/Invoke call to <paramref name="pInvoke"/>.
+        /// Direct calls are only generated when no marshalling is required, so the P/Invoke's own
+        /// signature is also the native signature.
+        /// </summary>
+        public ISortableSymbolNode DirectPInvokeTarget(Utf8String externName, MethodDesc pInvoke)
+        {
+            return ExternFunctionSymbol(externName, ExternalTypeSignature.Unmanaged(pInvoke.Signature));
+        }
+
         private NodeCache<Utf8String, ExternDataSymbolNode> _externDataSymbols;
 
         public ISortableSymbolNode ExternDataSymbol(Utf8String name)
         {
             return _externDataSymbols.GetOrAdd(name);
+        }
+
+        public ISortableSymbolNode KnownExternFunction(KnownExternFunction function)
+        {
+            return ExternFunctionSymbol(
+                KnownExternFunctions.GetName(function, TypeSystemContext.Target),
+                KnownExternFunctions.GetTypeSignature(function, TypeSystemContext));
         }
 
         public ISortableSymbolNode ExternVariable(Utf8String name)
@@ -1623,6 +1651,17 @@ namespace ILCompiler.DependencyAnalysis
 
         private NodeCache<WasmFuncType, WasmTypeNode> _wasmTypeNodes;
 
+        private NodeCache<Utf8String, WasmFunctionImportNode> _wasmFunctionImports;
+
+        /// <summary>
+        /// Gets the Wasm import for an extern function. Imports are keyed by symbol name, so every extern
+        /// function node with the same name shares one import, whose signature comes from the first node seen.
+        /// </summary>
+        public WasmFunctionImportNode WasmFunctionImport(ExternFunctionSymbolNode node)
+        {
+            return _wasmFunctionImports.GetOrAdd(node.Name, name => new WasmFunctionImportNode(name, node));
+        }
+
         // TODO-Wasm: Do not use WasmFuncType directly as the key for better
         // memory efficiency on lookup
         public WasmTypeNode WasmTypeNode(MethodDesc desc)
@@ -1846,6 +1885,24 @@ namespace ILCompiler.DependencyAnalysis
             public override bool Equals(object obj) => obj is SerializedFrozenObjectKey && Equals((SerializedFrozenObjectKey)obj);
             public bool Equals(SerializedFrozenObjectKey other) => OwnerType == other.OwnerType && AllocationSiteId == other.AllocationSiteId;
             public override int GetHashCode() => HashCode.Combine(OwnerType.GetHashCode(), AllocationSiteId);
+        }
+
+        private struct ExternFunctionKey : IEquatable<ExternFunctionKey>
+        {
+            public readonly Utf8String Name;
+
+            // Used to create the node, but not part of the key's identity
+            public readonly ExternalTypeSignature? TypeSignature;
+
+            public ExternFunctionKey(Utf8String name, ExternalTypeSignature? typeSignature)
+            {
+                Name = name;
+                TypeSignature = typeSignature;
+            }
+
+            public bool Equals(ExternFunctionKey other) => Name.Equals(other.Name);
+            public override bool Equals(object obj) => obj is ExternFunctionKey other && Equals(other);
+            public override int GetHashCode() => Name.GetHashCode();
         }
 
         private struct MethodILKey : IEquatable<MethodILKey>
