@@ -396,6 +396,17 @@ PCODE MethodDesc::PrepareCode(PrepareCodeConfig* pConfig)
         LOG((LF_CLASSLOADER, LL_INFO1000000,
             "    In PrepareILBasedCode, calling JitCompileCode\n"));
         pCode = JitCompileCode(pConfig);
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+        if (pConfig->GetAuxiliaryModuleActivationCounter() != nullptr && PortableEntryPoint::HasInterpreterData(pCode)
+            && PortableEntryPoint::PrefersInterpreterEntryPoint(pCode))
+        {
+            _ASSERTE(pCode == GetTemporaryEntryPoint());
+            _ASSERTE(m_codeData != nullptr);
+            m_codeData->AuxiliaryModuleActivationCounter = pConfig->GetAuxiliaryModuleActivationCounter();
+            PortableEntryPoint::ToPortableEntryPoint(pCode)->SetPendingAuxiliaryModule();
+            static_cast<InterpByteCodeStart*>(PortableEntryPoint::GetInterpreterData(pCode))->Method->auxiliaryModulePending = true;
+        }
+#endif // FEATURE_AUXILIARY_R2R_MODULES
     }
     else
     {
@@ -496,6 +507,11 @@ PCODE MethodDesc::GetPrecompiledR2RCode(PrepareCodeConfig* pConfig)
     {
         pAlreadyExaminedInfos[0] = pModule->GetReadyToRunInfo();
         pCode = pAlreadyExaminedInfos[0]->GetEntryPoint(this, pConfig, TRUE /* fFixups */);
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+        // A pending entrypoint is not a lookup miss; retain its code-owning image's counter.
+        if (pConfig->GetAuxiliaryModuleActivationCounter() != nullptr)
+            return (PCODE)nullptr;
+#endif // FEATURE_AUXILIARY_R2R_MODULES
     }
 
     //  Generics may be located in several places
@@ -508,6 +524,10 @@ PCODE MethodDesc::GetPrecompiledR2RCode(PrepareCodeConfig* pConfig)
         if (pAlreadyExaminedInfos[1] != NULL &&  pAlreadyExaminedInfos[1] != pAlreadyExaminedInfos[0])
         {
             pCode = pAlreadyExaminedInfos[1]->GetEntryPoint(this, pConfig, TRUE /* fFixups */);
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+            if (pConfig->GetAuxiliaryModuleActivationCounter() != nullptr)
+                return (PCODE)nullptr;
+#endif // FEATURE_AUXILIARY_R2R_MODULES
         }
 
         if (pCode == (PCODE)NULL)
@@ -522,6 +542,10 @@ PCODE MethodDesc::GetPrecompiledR2RCode(PrepareCodeConfig* pConfig)
                 if (pUnrelatedInfo == pAlreadyExaminedInfos[1]) continue;
 
                 pCode = pUnrelatedInfo->GetEntryPoint(this, pConfig, TRUE /* fFixups */);
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+                if (pConfig->GetAuxiliaryModuleActivationCounter() != nullptr)
+                    return (PCODE)nullptr;
+#endif // FEATURE_AUXILIARY_R2R_MODULES
             }
         }
     }
@@ -551,6 +575,66 @@ bool MethodDesc::TryPublishR2RCodeForUnmanagedCallersOnly()
 #endif // FEATURE_READYTORUN
 }
 #endif // FEATURE_PORTABLE_ENTRYPOINTS
+
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+bool MethodDesc::IsAuxModuleActivated()
+{
+    LIMITED_METHOD_CONTRACT;
+
+    PortableEntryPoint* entryPoint = PortableEntryPoint::ToPortableEntryPoint(GetTemporaryEntryPoint());
+    if (!entryPoint->PrefersInterpreterEntryPoint())
+        return true;
+
+    if (!entryPoint->IsPendingAuxiliaryModule())
+        return false;
+
+    // TODO: replace with a simple flag check instead of decrementing the artificial counter
+    uint32_t* pCounter = m_codeData->AuxiliaryModuleActivationCounter;
+    _ASSERTE(pCounter != nullptr);
+    if (*pCounter != 0)
+        --*pCounter;
+
+    return *pCounter == 0;
+}
+
+bool MethodDesc::TryActivateDelayedR2RCode()
+{
+    CONTRACTL
+    {
+        THROWS;
+        GC_TRIGGERS;
+        MODE_ANY;
+    }
+    CONTRACTL_END;
+
+    PortableEntryPoint* entryPoint = PortableEntryPoint::ToPortableEntryPoint(GetTemporaryEntryPoint());
+    if (!entryPoint->PrefersInterpreterEntryPoint())
+        return true;
+
+    if (!entryPoint->IsPendingAuxiliaryModule()
+        || *m_codeData->AuxiliaryModuleActivationCounter != 0)
+        return false;
+
+    bool activated = false;
+    {
+        GCX_PREEMP_REGION_BEGIN();
+        entryPoint->ClearPendingAuxiliaryModule();
+        PrepareCodeConfig config(NativeCodeVersion(this), FALSE, TRUE);
+        config.SetCallerGCMode(CallerGCMode::Coop);
+        PCODE code = GetPrecompiledCode(&config, false);
+        if (code != (PCODE)NULL)
+        {
+            PoisonInterpreterCode();
+            PerfMap::LogPreCompiledMethod(this, code);
+            DACNotifyCompilationFinished(this, code);
+            activated = true;
+        }
+        GCX_PREEMP_REGION_END();
+    }
+
+    return activated;
+}
+#endif // FEATURE_AUXILIARY_R2R_MODULES
 
 PCODE MethodDesc::GetMulticoreJitCode(PrepareCodeConfig* pConfig, bool* pWasTier0)
 {
@@ -2214,7 +2298,20 @@ void ExecuteInterpretedMethodWithArgs_PortableEntryPoint_Complex(PCODE portableE
     int8_t* args = (int8_t*)(block + 1);
     MethodDesc* pMethod = PortableEntryPoint::GetMethodDesc(portableEntrypoint);
     InterpByteCodeStart* targetIp = pMethod->GetInterpreterCode();
-    if (targetIp == NULL)
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+    bool activateDelayedR2RCode = false;
+    if (targetIp != NULL
+        && PortableEntryPoint::ToPortableEntryPoint(portableEntrypoint)->IsPendingAuxiliaryModule())
+    {
+        activateDelayedR2RCode = pMethod->IsAuxModuleActivated();
+    }
+#endif // FEATURE_AUXILIARY_R2R_MODULES
+
+    if (targetIp == NULL
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+        || activateDelayedR2RCode
+#endif // FEATURE_AUXILIARY_R2R_MODULES
+    )
     {
         MAKE_CURRENT_THREAD_AVAILABLE_EX(GetThread());
 
@@ -2230,6 +2327,14 @@ void ExecuteInterpretedMethodWithArgs_PortableEntryPoint_Complex(PCODE portableE
             INSTALL_MANAGED_EXCEPTION_DISPATCHER;
             INSTALL_UNWIND_AND_CONTINUE_HANDLER;
 
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+            if (activateDelayedR2RCode)
+            {
+                (void)pMethod->TryActivateDelayedR2RCode();
+                targetIp = pMethod->GetInterpreterCode();
+            }
+            else
+#endif // FEATURE_AUXILIARY_R2R_MODULES
             {
                 GCX_PREEMP_REGION_BEGIN();
                 (void)pMethod->DoPrestub(NULL /* MethodTable */, CallerGCMode::Coop);
@@ -2240,7 +2345,7 @@ void ExecuteInterpretedMethodWithArgs_PortableEntryPoint_Complex(PCODE portableE
             finishedPrestubPortion = true;
             if (targetIp == NULL)
             {
-                _ASSERTE(!PortableEntryPoint::PrefersInterpreterEntryPoint(portableEntrypoint));
+                _ASSERTE(!PortableEntryPoint::PrefersInterpreterEntryPoint(pMethod->GetTemporaryEntryPoint()));
                 // Keep the transition and argument roots, but do not report an additional
                 // managed activation that would be absent on subsequent calls.
                 pPFrame->MarkPrestubComplete();
@@ -2304,16 +2409,26 @@ void ExecuteInterpretedMethodWithArgs_PortableEntryPoint_Complex(PCODE portableE
 
 void ExecuteInterpretedMethodWithArgs_PortableEntryPoint(PCODE portableEntrypoint, TransitionBlock* block, size_t argsSize, int8_t* retBuff)
 {
-    PCODE targetIp;
+    InterpByteCodeStart* targetIp = PortableEntryPoint::HasInterpreterData(portableEntrypoint)
+        ? static_cast<InterpByteCodeStart*>(PortableEntryPoint::GetInterpreterData(portableEntrypoint))
+        : nullptr;
 
-    if (!PortableEntryPoint::HasInterpreterData(portableEntrypoint))
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+    if (targetIp != nullptr
+        && PortableEntryPoint::ToPortableEntryPoint(portableEntrypoint)->IsPendingAuxiliaryModule())
+    {
+        ExecuteInterpretedMethodWithArgs_PortableEntryPoint_Complex(portableEntrypoint, block, argsSize, retBuff);
+        return;
+    }
+#endif // FEATURE_AUXILIARY_R2R_MODULES
+
+    if (targetIp == nullptr)
     {
         // In this case, we're using this entrypoint like the prestub.
         ExecuteInterpretedMethodWithArgs_PortableEntryPoint_Complex(portableEntrypoint, block, argsSize, retBuff);
     }
     else
     {
-        targetIp = (PCODE)PortableEntryPoint::GetInterpreterData(portableEntrypoint);
         int8_t* args = (int8_t*)(block + 1);
 
         // Copy arguments to the stack

@@ -281,6 +281,11 @@ struct MethodDescCodeData final
 #ifdef FEATURE_INTERPRETER
     InterpreterCalliCookie CalliCookie;
 #endif // FEATURE_INTERPRETER
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+    // TODO: This should be a flag indicating if the auxiliary module has been activated.
+    //       The counter is a stand in for delayed activation of the auxiliary module.
+    DPTR(uint32_t) AuxiliaryModuleActivationCounter;
+#endif // FEATURE_AUXILIARY_R2R_MODULES
 #if defined(_DEBUG) && defined(ALLOW_SXS_JIT)
     PatchpointInfo *AltJitPatchpointInfo;
 #endif // _DEBUG && ALLOW_SXS_JIT
@@ -2350,6 +2355,11 @@ public:
     bool TryPublishR2RCodeForUnmanagedCallersOnly();
 #endif // FEATURE_PORTABLE_ENTRYPOINTS
 
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+    bool IsAuxModuleActivated();
+    bool TryActivateDelayedR2RCode();
+#endif // FEATURE_AUXILIARY_R2R_MODULES
+
 private:
     PCODE GetPrecompiledCode(PrepareCodeConfig* pConfig, bool shouldTier);
     PCODE GetPrecompiledR2RCode(PrepareCodeConfig* pConfig);
@@ -2433,6 +2443,36 @@ public:
     void SetReadyToRunRejectedPrecompiledCode();
     CallerGCMode GetCallerGCMode();
     void SetCallerGCMode(CallerGCMode mode);
+
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+    // TODO: These should be flags indicating if the auxiliary module has been activated.
+    //       The counter is a stand in for delayed activation of the auxiliary module.
+    uint32_t* GetAuxiliaryModuleActivationCounter() const
+    {
+        LIMITED_METHOD_CONTRACT;
+        return m_pAuxiliaryModuleActivationCounter;
+    }
+
+    void SetAuxiliaryModuleActivationCounter(uint32_t* pCounter)
+    {
+        LIMITED_METHOD_CONTRACT;
+        _ASSERTE(pCounter != nullptr && m_pAuxiliaryModuleActivationCounter == nullptr);
+        m_pAuxiliaryModuleActivationCounter = pCounter;
+    }
+
+    // Lookups that commit a method to R2R code for direct calls from R2R callers cannot wait for activation.
+    bool MayDelayAuxiliaryModule() const
+    {
+        LIMITED_METHOD_CONTRACT;
+        return m_mayDelayAuxiliaryModule;
+    }
+
+    void DisableAuxiliaryModuleDelay()
+    {
+        LIMITED_METHOD_CONTRACT;
+        m_mayDelayAuxiliaryModule = false;
+    }
+#endif // FEATURE_AUXILIARY_R2R_MODULES
 
 public:
     bool IsForMulticoreJit() const
@@ -2565,6 +2605,11 @@ protected:
     BOOL m_ProfilerRejectedPrecompiledCode;
     BOOL m_ReadyToRunRejectedPrecompiledCode;
     CallerGCMode m_callerGCMode;
+
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+    uint32_t* m_pAuxiliaryModuleActivationCounter = nullptr;
+    bool m_mayDelayAuxiliaryModule = true;
+#endif // FEATURE_AUXILIARY_R2R_MODULES
 
 #ifdef FEATURE_MULTICOREJIT
 private:

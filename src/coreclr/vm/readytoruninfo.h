@@ -201,6 +201,10 @@ class ReadyToRunInfo
     PTR_ReadyToRunInfo              m_pNextR2RForUnrelatedCode;
     TADDR                           m_pLoadedImageBase;
 
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+    uint32_t                        m_remainingAuxiliaryModuleEntries = 0;
+#endif // FEATURE_AUXILIARY_R2R_MODULES
+
 public:
     ReadyToRunInfo(Module * pModule, LoaderAllocator* pLoaderAllocator, READYTORUN_HEADER * pHeader, NativeImage * pNativeImage, ReadyToRunLoadedImage * pLayout, AllocMemTracker *pamTracker);
 

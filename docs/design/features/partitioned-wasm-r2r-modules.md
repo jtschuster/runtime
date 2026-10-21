@@ -41,10 +41,10 @@ InterpOrR2R DiscoverMethod(PEP pep)
         return ActivateOrFallBackToInterpreter(pep, entry);
     }
 
-    if (primary.AuxiliaryModuleMetadataHeader.EntryPointsModuleActivationStatus == 0)
+    if (primary.AuxiliaryModuleMetadataSection.EntryPointsModuleActivationStatus == 0)
     {
         EnsureInterpreterFallback(pep);
-        pep.InterpreterData.pAuxActivationFlag = &primary.AuxiliaryModuleMetadataHeader.EntryPointsModuleActivationStatus;
+        pep.InterpreterData.pAuxActivationFlag = &primary.AuxiliaryModuleMetadataSection.EntryPointsModuleActivationStatus;
         pep.SetFlag(kPendingAuxiliaryEntryPoints);
         return InterpOrR2R.Interp;
     }
@@ -58,7 +58,7 @@ InterpOrR2R ResolveAuxiliaryMethod(PEP pep)
     pep.ClearFlag(kPendingAuxiliaryEntryPoints);
     pep.ClearFlag(kPendingAuxiliaryModule);
 
-    AuxiliaryModuleMetadataHeader metadata = pep.GetModule().AuxiliaryModuleMetadataHeader;
+    AuxiliaryModuleMetadataHeader metadata = pep.GetModule().AuxiliaryModuleMetadataSection;
     EntryPoint entry = LookupEntryPoint(
         metadata.MethodDefEntryPointsInfoRVA, metadata.InstanceMethodEntryPointsRVA, pep.MethodDesc);
     if (entry is null)
@@ -355,6 +355,14 @@ V1 will focus on single-threaded, composite mode support. The designs shouldn't 
 ### 1. Support delayed resolution of R2R code within the same module.
 
 Using either call-counting in the interpreter or a timer in the host JavaScript code, force methods to be interpreted (even if R2R code exists for them in the primary module) before installing R2R code. This doesn't require any changes to crossgen2 or the webcil format.
+
+The implementation uses the `kPendingAuxiliaryModule` flag on each eligible method's portable entrypoint to keep it interpreted until auxiliary code is ready. Each pending method holds a pointer to `m_remainingAuxiliaryModuleEntries` on the image-wide `ReadyToRunInfo`, shared by all component assemblies in a composite image. `MethodDesc::IsAuxModuleActivated()` decrements this counter to simulate download progress and returns true once it reaches zero; pending methods resolve and activate lazily when they observe readiness.
+
+The initial prototype is compiled with `FEATURE_AUXILIARY_R2R_MODULES`, enabled by default on single-threaded Browser-WASM builds with `FEATURE_INTERPRETER`. It can be excluded with `-cmakeargs "-DFEATURE_AUXILIARY_R2R_MODULES=0"`. The temporary trigger is a shared countdown configured by `DOTNET_R2RDelayedActivationCallCount`, not a counter on each method. The knob defaults to `0`, marking auxiliary code ready immediately and preserving eager R2R resolution. Setting it to `3e8` (hexadecimal for 1,000) marks the image ready after 1,000 pending-method entry checks across all its component assemblies. The countdown saturates at zero, which itself represents readiness without a separate activation flag. Each check of a pending method at a call boundary consumes the count. Preparing a method, resuming an existing interpreter continuation, and executing an exception clause do not.
+
+Delayed activation applies to IL methods whose R2R bodies belong to a composite image and whose IL bodies are retained. R2R lookup records a pointer to the code-owning image's counter in the method's runtime code data, including when generic code is found outside its defining assembly. Interpreter entries use that pointer directly, without retaining a `ReadyToRunInfo` reference or consulting the method's defining module. Wrapper stubs and `UnmanagedCallersOnly` methods keep their existing preparation paths; non-composite images and images with stripped IL are unchanged.
+
+Once the image is ready, method activation runs synchronously, using the existing R2R lookup and fixup processing before publishing native code through the method's portable entrypoint. Readiness is checked at call boundaries, before the callee's interpreter frame exists, and only for methods whose entrypoint carries `kPendingAuxiliaryModule`. Interpreter-to-interpreter calls (including `calli` and delegate calls) check in `ResolveInterpreterCode`. Calls from R2R code arrive through the R2R-to-interpreter thunk, which checks in `ExecuteInterpretedMethodWithArgs_PortableEntryPoint` and activates under a `PrestubMethodFrame` so the incoming arguments stay reported to the GC. When activation succeeds, the call that observed readiness runs the native code. Resuming an interpreter continuation or executing an exception clause never checks readiness, so a method with a suspended interpreted continuation activates on its next fresh call. A method prepared for the first time after image activation uses ordinary eager R2R resolution. Interpreter dispatch caches are bypassed after publication, while active interpreter frames and suspended interpreter continuations retain their bytecode. The pending flag is cleared before fixups to prevent reentrant activation; if lookup finds no R2R body or fixups reject it, the method stays interpreted without retrying. This prototype does not split modules, download code, or change image formats.
 
 ### 2. Split InstanceMethodEntryPoints and MethodDefEntryPoints sections out
 

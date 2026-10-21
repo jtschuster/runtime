@@ -46,6 +46,9 @@ struct InterpMethod
     bool initLocals;
     bool unmanagedCallersOnly;
     bool publishSecretStubParam;
+    // Set by the VM when the method is prepared as pending auxiliary R2R code, so call sites can skip the
+    // activation check for every other method.
+    bool auxiliaryModulePending;
     int32_t codeSize; // size in int32_t slots
 
     // Maps Continuation.State (suspension-point index) to the byte offset of the matching
@@ -70,6 +73,7 @@ struct InterpMethod
         this->initLocals = initLocals;
         this->unmanagedCallersOnly = unmanagedCallersOnly;
         this->publishSecretStubParam = publishSecretStubParam;
+        this->auxiliaryModulePending = false;
         this->codeSize = codeSize;
         this->numSuspensionPoints = 0;
         this->suspensionPointIPOffsets = NULL;

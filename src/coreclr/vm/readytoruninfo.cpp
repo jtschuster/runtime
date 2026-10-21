@@ -829,6 +829,10 @@ ReadyToRunInfo::ReadyToRunInfo(Module * pModule, LoaderAllocator* pLoaderAllocat
         // In this case, we'll pull the ready to run image layout from pLayout.
         _ASSERT(pLayout != NULL);
         m_pCompositeInfo = this;
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+        if (pNativeImage != nullptr)
+            m_remainingAuxiliaryModuleEntries = CLRConfig::GetConfigValue(CLRConfig::EXTERNAL_R2RDelayedActivationCallCount);
+#endif // FEATURE_AUXILIARY_R2R_MODULES
         m_component = ReadyToRunCoreInfo(pLayout, &pHeader->CoreHeader);
         m_pComposite = &m_component;
         m_isComponentAssembly = false;
@@ -1290,6 +1294,15 @@ PCODE ReadyToRunInfo::GetEntryPoint(MethodDesc * pMD, PrepareCodeConfig* pConfig
 #endif
 
     PCODE pEntryPoint = (PCODE)NULL;
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+    bool delayR2RCode = m_pCompositeInfo->m_remainingAuxiliaryModuleEntries != 0
+        && (pConfig == nullptr || pConfig->MayDelayAuxiliaryModule())
+        && !HasStrippedILBodies()
+        && pMD->IsIL()
+        && !pMD->IsWrapperStub()
+        && (!pMD->GetModule()->IsReadyToRun() || !pMD->GetModule()->GetReadyToRunInfo()->HasStrippedILBodies())
+        && !pMD->HasUnmanagedCallersOnlyAttribute();
+#endif // FEATURE_AUXILIARY_R2R_MODULES
 #ifdef PROFILING_SUPPORTED
     BOOL fShouldSearchCache = TRUE;
 #endif // PROFILING_SUPPORTED
@@ -1344,6 +1357,16 @@ PCODE ReadyToRunInfo::GetEntryPoint(MethodDesc * pMD, PrepareCodeConfig* pConfig
         if (!m_methodDefEntryPoints.TryGetAt(rid - 1, &offset))
             goto done;
     }
+
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+    if (delayR2RCode && fFixups)
+    {
+        // Generic code can belong to an image other than the method's defining module.
+        // Use this image's m_pCompositeInfo, not pMD's defining module.
+        pConfig->SetAuxiliaryModuleActivationCounter(&m_pCompositeInfo->m_remainingAuxiliaryModuleEntries);
+        goto done;
+    }
+#endif // FEATURE_AUXILIARY_R2R_MODULES
 
 #ifdef PROFILING_SUPPORTED
         {
@@ -1413,7 +1436,13 @@ PCODE ReadyToRunInfo::GetEntryPoint(MethodDesc * pMD, PrepareCodeConfig* pConfig
     PCODE virtualEntrypointIP;
     virtualEntrypointIP = R2RRelativeFunctionIndexToVirtualIP(id);
     pEntryPoint = pMD->GetTemporaryEntryPoint();
-    PortableEntryPoint::SetActualCode(pEntryPoint, actualEntryPoint);
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+    // Metadata-only queries must not publish code from a pending image either.
+    if (!delayR2RCode)
+#endif // FEATURE_AUXILIARY_R2R_MODULES
+    {
+        PortableEntryPoint::SetActualCode(pEntryPoint, actualEntryPoint);
+    }
     m_pCompositeInfo->SetMethodDescForEntryPointInNativeImage(virtualEntrypointIP, pMD);
 #else
 #error "ReadyToRun and PortableEntryPoints are not currently compatible on non-WASM targets, as the R2R image layout would need to be changed to support this scenario."
