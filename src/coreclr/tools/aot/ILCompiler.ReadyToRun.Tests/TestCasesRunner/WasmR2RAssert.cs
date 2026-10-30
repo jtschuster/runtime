@@ -22,6 +22,113 @@ namespace ILCompiler.ReadyToRun.Tests.TestCasesRunner;
 
 internal static class WasmR2RAssert
 {
+    public static void InstallAuxiliaryEntryPoints(ReadyToRunReader reader)
+    {
+        ReadyToRunSection metadata = reader.ReadyToRunHeader.Sections[ReadyToRunSectionType.AuxiliaryModuleMetadata];
+        int metadataOffset = reader.CompositeReader.GetOffset(metadata.RelativeVirtualAddress);
+        ReadOnlySpan<byte> image = reader.Image;
+        Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(image.Slice(metadataOffset)));
+        int methodCount = BinaryPrimitives.ReadInt32LittleEndian(image.Slice(metadataOffset + 4));
+        Assert.True(methodCount > 0);
+        Assert.Equal(methodCount * 8, reader.ReadyToRunHeader.Sections[ReadyToRunSectionType.RuntimeFunctions].Size);
+        Assert.Equal(0, BinaryPrimitives.ReadInt32LittleEndian(image.Slice(metadataOffset + 8)));
+        int filenameRva = BinaryPrimitives.ReadInt32LittleEndian(image.Slice(metadataOffset + 12));
+        int filenameOffset = reader.CompositeReader.GetOffset(filenameRva);
+        string filename = Encoding.UTF8.GetString(image.Slice(filenameOffset, image.Slice(filenameOffset).IndexOf((byte)0)));
+        Assert.Equal(Path.GetFileNameWithoutExtension(reader.Filename) + ".entrypoints.wasm", filename);
+
+        WebcilImageReader webcil = Assert.IsType<WebcilImageReader>(reader.CompositeReader);
+        WasmImportIndex getterExport = ReadWasmExports(webcil)["getAuxiliaryModuleMetadata"];
+        Assert.Equal(WasmImportKind.Function, getterExport.Kind);
+        WebcilImageReader.WasmFunctionInfo? getter = webcil.GetWasmFunctionBody(checked((int)getterExport.Index));
+        Assert.True(getter.HasValue);
+        ReadOnlySpan<byte> getterBody = getter.Value.Image.AsSpan(getter.Value.InstructionOffset, getter.Value.InstructionLength);
+        Assert.Equal(new byte[] { 0x23, WebCilObjectWriter.ImageBaseGlobalIndex, 0x41 }, getterBody.Slice(0, 3).ToArray());
+        int getterOffset = 3;
+        Assert.Equal(metadata.RelativeVirtualAddress, ReadWasmSleb33(getterBody, ref getterOffset, getterBody.Length));
+        Assert.Equal(new byte[] { 0x6A, 0x0B }, getterBody.Slice(getterOffset).ToArray());
+
+        List<ReadyToRunSection> tables = new();
+        AddTable(reader.ReadyToRunHeader, ReadyToRunSectionType.AuxiliaryInstanceMethodEntryPoints,
+            ReadyToRunSectionType.InstanceMethodEntryPoints);
+        foreach (ReadyToRunCoreHeader header in reader.ReadyToRunAssemblyHeaders)
+        {
+            AddTable(header, ReadyToRunSectionType.AuxiliaryMethodDefEntryPoints,
+                ReadyToRunSectionType.MethodDefEntryPoints);
+        }
+
+        ReadOnlySpan<byte> sidecar = File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(reader.Filename)!, filename));
+        Assert.True(TryGetWasmSectionBounds(sidecar, WasmSectionKind.Export, out int offset, out int end));
+        Assert.Equal(1u, ReadWasmUleb32(sidecar, ref offset, end));
+        Assert.Equal("ActivateModule", ReadWasmName(sidecar, ref offset, end));
+        Assert.Equal(0, ReadWasmByte(sidecar, ref offset, end));
+        Assert.Equal(0u, ReadWasmUleb32(sidecar, ref offset, end));
+        Assert.Equal(end, offset);
+        Assert.False(TryGetWasmSectionBounds(sidecar, WasmSectionKind.Element, out _, out _));
+        Assert.False(TryGetWasmSectionBounds(sidecar, WasmSectionKind.Global, out _, out _));
+        Assert.False(TryGetWasmSectionBounds(sidecar, (WasmSectionKind)8, out _, out _)); // no start function
+        Assert.True(TryGetWasmSectionBounds(sidecar, WasmSectionKind.Data, out offset, out end));
+        int count = checked((int)ReadWasmUleb32(sidecar, ref offset, end));
+        Assert.Equal(tables.Count, count);
+        List<byte[]> segments = new();
+        for (int i = 0; i < count; i++)
+        {
+            Assert.Equal(1u, ReadWasmUleb32(sidecar, ref offset, end)); // passive
+            int size = checked((int)ReadWasmUleb32(sidecar, ref offset, end));
+            segments.Add(sidecar.Slice(offset, size).ToArray());
+            offset += size;
+        }
+        Assert.Equal(end, offset);
+
+        Assert.True(TryGetWasmSectionBounds(sidecar, WasmSectionKind.Code, out offset, out end));
+        Assert.Equal(1u, ReadWasmUleb32(sidecar, ref offset, end));
+        uint bodySize = ReadWasmUleb32(sidecar, ref offset, end);
+        Assert.Equal(end - offset, (int)bodySize);
+        Assert.Equal(0u, ReadWasmUleb32(sidecar, ref offset, end)); // locals
+        Assert.Equal(new byte[] { 0x23, WebCilObjectWriter.ImageBaseGlobalIndex, 0x28, 0x02 },
+            sidecar.Slice(offset, 4).ToArray());
+        offset += 4;
+        Assert.Equal((uint)metadata.RelativeVirtualAddress, ReadWasmUleb32(sidecar, ref offset, end));
+        Assert.Equal(new byte[] { 0x45, 0x04, 0x40 }, sidecar.Slice(offset, 3).ToArray()); // if status == 0
+        offset += 3;
+        HashSet<int> installed = new();
+        for (int i = 0; i < count; i++)
+        {
+            Assert.Equal(new byte[] { 0x23, WebCilObjectWriter.ImageBaseGlobalIndex, 0x41 },
+                sidecar.Slice(offset, 3).ToArray());
+            offset += 3;
+            int rva = checked((int)ReadWasmSleb33(sidecar, ref offset, end));
+            ReadyToRunSection table = Assert.Single(tables, table => table.RelativeVirtualAddress == rva);
+            Assert.True(installed.Add(rva));
+            Assert.Equal(table.Size, segments[i].Length);
+            Assert.Equal(new byte[] { 0x6A, 0x41, 0x00, 0x41 }, sidecar.Slice(offset, 4).ToArray());
+            offset += 4;
+            Assert.Equal(table.Size, (int)ReadWasmSleb33(sidecar, ref offset, end));
+            Assert.Equal(new byte[] { 0xFC, 0x08 }, sidecar.Slice(offset, 2).ToArray()); // memory.init
+            offset += 2;
+            Assert.Equal((uint)i, ReadWasmUleb32(sidecar, ref offset, end));
+            Assert.Equal(0u, ReadWasmUleb32(sidecar, ref offset, end));
+            int target = reader.CompositeReader.GetOffset(rva);
+            Assert.All(reader.Image.AsSpan(target, table.Size).ToArray(), value => Assert.Equal(0, value));
+            segments[i].CopyTo(reader.Image, target);
+        }
+        Assert.Equal(new byte[] { 0x23, WebCilObjectWriter.ImageBaseGlobalIndex, 0x41, 0x01, 0x36, 0x02 },
+            sidecar.Slice(offset, 6).ToArray());
+        offset += 6;
+        Assert.Equal((uint)metadata.RelativeVirtualAddress, ReadWasmUleb32(sidecar, ref offset, end));
+        Assert.Equal(new byte[] { 0x0B, 0x0B }, sidecar.Slice(offset, 2).ToArray());
+        Assert.Equal(end, offset + 2);
+
+        void AddTable(ReadyToRunCoreHeader header, ReadyToRunSectionType auxiliary, ReadyToRunSectionType primary)
+        {
+            Assert.False(header.Sections.ContainsKey(primary));
+            ReadyToRunSection table = header.Sections[auxiliary];
+            tables.Add(table);
+            // Let the existing reader validate method identities and backwards fixup-list references.
+            header.Sections.Add(primary, table);
+        }
+    }
+
     public static void AssertFrameIdentityPrologs(WebcilImageReader reader)
     {
         ReadOnlySpan<byte> image = reader.GetEntireImage().AsSpan();

@@ -84,6 +84,9 @@ public static class WasmWebcilModule
     [MethodImpl(MethodImplOptions.NoInlining)]
     public static Type ReadGenericTypeToken<T>() => typeof(T);
 
+    public static Type ReadInstantiatedTypeToken(bool referenceType)
+        => referenceType ? ReadGenericTypeToken<object>() : ReadGenericTypeToken<int>();
+
     public struct GenericTokenValue
     {
         public int Value;

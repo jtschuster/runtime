@@ -17,6 +17,7 @@
 #include "auxiliarymethods.h"
 
 typedef DPTR(struct READYTORUN_SECTION) PTR_READYTORUN_SECTION;
+typedef DPTR(struct READYTORUN_AUXILIARY_MODULE_METADATA) PTR_READYTORUN_AUXILIARY_MODULE_METADATA;
 
 class NativeImage;
 class PrepareCodeConfig;
@@ -145,6 +146,7 @@ class ReadyToRunInfo
     friend class HotColdMappingLookupTable;
 
     PTR_Module                      m_pModule;
+    PTR_Module                      m_pEntryPointModule;
     PTR_ModuleBase                  m_pNativeManifestModule;
     PTR_READYTORUN_HEADER           m_pHeader;
     bool                            m_isComponentAssembly;
@@ -203,6 +205,7 @@ class ReadyToRunInfo
     TADDR                           m_pLoadedImageBase;
 
 #ifdef FEATURE_AUXILIARY_R2R_MODULES
+    PTR_READYTORUN_AUXILIARY_MODULE_METADATA m_pAuxiliaryModuleMetadata = nullptr;
     PTR_DWORD                       m_pAuxiliaryModuleActivationFlag = 0;
     PTR_DWORD                       m_pAuxiliaryEntryPointsModuleStatus = 0;
 
@@ -262,12 +265,18 @@ public:
 #endif // TARGET_WASM
 
 #ifdef FEATURE_AUXILIARY_R2R_MODULES
-    PTR_DWORD GetAuxiliaryModuleActivationFlag(MethodDesc* pMD) const
+    PTR_DWORD GetAuxiliaryModuleActivationFlag(DWORD runtimeFunctionIndex) const
     {
         LIMITED_METHOD_CONTRACT;
+        _ASSERTE(runtimeFunctionIndex < m_nRuntimeFunctions);
+        // Entry-points-only images keep every method body in the primary module.
+        if (m_pAuxiliaryModuleMetadata != nullptr)
+            return nullptr;
         // The simulation has one code module per composite image, so every method shares this flag.
         return m_pAuxiliaryModuleActivationFlag;
     }
+
+    bool GetAuxiliaryEntryPointTables(NativeFormat::NativeArray* methodDefs, NativeFormat::NativeHashtable* instances);
 
     static AuxiliaryEntryPointsEra GetCurrentAuxiliaryEntryPointsEra()
     {
@@ -304,6 +313,8 @@ public:
     bool IsAuxiliaryEntryPointsModuleActivated() const
     {
         LIMITED_METHOD_CONTRACT;
+        if (m_pAuxiliaryModuleMetadata != nullptr)
+            return VolatileLoad(&m_pAuxiliaryModuleMetadata->EntryPointsModuleActivationStatus) == 1;
         return IsAuxiliaryEntryPointsModuleActivated(m_pAuxiliaryEntryPointsModuleStatus);
     }
 
@@ -454,6 +465,11 @@ public:
         ReadyToRunInfo * m_pInfo;
         int m_methodDefIndex;
 
+        NativeFormat::NativeArray m_methodDefEntryPoints;
+        NativeFormat::NativeHashtable m_instMethodEntryPoints;
+#ifdef FEATURE_AUXILIARY_R2R_MODULES
+        bool m_enumeratingAuxiliary = false;
+#endif // FEATURE_AUXILIARY_R2R_MODULES
         NativeFormat::NativeHashtable::AllEntriesEnumerator m_genericEnum;
         NativeFormat::NativeParser m_genericParser;
         uint m_genericCurrentOffset;
@@ -466,6 +482,8 @@ public:
         MethodIterator(ReadyToRunInfo * pInfo) :
             m_pInfo(pInfo),
             m_methodDefIndex(-1),
+            m_methodDefEntryPoints(pInfo->m_methodDefEntryPoints),
+            m_instMethodEntryPoints(pInfo->m_instMethodEntryPoints),
             m_genericEnum(),
             m_genericParser(),
             m_genericCurrentOffset(-1),
@@ -473,9 +491,9 @@ public:
             m_genericCurrentSig(NULL)
         {
             NativeFormat::PTR_NativeHashtable pHash = NULL;
-            if (!pInfo->m_instMethodEntryPoints.IsNull())
+            if (!m_instMethodEntryPoints.IsNull())
             {
-                pHash = NativeFormat::PTR_NativeHashtable(&pInfo->m_instMethodEntryPoints);
+                pHash = NativeFormat::PTR_NativeHashtable(&m_instMethodEntryPoints);
             }
 
             m_genericEnum = NativeFormat::NativeHashtable::AllEntriesEnumerator(pHash);

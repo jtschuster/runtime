@@ -25,7 +25,7 @@ namespace ILCompiler.ObjectWriter
     /// <summary>
     /// WebCIL object file format writer.
     /// </summary>
-    internal sealed class WebCilObjectWriter : WasmObjectWriter
+    internal sealed partial class WebCilObjectWriter : WasmObjectWriter
     {
         public const int WebcilSectionAlignment = 16;
 
@@ -286,6 +286,15 @@ namespace ILCompiler.ObjectWriter
 
             Debug.Assert(MethodCount == totalMethodCount);
 
+#if READYTORUN
+            if (_nodeFactory.UsesWasmAuxiliaryModules)
+            {
+                InsertWasmStub(new Utf8String("getAuxiliaryModuleMetadata"),
+                    new WasmFunctionBody(new WasmFuncType(new([]), new([WasmValueType.I32])),
+                        [Global.Get(ImageBaseGlobalIndex), I32.ConstRVA(_nodeFactory.AuxiliaryModuleMetadata), I32.Add]));
+                _activationSignature = RegisterSignature(new WasmFuncType(new([]), new([])));
+            }
+#endif
             WriteDataCountSection();
         }
 
@@ -501,6 +510,10 @@ namespace ILCompiler.ObjectWriter
             WriteMemoryImport((ulong)webcilPayloadSegment.ContentSize);
             FinalizeSectionEntryCounts();
 
+#if READYTORUN
+            if (_nodeFactory.UsesWasmAuxiliaryModules)
+                EmitAuxiliaryEntryPointsModule(webcilSections);
+#endif
            /*********************************************************************
            * Write Wasm Sections, Excluding Data
            *********************************************************************/

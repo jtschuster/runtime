@@ -669,6 +669,61 @@ public class R2RTestSuites
         }
     }
 
+    [ConditionalTheory(typeof(TestPaths), nameof(TestPaths.IsBrowserWasmTarget))]
+    [InlineData(false, 1)]
+    [InlineData(true, 1)]
+    [InlineData(false, 2)]
+    [InlineData(true, 2)]
+    public void AuxiliaryEntryPointsPreserveMethodIndicesAndFixups(bool optimize, int assemblyCount)
+    {
+        List<CrossgenAssembly> assemblies = new();
+        for (int i = 0; i < assemblyCount; i++)
+        {
+            assemblies.Add(new(new CompiledAssembly
+            {
+                AssemblyName = nameof(AuxiliaryEntryPointsPreserveMethodIndicesAndFixups) + i,
+                SourceResourceNames = ["Webcil/WasmWebcilModule.cs"],
+            }));
+        }
+
+        string[] expectedMethods = [];
+        string optimization = optimize ? "--optimize" : "--optimize-disabled";
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            nameof(AuxiliaryEntryPointsPreserveMethodIndicesAndFixups),
+            [
+                new("Primary", assemblies)
+                {
+                    Options = [Crossgen2Option.Composite],
+                    AdditionalArgs = [optimization],
+                    OutputFileExtension = ".wasm",
+                    Validate = reader => expectedMethods = DescribeMethods(reader),
+                },
+                new("Auxiliary", assemblies)
+                {
+                    Options = [Crossgen2Option.Composite],
+                    AdditionalArgs = [optimization, "--wasm-auxiliary-modules"],
+                    OutputFileExtension = ".wasm",
+                    Validate = reader =>
+                    {
+                        WasmR2RAssert.InstallAuxiliaryEntryPoints(reader);
+                        Assert.Equal(expectedMethods, DescribeMethods(reader));
+                    },
+                },
+            ]));
+
+        static string[] DescribeMethods(ReadyToRunReader reader)
+        {
+            List<ReadyToRunMethod> methods = R2RAssert.GetAllMethods(reader);
+            Assert.Contains(methods, method => method.SignatureString.Contains(".AddIntegers(", StringComparison.Ordinal));
+            Assert.Contains(methods, method => method.SignatureString.Contains(".ReadGenericTypeToken<", StringComparison.Ordinal));
+            Assert.Contains(methods, method => method.Fixups is { Count: > 0 });
+            return methods.Select(method =>
+                $"{method.SignatureString}:{method.EntryPointRuntimeFunctionId}:" +
+                string.Join(",", (method.Fixups ?? Array.Empty<FixupCell>()).Select(fixup =>
+                    $"{fixup.TableIndex}/{fixup.CellOffset}"))).Order(StringComparer.Ordinal).ToArray();
+        }
+    }
+
     [ConditionalFact(typeof(TestPaths), nameof(TestPaths.IsWasmTarget))]
     public void WasmWebcilModule()
     {

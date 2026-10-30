@@ -17,6 +17,10 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 {
     public class MethodEntryPointTableNode : ModuleSpecificHeaderTableNode
     {
+        private int _entryPointsOffset;
+
+        public override int Offset => _entryPointsOffset;
+
         private struct EntryPoint
         {
             public static EntryPoint Null = new EntryPoint(-1, null);
@@ -70,6 +74,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
             NativeWriter writer = new NativeWriter();
 
+            Section fixupsSection = factory.UsesWasmAuxiliaryModules ? writer.NewSection() : null;
             Section arraySection = writer.NewSection();
             VertexArray vertexArray = new VertexArray(arraySection);
             arraySection.Place(vertexArray);
@@ -88,6 +93,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                     {
                         fixupBlobVertex = new BlobVertex(fixups);
                         uniqueFixups.Add(fixups, fixupBlobVertex);
+                        fixupsSection?.Place(fixupBlobVertex);
                     }
                     EntryPointVertex entryPointVertex = new EntryPointVertex((uint)entryPoint.MethodIndex, fixupBlobVertex);
                     vertexArray.Set(rid, entryPointVertex);
@@ -98,6 +104,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
             MemoryStream arrayContent = new MemoryStream();
             writer.Save(arrayContent);
+            _entryPointsOffset = vertexArray.VertexOffset;
             return new ObjectData(
                 data: arrayContent.ToArray(),
                 relocs: null,

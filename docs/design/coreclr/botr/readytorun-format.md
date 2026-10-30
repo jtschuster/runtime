@@ -198,6 +198,31 @@ The following section types are defined and described later in this document:
 | ExternalTypeMaps          |   124 | Assembly (added in V18.3, extended in V28)
 | ProxyTypeMaps             |   125 | Assembly (added in V18.3, extended in V28)
 | TypeMapAssemblyTargets    |   126 | Assembly (added in V18.3)
+| AuxiliaryModuleMetadata   |   128 | Image (added in V32.1)
+| AuxiliaryMethodDefEntryPoints | 129 | Assembly (added in V32.1)
+| AuxiliaryInstanceMethodEntryPoints | 130 | Image (added in V32.1)
+
+## Auxiliary WebAssembly entrypoints
+
+Composite Browser-WASM images may move their method lookup records into a separate
+WebAssembly module. Sections 129 and 130 use the existing `MethodDefEntryPoints` and
+`InstanceMethodEntryPoints` encodings. Their directory entries cover only the lookup
+records; fixup blobs precede the records in the primary image and are referenced by
+backwards distances. The primary reserves zero-filled space for the records, and
+the runtime must not construct readers for them until the entrypoint module is active.
+
+Section 128 begins with four little-endian DWORDs:
+
+| Field | Meaning |
+|---|---|
+| EntryPointsModuleActivationStatus | Zero while pending; one after lookup records have been installed |
+| PrimaryModuleMethodCount | Number of primary runtime-function records, including funclets |
+| AuxiliaryModuleCount | Zero for entry-points-only images |
+| EntryPointsFilenameRVA | RVA of the zero-terminated UTF-8 sibling module filename |
+
+The entry-points-only implementation keeps the complete runtime-function table and
+all fixup lists resident. No runtime-function entries or method bodies are installed
+by the entrypoint module.
 
 ## ReadyToRunSectionType.CompilerIdentifier
 

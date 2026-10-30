@@ -210,6 +210,7 @@
     <Compile Include="..\..\Common\Compiler\ObjectWriter\Wasm\WebcilSection.cs" Link="Compiler\ObjectWriter\Wasm\WebcilSection.cs" />
     <Compile Include="..\..\Common\Compiler\ObjectWriter\WasmFunctionBodyDeduplicator.cs" Link="Compiler\ObjectWriter\WasmFunctionBodyDeduplicator.cs" />
     <Compile Include="..\..\Common\Compiler\ObjectWriter\WasmObjectWriter.cs" Link="Compiler\ObjectWriter\WasmObjectWriter.cs" />
+    <Compile Include="..\..\Common\Compiler\ObjectWriter\WebCilObjectWriter.Auxiliary.cs" Link="Compiler\ObjectWriter\WebCilObjectWriter.Auxiliary.cs" />
     <Compile Include="..\..\Common\Compiler\ObjectWriter\WebCilObjectWriter.cs" Link="Compiler\ObjectWriter\WebCilObjectWriter.cs" />
     <Compile Include="..\..\Common\Compiler\ObjectWriter\WasmSymbolManager.cs" Link="Compiler\ObjectWriter\WasmSymbolManager.cs" />
     <Compile Include="..\..\Common\Compiler\ObjectWriter\WasmGlobalImports.cs" Link="Compiler\ObjectWriter\WasmGlobalImports.cs" />
@@ -280,6 +281,7 @@
     <Compile Include="Compiler\DependencyAnalysis\ReadyToRun\DelayLoadHelperMethodImport.cs" />
     <Compile Include="Compiler\DependencyAnalysis\ReadyToRun\ExceptionInfoLookupTableNode.cs" />
     <Compile Include="Compiler\DependencyAnalysis\ReadyToRunCodegenNodeFactory.cs" />
+    <Compile Include="Compiler\DependencyAnalysis\ReadyToRun\AuxiliaryModuleMetadataNode.cs" />
     <Compile Include="Compiler\DependencyAnalysis\ReadyToRun\ByteArrayComparer.cs" />
     <Compile Include="Compiler\DependencyAnalysis\ReadyToRun\CompilerIdentifierNode.cs" />
     <Compile Include="Compiler\DependencyAnalysis\ReadyToRun\DebugInfoTableNode.cs" />

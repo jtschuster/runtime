@@ -91,6 +91,13 @@ namespace ILCompiler
                 ?? GetTargetAllowsRuntimeCodeGeneration(targetOS, targetArchitecture);
             bool targetIsSingleThreaded = Get(_command.TargetSingleThreaded)
                 ?? GetTargetIsSingleThreaded(targetArchitecture);
+            if (Get(_command.WasmAuxiliaryModules) &&
+                (targetArchitecture != TargetArchitecture.Wasm32 || targetOS != TargetOS.Browser ||
+                 !Get(_command.Composite) || !targetIsSingleThreaded || Get(_command.StripILBodies) ||
+                 Get(_command.OutputFormat) == ReadyToRunContainerFormat.MachO))
+            {
+                throw new CommandLineException(SR.WasmAuxiliaryModulesUnsupportedConfiguration);
+            }
 
             // Crossgen2 is partial AOT and its pre-compiled methods can be thrown away at runtime if
             // they mismatch in required ISAs or computed layouts of structs. On targets that allow
@@ -696,6 +703,7 @@ namespace ILCompiler
                     nodeFactoryFlags.StripInliningInfo = Get(_command.StripInliningInfo);
                     nodeFactoryFlags.StripDebugInfo = Get(_command.StripDebugInfo);
                     nodeFactoryFlags.StripILBodies = Get(_command.StripILBodies);
+                    nodeFactoryFlags.WasmAuxiliaryModules = Get(_command.WasmAuxiliaryModules);
 
                     builder
                         .UseMapFile(Get(_command.Map))

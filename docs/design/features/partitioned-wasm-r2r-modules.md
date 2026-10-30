@@ -4,6 +4,32 @@
 
 This doc outlines a design for a logical ReadyToRun (R2R) module which is distributed across a primary WebAssembly module and one or more auxiliary WebAssembly modules.
 
+### Entry-points-only implementation
+
+The current implementation is an opt-in first step, enabled by crossgen2's
+`--wasm-auxiliary-modules` option for single-threaded composite Browser-WASM images
+with retained IL. It emits `<output-stem>.entrypoints.wasm` alongside the primary
+image. All method mappings move to this module; method bodies, runtime-function
+records, fixup lists, imports, GC info, and EH info remain in the primary image.
+Hot/cold selection and auxiliary code modules described below are not implemented
+by this step.
+
+The primary reserves zero-filled space for the auxiliary lookup tables. Fixup
+lists precede their tables and remain resident, so the existing backwards-distance
+encoding still applies. `AuxiliaryModuleMetadata` contains a pending entrypoint
+status, the complete primary runtime-function count, an auxiliary code-module
+count of zero, and the UTF-8 entrypoint filename RVA.
+
+Host download and packaging integration are separate work. The primary exports
+`getAuxiliaryModuleMetadata(): i32`, returning the metadata's absolute address.
+The host instantiates
+the entrypoint module with the same `webcil` imports and image base as the primary,
+then calls its idempotent `ActivateModule()` export. Instantiation alone does not
+install the passive data segments. Activation copies only lookup records and
+sets the image-owned entrypoint status to one. The host must then call
+`dotnet_wasm_notify_auxiliary_entrypoints_activated()` to advance the runtime's
+lookup era and allow interpreted methods to retry discovery.
+
 Loading the primary module makes the logical R2R module functional and usable. Methods whose compiled code has not yet arrived remain callable through R2R-to-interpreter thunks. Auxiliary modules can arrive later.
 
 Auxiliary modules will hold the wasm method bodies for their aux methods, as well as their fixup data, GC info, and EH info.

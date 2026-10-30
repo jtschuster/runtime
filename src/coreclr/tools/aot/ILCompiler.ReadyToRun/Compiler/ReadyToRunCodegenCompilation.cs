@@ -435,6 +435,8 @@ namespace ILCompiler
             var nodes = _dependencyGraph.MarkedNodeList;
 
             nodes = _fileLayoutOptimizer.ApplyProfilerGuidedMethodSort(nodes);
+            if (NodeFactory.UsesWasmAuxiliaryModules)
+                NodeFactory.AuxiliaryModuleMetadata.OutputFilePath = outputFile;
 
             using (PerfEventSource.StartStopEvents.EmittingEvents())
             {

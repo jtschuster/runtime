@@ -22,6 +22,9 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
     {
         private readonly NodeFactory _factory;
         private bool _materializedSignature;
+        private int _entryPointsOffset;
+
+        public override int Offset => _entryPointsOffset;
 
         public InstanceEntryPointTableNode(NodeFactory factory)
         {
@@ -100,6 +103,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
             NativeWriter hashtableWriter = new NativeWriter();
 
+            Section fixupsSection = factory.UsesWasmAuxiliaryModules ? hashtableWriter.NewSection() : null;
             Section hashtableSection = hashtableWriter.NewSection();
             VertexHashtable vertexHashtable = new VertexHashtable();
             hashtableSection.Place(vertexHashtable);
@@ -136,6 +140,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
                 {
                     fixupBlob = new BlobVertex(fixup);
                     uniqueFixups.Add(fixup, fixupBlob);
+                    fixupsSection?.Place(fixupBlob);
                 }
 
                 EntryPointVertex entryPointVertex = new EntryPointWithBlobVertex((uint)methodIndex, fixupBlob, signatureBlob);
@@ -150,6 +155,7 @@ namespace ILCompiler.DependencyAnalysis.ReadyToRun
 
             MemoryStream hashtableContent = new MemoryStream();
             hashtableWriter.Save(hashtableContent);
+            _entryPointsOffset = vertexHashtable.VertexOffset;
             return new ObjectData(
                 data: hashtableContent.ToArray(),
                 relocs: null,

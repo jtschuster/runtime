@@ -29,6 +29,7 @@ internal static class TestPaths
     private static string TargetRid => $"{TargetOS}-{TargetArchitecture}";
 
     public static bool IsWasmTarget => TargetArchitecture == "wasm";
+    public static bool IsBrowserWasmTarget => IsWasmTarget && TargetOS == "browser";
 
     public static bool IsNotWasmTarget => !IsWasmTarget;
 

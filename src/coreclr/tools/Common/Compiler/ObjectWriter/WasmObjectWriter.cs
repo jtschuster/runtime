@@ -541,6 +541,17 @@ namespace ILCompiler.ObjectWriter
             body.Encode(data);
 
             codeWriter.EmitSymbolDefinition(name);
+            int relocationCount = body.EncodeRelocationCount();
+            if (relocationCount != 0)
+            {
+                Relocation[] relocations = new Relocation[relocationCount];
+                body.EncodeRelocations(relocations);
+                foreach (Relocation relocation in relocations)
+                {
+                    codeWriter.EmitRelocation(relocation.Offset, data.AsSpan(relocation.Offset),
+                        relocation.RelocType, GetMangledName(relocation.Target), relocation.Target.Offset);
+                }
+            }
             codeWriter.EmitData(data);
 
             RegisterFunctionSymbol(name);

@@ -72,6 +72,7 @@ namespace ILCompiler.DependencyAnalysis
         public bool StripInliningInfo;
         public bool StripDebugInfo;
         public bool StripILBodies;
+        public bool WasmAuxiliaryModules;
         public HashSet<MethodDesc> CompiledMethodDefs;
     }
 
@@ -106,6 +107,7 @@ namespace ILCompiler.DependencyAnalysis
         List<ILBodyFixupSignature> _markedILBodyFixupSignatures = new List<ILBodyFixupSignature>();
 
         public bool MarkingComplete => _markingComplete;
+        public bool UsesWasmAuxiliaryModules => OptimizationFlags.WasmAuxiliaryModules && !OptimizationFlags.IsComponentModule;
 
         public void GenerateHotColdMap(DependencyAnalyzerBase<NodeFactory> dependencyGraph)
         {
@@ -598,6 +600,7 @@ namespace ILCompiler.DependencyAnalysis
         public SymbolNodeRange DelayLoadMethodCallThunks;
 
         public InstanceEntryPointTableNode InstanceEntryPointTable;
+        public AuxiliaryModuleMetadataNode AuxiliaryModuleMetadata;
 
         public ManifestMetadataTableNode ManifestMetadataTable;
 
@@ -1143,7 +1146,9 @@ namespace ILCompiler.DependencyAnalysis
                 }
 
                 MethodEntryPointTableNode methodEntryPointTable = new MethodEntryPointTableNode(inputModule);
-                tableHeader.Add(Internal.Runtime.ReadyToRunSectionType.MethodDefEntryPoints, methodEntryPointTable);
+                tableHeader.Add(UsesWasmAuxiliaryModules
+                    ? Internal.Runtime.ReadyToRunSectionType.AuxiliaryMethodDefEntryPoints
+                    : Internal.Runtime.ReadyToRunSectionType.MethodDefEntryPoints, methodEntryPointTable);
 
                 TypesTableNode typesTable = new TypesTableNode(inputModule);
                 tableHeader.Add(Internal.Runtime.ReadyToRunSectionType.AvailableTypes, typesTable);
@@ -1199,7 +1204,14 @@ namespace ILCompiler.DependencyAnalysis
             }
 
             InstanceEntryPointTable = new InstanceEntryPointTableNode(this);
-            Header.Add(Internal.Runtime.ReadyToRunSectionType.InstanceMethodEntryPoints, InstanceEntryPointTable);
+            Header.Add(UsesWasmAuxiliaryModules
+                ? Internal.Runtime.ReadyToRunSectionType.AuxiliaryInstanceMethodEntryPoints
+                : Internal.Runtime.ReadyToRunSectionType.InstanceMethodEntryPoints, InstanceEntryPointTable);
+            if (UsesWasmAuxiliaryModules)
+            {
+                AuxiliaryModuleMetadata = new AuxiliaryModuleMetadataNode();
+                Header.Add(Internal.Runtime.ReadyToRunSectionType.AuxiliaryModuleMetadata, AuxiliaryModuleMetadata);
+            }
 
             ImportSectionsTable = new ImportSectionsTableNode(this);
             Header.Add(Internal.Runtime.ReadyToRunSectionType.ImportSections, ImportSectionsTable);
