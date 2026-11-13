@@ -36,3 +36,20 @@ flags:
 
 Many subdirectories under `src/tests/` have their own `README.md` with
 area-specific authoring and run guidance — read them before making changes.
+
+## Crossgen2 test caching
+
+`RunCrossgen2Tests` preserves original IL in `IL-CG2` and uses `CachedToolTask`
+to cache PE compilation outputs. Changes to Crossgen2, the runtime and references
+in `Core_Root`, test inputs, compiler arguments, or runtime/JIT environment settings
+invalidate the cache. Refresh `Core_Root` after rebuilding the product; deleting
+`IL-CG2` is not necessary. Test builds restore the original IL before copying new
+assemblies.
+
+Caching is enabled by default. Set `DOTNET_CROSSGEN2_CACHE=false` to compile
+without caching, or `DOTNET_CROSSGEN2_CACHE_PATH` to override the user cache
+directory. Custom compiler arguments, symbol generation, synthesized profiles, and non-PE outputs
+bypass caching and compile on every run. R2RDump and PDB validation remain outside
+the compiler cache. The task host is published to `Core_Root/crossgen2-test` as a NativeAOT
+executable (single-file where NativeAOT is unsupported), so the test machine needs neither
+an SDK nor a `dotnet` runtime to run it.

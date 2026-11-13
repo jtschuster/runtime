@@ -36,6 +36,23 @@
     DependsOnTargets="ResolveRuntimeFilesFromLocalBuild"
     Condition="'$(TestBuildMode)' != 'nativeaot'" />
 
+  <Target Name="_BuildCrossgen2Test"
+          BeforeTargets="CopyDependencyToCoreRoot"
+          Condition="'$(MSBuildProjectName)' == 'test_dependencies' and '$(TestBuildMode)' != 'nativeaot'">
+    <PropertyGroup>
+      <_Crossgen2TestProperties>Configuration=Release;TargetOS=$(HostOS);TargetArchitecture=$(BuildArchitecture)</_Crossgen2TestProperties>
+      <_Crossgen2TestPublishDir>$(ArtifactsBinDir)coreclr/$(HostOS).$(BuildArchitecture).Release/crossgen2-test-published/</_Crossgen2TestPublishDir>
+    </PropertyGroup>
+    <MSBuild Projects="$(RepoRoot)src/tasks/Crossgen2Test/Crossgen2Test.csproj"
+             Targets="Restore"
+             Properties="$(_Crossgen2TestProperties);_IsRestoring=true"
+             RemoveProperties="RuntimeIdentifier" />
+    <MSBuild Projects="$(RepoRoot)src/tasks/Crossgen2Test/Crossgen2Test.csproj"
+             Targets="Publish"
+             Properties="$(_Crossgen2TestProperties)"
+             RemoveProperties="RuntimeIdentifier" />
+  </Target>
+
   <Target Name="CopyDependencyToCoreRoot"
     DependsOnTargets="_ComputeCoreRootArtifactSources;ResolveAssemblyReferences;_ResolveRuntimeFilesForCoreRoot">
 
@@ -50,6 +67,10 @@
     <!-- CoreCLR artifacts from shared target -->
     <ItemGroup>
       <RunTimeDependencyCopyLocal Include="@(_CoreRootArtifactSource)" />
+      <RunTimeDependencyCopyLocal
+        Include="$(_Crossgen2TestPublishDir)**"
+        TargetDir="crossgen2-test/"
+        Condition="'$(TestBuildMode)' != 'nativeaot'" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetArchitecture)' == 'wasm' and '$(TestBuildMode)' != 'nativeaot'">

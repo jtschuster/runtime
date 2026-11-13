@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>$(NetCoreAppToolCurrent)</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Common\InvocationCache\*.cs" Exclude="..\Common\InvocationCache\InvocationCachePurge.cs" Link="InvocationCache\%(Filename)%(Extension)" />
+    <Compile Include="..\Crossgen2Test\Crossgen2Test.cs" Link="Crossgen2Test.cs" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="$(MicrosoftBuildFrameworkVersion)" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="$(MicrosoftBuildUtilitiesCoreVersion)" />
+  </ItemGroup>
+</Project>

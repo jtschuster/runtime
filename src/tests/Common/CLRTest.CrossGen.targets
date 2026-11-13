@@ -26,6 +26,21 @@ WARNING:   When setting properties based on their current state (for example:
     <IlasmRoundTripIncompatible Condition="'$(AlwaysUseCrossGen2)' == 'true'">true</IlasmRoundTripIncompatible>
   </PropertyGroup>
 
+  <!-- Restore the preserved IL before an incremental test build decides which assemblies to copy. -->
+  <Target Name="RestoreCrossgen2TestInputs" BeforeTargets="PrepareForBuild"
+          Condition="'$(OutputPath)' != ''">
+    <ItemGroup>
+      <_Crossgen2TestInput Include="$(OutputPath)IL-CG2/*.dll" />
+      <_Crossgen2TestInput Include="$(OutputPath)IL-CG2-WholeProgram/inputs/*.dll"
+                           Exclude="$(OutputPath)IL-CG2-WholeProgram/inputs/System.Private.CoreLib.dll"
+                           Condition="!Exists('$(OutputPath)IL-CG2')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_Crossgen2TestInput)" DestinationFolder="$(OutputPath)" />
+    <Delete Files="$(OutputPath)System.Private.CoreLib.dll"
+            Condition="Exists('$(OutputPath)IL-CG2-WholeProgram/inputs/System.Private.CoreLib.dll') and !Exists('$(OutputPath)IL-CG2/System.Private.CoreLib.dll')" />
+    <RemoveDir Directories="$(OutputPath)IL-CG2;$(OutputPath)IL-CG2-WholeProgram" />
+  </Target>
+
   <!--
     This returns the portion of the execution script that generates the required lines to crossgen the test executable.
 
@@ -91,29 +106,39 @@ if [ ! -z ${RunCrossGen2+x} ]%3B then
     # WASI loads R2R code from a single composite spliced into the host.
     export CompositeBuildMode=1
   fi
-  compilationDoneFlagFile="$crossgen2OutputDirectory/done"
-  if [ -d "$crossgen2OutputDirectory" ]%3B then
-    while [ ! -f $compilationDoneFlagFile ]%3B
-    do
-      echo "Waiting for concurrent Crossgen2 compilation: $compilationDoneFlagFile"
-      sleep 5%3B
-    done
-  else
     TakeLock
-    if [ ! -d "$crossgen2OutputDirectory" ]%3B then
-      mkdir -p "$crossgen2InputDirectory"
+    export DOTNET_CROSSGEN2_CACHE="${DOTNET_CROSSGEN2_CACHE:-true}"
+    __Crossgen2TestNoCache=
+    if [ -n "$ExtraCrossGen2Args$(CrossGen2TestExtraArguments)$(CompositeCrossGen2TestExtraArguments)" ] || [ ! -z ${CrossGen2SynthesizePgo+x} ]; then
+      __Crossgen2TestNoCache=--no-cache
+    fi
+    if [ ! -d "IL-CG2" ]%3B then
+      mkdir "IL-CG2"
+      for dllFile in ./*.dll; do
+        bareFileName="${dllFile##*/}"
+        if [ -f "IL-CG2-WholeProgram/inputs/$bareFileName" ]; then
+          cp "IL-CG2-WholeProgram/inputs/$bareFileName" "IL-CG2/"
+        else
+          cp "$dllFile" "IL-CG2/"
+        fi
+      done
+    fi
       if [ ! -z ${WholeProgramCompositeBuildMode+x} ]%3B then
-        mkdir "$R2RTestCoreRoot"
+        mkdir -p "$R2RTestCoreRoot" "$crossgen2InputDirectory"
+        cp "IL-CG2/"*.dll "$crossgen2InputDirectory/"
         cp "$CORE_ROOT"/*.dll "$R2RTestCoreRoot/"
         cp "$CORE_ROOT/System.Private.CoreLib.dll" "$crossgen2InputDirectory/"
       fi
-      cp ./*.dll "$crossgen2InputDirectory/"
       rm "$crossgen2OutputDirectory"/composite-r2r.* 2>/dev/null
 
       if [ ! -z ${CompositeBuildMode+x} ]%3B then
         if [ "$(CrossGen2OutputFormat)" != "wasm" ]; then
           # HACK: copy native shared shim libraries. Not needed on Windows.
-          cp "$CORE_ROOT"/lib*.so "$CORE_ROOT"/lib*.dylib $(scriptPath)
+          for nativeLibrary in "$CORE_ROOT"/lib*.so "$CORE_ROOT"/lib*.dylib; do
+            if [ -f "$nativeLibrary" ]; then
+              cp "$nativeLibrary" "$PWD/"
+            fi
+          done
         fi
 
         ExtraCrossGen2Args+=" --composite"
@@ -205,7 +230,15 @@ if [ ! -z ${RunCrossGen2+x} ]%3B then
         export -n DOTNET_TC_OnStackReplacement DOTNET_TC_PartialCompilation
 
         echo "Running CrossGen2: $__Command"
-        $__Command
+        if [ -n "$_DebuggerFullPath" ]; then
+          $__Command
+        else
+          __CacheExtraArguments="$ExtraCrossGen2Args"
+          if [ -n "$(CrossGen2OutputFormat)" ]; then
+            __CacheExtraArguments+=" -f $(CrossGen2OutputFormat)"
+          fi
+          "$CORE_ROOT/crossgen2-test/crossgen2-test" --core-root "$CORE_ROOT" --input-directory "$PWD/$crossgen2InputDirectory" --out "$__OutputFile" --rsp "$__ResponseFile" $__Crossgen2TestNoCache -- $__CacheExtraArguments
+        fi
         __cg2ExitCode=$?
 
         __linkExitCode=0
@@ -296,7 +329,6 @@ if [ ! -z ${RunCrossGen2+x} ]%3B then
         fi
       fi
 
-      echo "Crossgen2 compilation finished, exit code $__cg2ExitCode" >> $compilationDoneFlagFile
       if [ $__cg2ExitCode -ne 0 ]; then
         echo Crossgen2 failed with exitcode: $__cg2ExitCode
         ReleaseLock
@@ -312,9 +344,7 @@ if [ ! -z ${RunCrossGen2+x} ]%3B then
         ReleaseLock
         exit 1
       fi
-    fi
     ReleaseLock
-  fi
 fi
         ]]>
       </CrossgenBashScript>
@@ -359,6 +389,10 @@ if defined WholeProgramCompositeBuildMode (
 REM CrossGen2 Script
 if defined RunCrossGen2 (
     set TEST_READY_TO_RUN_MODE=1
+    set __Crossgen2TestNoCache=
+    if defined ExtraCrossGen2Args set __Crossgen2TestNoCache=--no-cache
+    if not "$(CrossGen2TestExtraArguments)$(CompositeCrossGen2TestExtraArguments)"=="" set __Crossgen2TestNoCache=--no-cache
+    if defined CrossGen2SynthesizePgo set __Crossgen2TestNoCache=--no-cache
     set ExtraCrossGen2Args=!ExtraCrossGen2Args! $(CrossGen2TestExtraArguments)
     set CrossGen2TestCheckPdb=$(CrossGen2TestCheckPdb)
     set __CreatePdb=$(__CreatePdb)
@@ -368,26 +402,25 @@ if defined RunCrossGen2 (
 
     set CrossGen2Status=0
     set R2RDumpStatus=0
-    set compilationDoneFlagFile=!ScriptPath!!crossgen2OutputDirectory!\done
-    if exist "!crossgen2OutputDirectory!" (
-      REM We may have come in the middle of a concurrent CG2 compilation, wait for it to finish
-      :ProbeCompilationFinished
-      if exist "!compilationDoneFlagFile!" goto :DoneCrossgen2OperationsNoRelease
-      echo Waiting for concurrent Crossgen2 compilation^: !compilationDoneFlagFile!
-      timeout /t 5 /nobreak
-      goto :ProbeCompilationFinished
-    )
     call :TakeLock
-    if exist "!crossgen2OutputDirectory!" goto :DoneCrossgen2Operations
-
-    mkdir !crossgen2OutputDirectory!
-    mkdir !crossgen2InputDirectory!
+    if not defined DOTNET_CROSSGEN2_CACHE set DOTNET_CROSSGEN2_CACHE=true
+    if not exist "IL-CG2" (
+        mkdir IL-CG2
+        for %%I in (*.dll) do (
+            if exist "IL-CG2-WholeProgram\inputs\%%~nxI" (
+                copy /y "IL-CG2-WholeProgram\inputs\%%~nxI" "IL-CG2\"
+            ) else (
+                copy /y "%%I" "IL-CG2\"
+            )
+        )
+    )
     if defined WholeProgramCompositeBuildMode (
-        mkdir "!R2RTestCoreRoot!"
+        if not exist "!R2RTestCoreRoot!" mkdir "!R2RTestCoreRoot!"
+        if not exist "!crossgen2InputDirectory!" mkdir "!crossgen2InputDirectory!"
+        copy /y "IL-CG2\*.dll" "!crossgen2InputDirectory!\"
         copy /y "!CORE_ROOT!\*.dll" "!R2RTestCoreRoot!\"
         copy /y "!CORE_ROOT!\System.Private.CoreLib.dll" "!crossgen2InputDirectory!\"
     )
-    copy /y *.dll !crossgen2InputDirectory!\
     del !crossgen2OutputDirectory!\composite-r2r.* 2>nul
 
     if defined CompositeBuildMode (
@@ -492,7 +525,11 @@ if defined RunCrossGen2 (
     set "DOTNET_TC_PartialCompilation="
 
     echo "Running CrossGen2: !__Command!"
-    call !__Command!
+    if defined _DebuggerFullPath (
+        call !__Command!
+    ) else (
+        call "!CORE_ROOT!\crossgen2-test\crossgen2-test.exe" --core-root "!CORE_ROOT!" --input-directory "!scriptPath!!crossgen2InputDirectory!" --out "!__OutputFile!" --rsp "!__ResponseFile!" !__Crossgen2TestNoCache! -- !ExtraCrossGen2Args!
+    )
 
     set CrossGen2Status=!ERRORLEVEL!
 
@@ -550,9 +587,7 @@ if defined RunCrossGen2 (
     Exit /b 0
 
 :DoneCrossgen2Operations
-    echo Crossgen2 compilation finished, exit code !CrossGen2Status!>>!compilationDoneFlagFile!
     call :ReleaseLock
-:DoneCrossgen2OperationsNoRelease
     IF NOT !CrossGen2Status!==0 (
         ECHO Crossgen2 failed with exitcode - !CrossGen2Status!
         Exit /b 1

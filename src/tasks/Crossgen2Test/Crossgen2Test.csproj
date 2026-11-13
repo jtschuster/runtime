@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>$(NetCoreAppToolCurrent)</TargetFramework>
+    <AssemblyName>crossgen2-test</AssemblyName>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <RuntimeIdentifier>$(PortableOS)-$(TargetArchitecture)</RuntimeIdentifier>
+    <PublishDir>$(CoreclrRuntimeBinDir)crossgen2-test-published/</PublishDir>
+    <SelfContained>true</SelfContained>
+    <PublishTrimmed>true</PublishTrimmed>
+    <!-- NativeAOT when the host supports it (eng/toolAot.targets), otherwise single-file. -->
+    <AotOrSingleFile>true</AotOrSingleFile>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Common\InvocationCache\*.cs" Exclude="..\Common\InvocationCache\InvocationCachePurge.cs" Link="InvocationCache\%(Filename)%(Extension)" />
+    <PackageReference Include="Microsoft.Build.Framework" Version="$(MicrosoftBuildFrameworkVersion)" />
+    <PackageReference Include="Microsoft.Build.Utilities.Core" Version="$(MicrosoftBuildUtilitiesCoreVersion)" />
+  </ItemGroup>
+</Project>
