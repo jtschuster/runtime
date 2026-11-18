@@ -97,6 +97,11 @@ if [ ! -z ${RunCrossGen2+x} ]%3B then
     export CompositeBuildMode=1
   fi
     TakeLock
+    export DOTNET_CROSSGEN2_CACHE="${DOTNET_CROSSGEN2_CACHE:-true}"
+    __Crossgen2TestNoCache=
+    if [ -n "$ExtraCrossGen2Args$(CrossGen2TestExtraArguments)$(CompositeCrossGen2TestExtraArguments)" ] || [ ! -z ${CrossGen2SynthesizePgo+x} ]; then
+      __Crossgen2TestNoCache=--no-cache
+    fi
     rm -rf "$crossgen2OutputDirectory"
     mkdir "$crossgen2OutputDirectory"
     for testFile in *%3B do
@@ -214,7 +219,15 @@ if [ ! -z ${RunCrossGen2+x} ]%3B then
         export -n DOTNET_TC_OnStackReplacement DOTNET_TC_PartialCompilation
 
         echo "Running CrossGen2: $__Command"
-        $__Command
+        if [ -n "$_DebuggerFullPath" ]; then
+          $__Command
+        else
+          __CacheExtraArguments="$ExtraCrossGen2Args"
+          if [ -n "$(CrossGen2OutputFormat)" ]; then
+            __CacheExtraArguments+=" -f $(CrossGen2OutputFormat)"
+          fi
+          "$CORE_ROOT/crossgen2-test/crossgen2-test" --core-root "$CORE_ROOT" --out "$__OutputFile" --rsp "$__ResponseFile" $__Crossgen2TestNoCache -- $__CacheExtraArguments
+        fi
         __cg2ExitCode=$?
 
         __linkExitCode=0
@@ -370,6 +383,10 @@ if defined WholeProgramCompositeBuildMode (
 REM CrossGen2 Script
 if defined RunCrossGen2 (
     set TEST_READY_TO_RUN_MODE=1
+    set __Crossgen2TestNoCache=
+    if defined ExtraCrossGen2Args set __Crossgen2TestNoCache=--no-cache
+    if not "$(CrossGen2TestExtraArguments)$(CompositeCrossGen2TestExtraArguments)"=="" set __Crossgen2TestNoCache=--no-cache
+    if defined CrossGen2SynthesizePgo set __Crossgen2TestNoCache=--no-cache
     set ExtraCrossGen2Args=!ExtraCrossGen2Args! $(CrossGen2TestExtraArguments)
     set CrossGen2TestCheckPdb=$(CrossGen2TestCheckPdb)
     set __CreatePdb=$(__CreatePdb)
@@ -380,6 +397,7 @@ if defined RunCrossGen2 (
     set CrossGen2Status=0
     set R2RDumpStatus=0
     call :TakeLock
+    if not defined DOTNET_CROSSGEN2_CACHE set DOTNET_CROSSGEN2_CACHE=true
     if exist "!crossgen2OutputDirectory!" rd /s /q "!crossgen2OutputDirectory!"
     REM Copied wrappers and markers would be discovered as additional tests.
     robocopy "!scriptPath:~0,-1!" "!crossgen2OutputDirectory!" /E /NFL /NDL /NJH /NJS /NP /XD "!scriptPath!readytorun" "!scriptPath!readytorun-wholeprogram" "!scriptPath!lock" "!scriptPath!Reports" /XF *.sh *.cmd *.MergedTestAssembly *.MergedTestAssemblyForStress *.StandaloneTestRunner *.OutOfProcessTest *.HasOutOfProcessTests *.log >nul
@@ -494,7 +512,11 @@ if defined RunCrossGen2 (
     set "DOTNET_TC_PartialCompilation="
 
     echo "Running CrossGen2: !__Command!"
-    call !__Command!
+    if defined _DebuggerFullPath (
+        call !__Command!
+    ) else (
+        call "!CORE_ROOT!\crossgen2-test\crossgen2-test.exe" --core-root "!CORE_ROOT!" --out "!__OutputFile!" --rsp "!__ResponseFile!" !__Crossgen2TestNoCache! -- !ExtraCrossGen2Args!
+    )
 
     set CrossGen2Status=!ERRORLEVEL!
 

@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.Build.Traversal">
 
   <ItemGroup>
-    <ProjectReference Include="**\*.csproj" />
+    <ProjectReference Include="**\*.csproj" Exclude="**\*.Tests.csproj" />
     <ProjectReference Remove="AotCompilerTask\MonoAOTCompiler.csproj" />
+    <ProjectReference Remove="Crossgen2Test\Crossgen2Test.csproj" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetsMobile)' != 'true'">

@@ -126,6 +126,7 @@
     <AllSubsetsExpansion>$(AllSubsetsExpansion)+host.native+host.pkg+host.tools+host.pretest+host.tests</AllSubsetsExpansion>
     <AllSubsetsExpansion>$(AllSubsetsExpansion)+libs.native+libs.sfx+libs.oob+libs.pretest+libs.tests</AllSubsetsExpansion>
     <AllSubsetsExpansion>$(AllSubsetsExpansion)+packs.product+packs.installers+packs.tests</AllSubsetsExpansion>
+    <AllSubsetsExpansion>$(AllSubsetsExpansion)+tasks.tests</AllSubsetsExpansion>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -230,6 +231,7 @@
     <!-- Utility -->
     <SubsetName Include="RegenerateThirdPartyNotices" OnDemand="true" Description="Regenerates the THIRD-PARTY-NOTICES.TXT file based on other repos' TPN files." />
     <SubsetName Include="tasks" OnDemand="true" Description="Build the repo local task projects." />
+    <SubsetName Include="Tasks.Tests" OnDemand="true" Description="Unit tests for the repo local task projects." />
     <SubsetName Include="bootstrap" OnDemand="true" Description="Build the projects needed to build shipping assets in the repo against live assets." />
 
     <!-- AllSubsets option to include everything -->
@@ -715,6 +717,10 @@
   <!-- Tasks-->
   <ItemGroup Condition="$(_subset.Contains('+tasks+'))">
     <ProjectToBuild Include="$(RepoTasksDir)tasks.proj" Category="tasks" />
+  </ItemGroup>
+  <ItemGroup Condition="$(_subset.Contains('+tasks.tests+'))">
+    <ProjectToBuild Include="$(RepoTasksDir)Crossgen2Test.Tests\Crossgen2Test.Tests.csproj"
+                    Test="true" Category="tasks" Condition="'$(DotNetBuildSourceOnly)' != 'true'" />
   </ItemGroup>
 
   <!-- Bootstrap -->

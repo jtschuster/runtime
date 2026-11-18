@@ -49,7 +49,6 @@ internal static class Crossgen2Cache
     internal static InvocationDescription DescribeInvocation(string[] compilerDependencies, string input, ITaskItem[] references,
         ITaskItem[]? profiles, string[] outputs, string response, string command, string workingDirectory)
     {
-        var files = new List<string>();
 #pragma warning disable IL3000 // MSBuild tasks are loaded from assemblies on disk.
         string taskAssemblyPath = typeof(RunReadyToRunCompiler).Assembly.Location;
 #pragma warning restore IL3000
@@ -57,30 +56,37 @@ internal static class Crossgen2Cache
         {
             throw new InvalidDataException("The task assembly has no on-disk location.");
         }
-        AddFile(taskAssemblyPath);
+        return DescribeInvocation(taskAssemblyPath,
+            compilerDependencies,
+            references.Select(reference => reference.ItemSpec).Prepend(input),
+            outputs, response, command, workingDirectory, [], profiles?.Select(profile => profile.ItemSpec) ?? []);
+    }
+
+    internal static InvocationDescription DescribeInvocation(string taskIdentity, IEnumerable<string> compilerDependencies,
+        IEnumerable<string> assemblyInputs, string[] outputs, string response, string command, string workingDirectory,
+        IEnumerable<string> additionalContext, IEnumerable<string> profiles)
+    {
+        var files = new List<string>();
+        AddFile(taskIdentity);
         foreach (string dependency in compilerDependencies)
         {
             AddFile(dependency);
         }
-        AddAssembly(input);
-        foreach (ITaskItem reference in references)
+        foreach (string assembly in assemblyInputs)
         {
-            AddAssembly(reference.ItemSpec);
+            AddAssembly(assembly);
         }
-        if (profiles is not null)
+        foreach (string profile in profiles)
         {
-            foreach (ITaskItem profile in profiles)
-            {
-                AddFile(profile.ItemSpec);
-            }
+            AddFile(profile);
         }
-        return new InvocationDescription(InvocationInputs.FromFiles(files.ToArray()), new[]
+        return new InvocationDescription(InvocationInputs.FromFiles(files.Distinct(PathComparer).ToArray()), new[]
         {
             Path.GetFullPath(workingDirectory),
             Environment.GetEnvironmentVariable("DOTNET_PROCESSOR_COUNT") ?? "",
             response ?? "",
             command ?? ""
-        }, InvocationOutputs.FromFiles(outputs));
+        }.Concat(additionalContext).ToArray(), InvocationOutputs.FromFiles(outputs));
 
         void AddFile(string path)
         {

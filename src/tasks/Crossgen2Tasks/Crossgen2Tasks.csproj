@@ -43,11 +43,13 @@
     <Compile Include="..\Common\InvocationCache\InvocationOutputs.cs" Link="InvocationCache\InvocationOutputs.cs" />
     <Compile Include="..\Common\InvocationCache\InvocationDescription.cs" Link="InvocationCache\InvocationDescription.cs" />
     <Compile Include="..\Common\InvocationCache\InvocationInputs.cs" Link="InvocationCache\InvocationInputs.cs" />
-    <InternalsVisibleTo Include="Crossgen2Tasks.Tests" />
-    <Content Include="Microsoft.NET.CrossGen.targets" CopyToOutputDirectory="PreserveNewest" />
+    <InternalsVisibleTo Include="crossgen2-test" />
+    <InternalsVisibleTo Include="Crossgen2Test.Tests" />
+    <Content Include="Microsoft.NET.CrossGen.targets" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
     <Content Include="ShimFilesSimulatingLogicInSdkRepo/Microsoft.NET.CrossGen.props"
       Link="Microsoft.NET.CrossGen.props"
-      CopyToOutputDirectory="PreserveNewest" />
+      CopyToOutputDirectory="PreserveNewest"
+      CopyToPublishDirectory="Never" />
   </ItemGroup>
 
 </Project>

@@ -2,3 +2,7 @@ The files in this directory are equivalent/identical to corresponding files in t
 
 The files in the subdirectory CommoonFilesPulledFromSdkRepo do not need to be updated aggressively as they change.
 The files in the subdirectory ShimFilesSimulatingLogicInSdkRepo are simply in place to make the functionality be close enough so that these tasks can easily be compiled.
+
+The ReadyToRun compiler cache is adapted from [dotnet/runtime#135446](https://github.com/dotnet/runtime/pull/135446).
+Its `RunReadyToRunCompiler` changes and shared cache sources need a coordinated port to dotnet/sdk.
+The runtime-test invocation mode is only used by this repository's standalone test launcher.

@@ -11,7 +11,7 @@ using Microsoft.Build.Utilities;
 
 namespace Microsoft.NET.Build.Tasks
 {
-    public class RunReadyToRunCompiler : CachedToolTask
+    public partial class RunReadyToRunCompiler : CachedToolTask
     {
         private static readonly InvocationCacheConfiguration s_cacheConfiguration =
             new("Crossgen2", "CROSSGEN2_EXPERIMENTAL_CACHE", "CROSSGEN2_EXPERIMENTAL_CACHE_PATH");
@@ -85,6 +85,9 @@ namespace Microsoft.NET.Build.Tasks
 
         protected override bool ValidateParameters()
         {
+            if (_runtimeTest is not null)
+                return ValidateRuntimeTest();
+
             string emitSymbolsMetadata = CompilationEntry.GetMetadata(MetadataKeys.EmitSymbols);
             _emitSymbols = !string.IsNullOrEmpty(emitSymbolsMetadata) && bool.Parse(emitSymbolsMetadata);
             _createPDBCommand = CompilationEntry.GetMetadata(MetadataKeys.CreatePDBCommand);
@@ -263,6 +266,9 @@ namespace Microsoft.NET.Build.Tasks
 
         protected override string GenerateResponseFileCommands()
         {
+            if (_runtimeTest is not null)
+                return File.ReadAllText(_runtimeTest.ResponseFile);
+
             // Crossgen2 5.0 doesn't support PDB generation so Crossgen1 is used for that purpose.
             if (ActuallyUseCrossgen2)
             {
@@ -417,11 +423,15 @@ namespace Microsoft.NET.Build.Tasks
             return base.ExecuteTool(pathToTool, responseFileCommands, commandLineCommands);
         }
 
-        private protected override InvocationCacheConfiguration CacheConfiguration => s_cacheConfiguration;
+        private protected override InvocationCacheConfiguration CacheConfiguration =>
+            _runtimeTest is null ? s_cacheConfiguration : s_runtimeTestCacheConfiguration;
 
 #nullable enable annotations
         private protected override InvocationDescription? DescribeInvocation(string pathToTool, string responseFileCommands, string commandLineCommands)
         {
+            if (_runtimeTest is not null)
+                return DescribeRuntimeTest(_runtimeTest, pathToTool, responseFileCommands, commandLineCommands);
+
             try
             {
                 if (!ActuallyUseCrossgen2 || Crossgen2IsVersion5 || _createCompositeImage ||
@@ -459,6 +469,10 @@ namespace Microsoft.NET.Build.Tasks
 
         protected override int ExecuteToolCore(string pathToTool, string responseFileCommands, string commandLineCommands)
         {
+            // The test wrapper owns the output directory, including IL copies for inputs Crossgen2 skips.
+            if (_runtimeTest is not null)
+                return ExecuteCompiler(pathToTool, responseFileCommands, commandLineCommands);
+
             try
             {
                 if (!IsPdbCompilation)

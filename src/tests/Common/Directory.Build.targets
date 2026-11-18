@@ -36,6 +36,32 @@
     DependsOnTargets="ResolveRuntimeFilesFromLocalBuild"
     Condition="'$(TestBuildMode)' != 'nativeaot'" />
 
+  <Target Name="_BuildCrossgen2Test"
+          BeforeTargets="CopyDependencyToCoreRoot"
+          Condition="'$(MSBuildProjectName)' == 'test_dependencies' and '$(TestBuildMode)' != 'nativeaot'">
+    <PropertyGroup>
+      <_Crossgen2TestOS>$(TargetOS)</_Crossgen2TestOS>
+      <_Crossgen2TestArchitecture>$(TargetArchitecture)</_Crossgen2TestArchitecture>
+      <_Crossgen2TestRid>$(PortableTargetRid)</_Crossgen2TestRid>
+    </PropertyGroup>
+    <!-- On mobile and Wasm, Crossgen2 runs outside the test runtime. -->
+    <PropertyGroup Condition="'$(IsDesktopOS)' != 'true' or '$(TargetArchitecture)' == 'wasm'">
+      <_Crossgen2TestOS>$(HostOS)</_Crossgen2TestOS>
+      <_Crossgen2TestArchitecture>$(BuildArchitecture)</_Crossgen2TestArchitecture>
+      <_Crossgen2TestRid>$(NETCoreSdkPortableRuntimeIdentifier)</_Crossgen2TestRid>
+    </PropertyGroup>
+    <PropertyGroup>
+      <_Crossgen2TestPublishDir>$(ArtifactsBinDir)Crossgen2Test/Release/$(_Crossgen2TestRid)/publish/</_Crossgen2TestPublishDir>
+      <_Crossgen2TestProperties>Configuration=Release;TargetOS=$(_Crossgen2TestOS);TargetArchitecture=$(_Crossgen2TestArchitecture);RuntimeIdentifier=$(_Crossgen2TestRid);PublishDir=$(_Crossgen2TestPublishDir)</_Crossgen2TestProperties>
+    </PropertyGroup>
+    <MSBuild Projects="$(RepoRoot)src/tasks/Crossgen2Test/Crossgen2Test.csproj"
+             Targets="Restore"
+             Properties="$(_Crossgen2TestProperties);_IsRestoring=true" />
+    <MSBuild Projects="$(RepoRoot)src/tasks/Crossgen2Test/Crossgen2Test.csproj"
+             Targets="Publish"
+             Properties="$(_Crossgen2TestProperties)" />
+  </Target>
+
   <Target Name="CopyDependencyToCoreRoot"
     DependsOnTargets="_ComputeCoreRootArtifactSources;ResolveAssemblyReferences;_ResolveRuntimeFilesForCoreRoot">
 
@@ -50,6 +76,10 @@
     <!-- CoreCLR artifacts from shared target -->
     <ItemGroup>
       <RunTimeDependencyCopyLocal Include="@(_CoreRootArtifactSource)" />
+      <RunTimeDependencyCopyLocal
+        Include="$(_Crossgen2TestPublishDir)**"
+        TargetDir="crossgen2-test/"
+        Condition="'$(_Crossgen2TestPublishDir)' != ''" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetArchitecture)' == 'wasm' and '$(TestBuildMode)' != 'nativeaot'">

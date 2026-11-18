@@ -37,14 +37,26 @@ flags:
 Many subdirectories under `src/tests/` have their own `README.md` with
 area-specific authoring and run guidance — read them before making changes.
 
-## ReadyToRun test layout
+## Crossgen2 test caching
 
 `RunCrossgen2Tests` never modifies the IL in a test's directory. Each run recreates
 `readytorun/` as a copy of the test directory (without wrapper scripts and test markers),
 compiles the test assemblies into it, and runs the test from there. Whole-program
 composite mode uses `readytorun-wholeprogram/` instead, which also holds a copy of the
 `Core_Root` assemblies so that the test loads the compiled CoreLib. Out-of-process tests
-are still launched from their wrappers in the original directory.
+are still launched from their wrappers in the original directory. Concurrent runs of the
+same test directory are not supported.
 
-Refresh `Core_Root` after rebuilding the product. If an older wrapper overwrote the
-original IL, clean and rebuild the affected tests once before using the new wrapper.
+The test launcher calls `RunReadyToRunCompiler` to cache PE outputs. Changes to Crossgen2, the runtime
+and references in `Core_Root`, test inputs, compiler arguments, or runtime/JIT environment
+settings invalidate the cache. Refresh `Core_Root` after rebuilding the product; no
+cache directories need to be deleted. If an older wrapper overwrote the original IL,
+clean and rebuild the affected tests once before using the new wrapper.
+
+Caching is enabled by default. Set `DOTNET_CROSSGEN2_CACHE=false` to compile
+without caching, or `DOTNET_CROSSGEN2_CACHE_PATH` to override the user cache
+directory. Custom compiler arguments, symbol generation, synthesized profiles, and non-PE outputs
+bypass caching and compile on every run. R2RDump and PDB validation remain outside
+the compiler cache. The task host is published to `Core_Root/crossgen2-test` as a self-contained
+CoreCLR app for the platform that runs Crossgen2, so no SDK or installed `dotnet` runtime
+is needed to run it.
