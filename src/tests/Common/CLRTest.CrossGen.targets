@@ -285,10 +285,10 @@ if [ ! -z ${RunCrossGen2+x} ]%3B then
           unset DOTNET_GCName DOTNET_GCStress DOTNET_HeapVerify DOTNET_ReadyToRun DOTNET_GCHeapAffinitizeRanges
           unset DOTNET_TC_OnStackReplacement DOTNET_TC_PartialCompilation
           mkdir -p "$crossgen2OutputDirectory/wasi-r2r/comp" || exit 1
-          # A test that links its own native code composes into its own host.
+          # Use the staged test-specific host so the composer excludes it from the stub scan.
           __WasiR2RComponent="$CORE_ROOT/corerun"
           if [ -f "$PWD/corerun.wasm" ]; then
-            __WasiR2RComponent="$PWD/corerun.wasm"
+            __WasiR2RComponent="$crossgen2OutputDirectory/corerun.wasm"
           fi
           "$__DotNet" msbuild "$CORE_ROOT/wasi-r2r/WasiR2RComposer.proj" -nologo -t:Compose "/p:CompositePath=$crossgen2OutputDirectory/composite-r2r.wasm" "/p:ComponentPath=$__WasiR2RComponent" "/p:OutputDirectory=$crossgen2OutputDirectory/wasi-r2r/work" "/p:OutputPath=$crossgen2OutputDirectory/wasi-r2r/corerun-composite.wasm" "/p:WasmToolsPath=%24(command -v wasm-tools)" "/p:WasmMergePath=%24(command -v wasm-merge)" "/p:WasmOptPath=%24(command -v wasm-opt)" "/p:StubOutputDirectory=$crossgen2OutputDirectory/wasi-r2r/comp" "/p:ComponentStubsDirectory=$crossgen2OutputDirectory"
         )
