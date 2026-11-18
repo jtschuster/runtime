@@ -51,7 +51,7 @@ WARNING:   When setting properties based on their current state (for example:
   Note also that this means it will run after the first of such targets.
   -->
   <Target Name="GenerateBashExecutionScript"
-    Inputs="$(MSBuildProjectFullPath);$(MSBuildThisFileFullPath)"
+    Inputs="$(MSBuildProjectFullPath);$(MSBuildThisFileFullPath);$(MSBuildThisFileDirectory)CLRTest.CrossGen.targets"
     Outputs="$(OutputPath)\$(AssemblyName).sh"
     DependsOnTargets="$(BashScriptSnippetGen);GetIlasmRoundTripBashScript;GetSuperPMICollectionBashScript">
 
@@ -462,7 +462,7 @@ if [ -z "${RunWithNodeJS:-}" ] ; then
     # workaround msbuild issue - https://github.com/dotnet/runtime/issues/74328
     export DOTNET_CLI_DO_NOT_USE_MSBUILD_SERVER=1
 
-    $__Command msbuild $CORE_ROOT/wasm-test-runner/WasmTestRunner.proj /p:NetCoreAppCurrent=$(NetCoreAppCurrent) /p:TestAssemblyFileName=$(MsBuildProjectName).dll /p:TestBinDir=`pwd` $(CLRTestMSBuildArgs) || exit $?
+    $__Command msbuild $CORE_ROOT/wasm-test-runner/WasmTestRunner.proj /p:NetCoreAppCurrent=$(NetCoreAppCurrent) /p:TestAssemblyFileName=$(MsBuildProjectName).dll /p:TestBinDir="%24(cd "%24(dirname "$ExePath")" && pwd)" $(CLRTestMSBuildArgs) || exit $?
 fi
 
 if [ ! -z ${RunCrossGen2+x} ]%3B then
@@ -472,9 +472,9 @@ fi
       </CLRTestBashPreCommands>
       <CLRTestBashPreCommands Condition="'$(CLRTestKind)' == 'BuildAndRun' and '$(TargetOS)' == 'wasi'"><![CDATA[
 $(CLRTestBashPreCommands)
-__WasiCrossgen2OutputDirectory="IL-CG2"
+__WasiCrossgen2OutputDirectory="readytorun"
 if [ ! -z ${WholeProgramCompositeBuildMode+x} ]; then
-  __WasiCrossgen2OutputDirectory="IL-CG2-WholeProgram"
+  __WasiCrossgen2OutputDirectory="readytorun-wholeprogram"
 fi
 __WasiCorerun="$CORE_ROOT/corerun"
 # Tells PlatformDetection.PlatformDoesNotSupportNativeTestAssets whether this test's native

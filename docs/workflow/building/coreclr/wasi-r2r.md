@@ -59,9 +59,10 @@ RunCrossGen2=1 bash artifacts/tests/coreclr/wasi.wasm.Checked/JIT/CodeGenBringUp
 
 The wrapper compiles the runner and referenced test assemblies into a composite, then invokes the
 same composition task through `CORE_ROOT/wasi-r2r/WasiR2RComposer.proj`. It launches
-`IL-CG2/wasi-r2r/corerun-composite.wasm` with
-`APP_ASSEMBLIES=EXTERNAL` and `CORE_LIBRARIES=/IL-CG2/wasi-r2r` so the guest probes the private
-`comp/` stubs. `TEST_READY_TO_RUN_MODE=1` enables R2R-specific test conditions.
+`readytorun/wasi-r2r/corerun-composite.wasm` with `APP_ASSEMBLIES=EXTERNAL` and
+`CORE_LIBRARIES=/readytorun/wasi-r2r` so the guest probes the private `comp/` stubs.
+Whole-program mode uses `readytorun-wholeprogram/` instead.
+`TEST_READY_TO_RUN_MODE=1` enables R2R-specific test conditions.
 
 Without `RunCrossGen2`, the wrapper uses the original host and does not probe those stubs.
 Composition failures fail the test rather than silently falling back to interpretation.

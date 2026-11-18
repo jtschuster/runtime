@@ -134,7 +134,6 @@
            reverse-maps remaining root files to libraries source paths.
          CheckCoreRootFreshness: incremental target (Inputs/Outputs) that
            warns about stale files without failing the build.
-       A separate target handles IL-CG2 R2R cache staleness.
        ========================================================================= -->
 
   <!-- Needed here because build.proj imports tests.targets without Common/Directory.Build.targets,
@@ -220,37 +219,7 @@
              Text="Core_Root has @(_StaleFile->Count()) stale file(s). Run: `src/tests/build.[cmd|sh] $(TargetArchitecture) $(Configuration) -generatelayoutonly`. To suppress, set `/p:SkipCoreRootFreshnessCheck=true`" />
   </Target>
 
-  <!-- IL-CG2 R2R cache staleness (separate concern, runs independently) -->
-  <Target Name="_CheckIlCg2CacheFreshness"
-          Condition="'$(SkipCoreRootFreshnessCheck)' != 'true' and
-                     '$(ContinuousIntegrationBuild)' != 'true' and
-                     '$(RunCrossGen2)' == '1' and
-                     Exists('$(CORE_ROOT)')">
-
-    <PropertyGroup>
-      <_CoreRootDir>$([MSBuild]::NormalizeDirectory('$(CORE_ROOT)'))</_CoreRootDir>
-      <_Crossgen2DstPath>$(_CoreRootDir)crossgen2\crossgen2.exe</_Crossgen2DstPath>
-      <_Crossgen2DstPath Condition="'$(OS)' != 'Windows_NT'">$(_CoreRootDir)crossgen2/crossgen2</_Crossgen2DstPath>
-    </PropertyGroup>
-
-    <ItemGroup Condition="Exists('$(_Crossgen2DstPath)')">
-      <_IlCg2DoneFiles Include="$(BaseOutputPathWithConfig)**\IL-CG2\done" />
-    </ItemGroup>
-
-    <PropertyGroup Condition="'@(_IlCg2DoneFiles)' != ''">
-      <_Crossgen2InCoreRootTime>$([System.IO.File]::GetLastWriteTime('$(_Crossgen2DstPath)').Ticks)</_Crossgen2InCoreRootTime>
-    </PropertyGroup>
-
-    <ItemGroup Condition="'@(_IlCg2DoneFiles)' != ''">
-      <_StaleIlCg2DoneFile Include="@(_IlCg2DoneFiles)"
-          Condition="$([System.IO.File]::GetLastWriteTime('%(Identity)').Ticks) &lt; $(_Crossgen2InCoreRootTime)" />
-    </ItemGroup>
-
-    <Warning Text="STALE IL-CG2: One or more IL-CG2 R2R caches may be stale (crossgen2 is newer than cached compilations)."
-             Condition="'@(_StaleIlCg2DoneFile)' != ''" />
-  </Target>
-
-  <Target Name="RunTests" DependsOnTargets="CheckCoreRootFreshness;_CheckIlCg2CacheFreshness;RunMergedTests;RunStandaloneRunnerTests" Condition="'$(SkipTests)' != 'True'">
+  <Target Name="RunTests" DependsOnTargets="CheckCoreRootFreshness;RunMergedTests;RunStandaloneRunnerTests" Condition="'$(SkipTests)' != 'True'">
     <!-- TODO - merged reporting? -->
   </Target>
 </Project>

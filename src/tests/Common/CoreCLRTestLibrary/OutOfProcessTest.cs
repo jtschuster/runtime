@@ -32,6 +32,9 @@ namespace TestLibrary
         private const string OutOfProcessResultSkipped = "Skip";
         private const string OutOfProcessResultTokenEnvironmentVariable = "__TestOutOfProcessResultToken";
         private const string OutOfProcessStatusFileEnvironmentVariable = "__TestOutOfProcessStatusFile";
+        // Set when the runner runs from a copy of its directory, such as compiled ReadyToRun images,
+        // while the out-of-process tests' wrappers remain in the original directory.
+        internal const string OutOfProcessBaseDirectoryEnvironmentVariable = "__TestOutOfProcessBaseDirectory";
 
         internal static bool runningInWindows;
         internal static string reportBase;
@@ -41,7 +44,8 @@ namespace TestLibrary
         static OutOfProcessTest()
         {
             reportBase = Directory.GetCurrentDirectory();
-            testBinaryBase = AppContext.BaseDirectory;
+            string? baseDirectory = Environment.GetEnvironmentVariable(OutOfProcessBaseDirectoryEnvironmentVariable);
+            testBinaryBase = String.IsNullOrEmpty(baseDirectory) ? AppContext.BaseDirectory : baseDirectory;
             helixUploadRoot = Environment.GetEnvironmentVariable("HELIX_WORKITEM_UPLOAD_ROOT");
             if (!String.IsNullOrEmpty(helixUploadRoot))
             {
@@ -87,7 +91,7 @@ namespace TestLibrary
             }
 
             int ret = -100;
-            string baseDir = AppContext.BaseDirectory;
+            string baseDir = testBinaryBase;
             string outputDir = System.IO.Path.GetFullPath(Path.Combine(reportBase, Path.GetDirectoryName(assemblyPath) ?? string.Empty));
             string outputFile = Path.Combine(outputDir, "output.txt");
             string errorFile = Path.Combine(outputDir, "error.txt");

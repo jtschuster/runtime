@@ -50,7 +50,7 @@ WARNING:   When setting properties based on their current state (for example:
   Note also that this means it will run after the first of such targets.
   -->
   <Target Name="GenerateBatchExecutionScript"
-    Inputs="$(MSBuildProjectFullPath);$(MSBuildThisFileFullPath)"
+    Inputs="$(MSBuildProjectFullPath);$(MSBuildThisFileFullPath);$(MSBuildThisFileDirectory)CLRTest.CrossGen.targets"
     Outputs="$(OutputPath)\$(AssemblyName).cmd"
     DependsOnTargets="$(BatchScriptSnippetGen);GetIlasmRoundTripBatchScript;GetSuperPMICollectionBatchScript">
 

@@ -640,6 +640,8 @@ namespace TestLibrary
                 startInfo.EnvironmentVariables.Add("__Category", category);
                 startInfo.EnvironmentVariables.Add("__TestBinaryBase", testBinaryBase);
                 startInfo.EnvironmentVariables.Add("__OutputDir", outputDir);
+                // Each out-of-process test chooses its own run directory.
+                startInfo.EnvironmentVariables.Remove(OutOfProcessTest.OutOfProcessBaseDirectoryEnvironmentVariable);
 
                 DateTime startTime = DateTime.Now;
                 process.Start();

@@ -36,3 +36,15 @@ flags:
 
 Many subdirectories under `src/tests/` have their own `README.md` with
 area-specific authoring and run guidance — read them before making changes.
+
+## ReadyToRun test layout
+
+`RunCrossgen2Tests` never modifies the IL in a test's directory. Each run recreates
+`readytorun/` as a copy of the test directory (without wrapper scripts and test markers),
+compiles the test assemblies into it, and runs the test from there. Whole-program
+composite mode uses `readytorun-wholeprogram/` instead, which also holds a copy of the
+`Core_Root` assemblies so that the test loads the compiled CoreLib. Out-of-process tests
+are still launched from their wrappers in the original directory.
+
+Refresh `Core_Root` after rebuilding the product. If an older wrapper overwrote the
+original IL, clean and rebuild the affected tests once before using the new wrapper.

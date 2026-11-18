@@ -24,7 +24,7 @@ public static class HalfEstimateR2R
         // ReadyToRun maps AVX10v1 to Avx512Bf16 in ReadyToRunInstructionSetHelper.
         const string Avx10v1Prerequisite = "Avx512Bf16-";
 
-        string imagePath = Path.Combine(Environment.CurrentDirectory, "composite-r2r.dll");
+        string imagePath = Path.Combine(AppContext.BaseDirectory, "composite-r2r.dll");
         string coreRoot = Environment.GetEnvironmentVariable("CORE_ROOT")
             ?? throw new InvalidOperationException("CORE_ROOT is required to inspect the ReadyToRun image.");
 
