@@ -371,6 +371,109 @@ public class R2RTestSuites
     }
 
     [ConditionalTheory(typeof(TestPaths), nameof(TestPaths.IsWasmTarget))]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void WasmCanonicalMethodReadiness(bool direct) =>
+        CheckWasmCanonicalMethodReadiness(nameof(WasmCanonicalMethodReadiness), direct, split: false);
+
+    [ConditionalTheory(typeof(TestPaths), nameof(TestPaths.IsBrowserWasmTarget))]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void WasmCanonicalMethodReadinessAcrossPartitions(bool calleeInPrimary) =>
+        CheckWasmCanonicalMethodReadiness(nameof(WasmCanonicalMethodReadinessAcrossPartitions), calleeInPrimary, split: true);
+
+    private void CheckWasmCanonicalMethodReadiness(string testName, bool expectDirect, bool split)
+    {
+        const string EnumeratorType = "CanonicalActivation.Enumerator`1";
+        const string CanonicalDispose = EnumeratorType + "<__Canon>.Dispose()";
+        const string CallerType = "CanonicalActivation.Test";
+
+        CompiledAssembly input = new()
+        {
+            AssemblyName = "CanonicalActivation",
+            SourceResourceNames = ["CanonicalActivation.cs"],
+        };
+        List<string> additionalArgs =
+        [
+            "--unrooted-input-file-paths", TestPaths.SystemPrivateCoreLibPath,
+            "--codegenopt", "JitNoInline=1",
+        ];
+        List<MibcMethod> profileMethods = [];
+        if (split)
+        {
+            additionalArgs.Add("--auxiliary-modules");
+            profileMethods.Add(new(input.AssemblyName, CallerType, "Run"));
+            if (expectDirect)
+            {
+                profileMethods.Add(new(input.AssemblyName, EnumeratorType + "[[CanonicalActivation.Marker, CanonicalActivation]]", "Dispose"));
+            }
+        }
+        else if (!expectDirect)
+        {
+            additionalArgs.Add("--disable-deferred-wasm-calls");
+        }
+
+        new R2RTestRunner(_output).Run(new R2RTestCase(
+            testName,
+            [
+                new("CanonicalActivation", [new CrossgenAssembly(input)])
+                {
+                    Options = [Crossgen2Option.Composite, Crossgen2Option.InputBubble, Crossgen2Option.Optimize],
+                    AdditionalArgs = additionalArgs,
+                    MibcMethods = profileMethods,
+                    OutputFileExtension = ".wasm",
+                    Validate = Validate,
+                },
+            ]));
+
+        void Validate(ReadyToRunReader reader)
+        {
+            if (split)
+            {
+                List<ReadyToRunMethod> methods = R2RAssert.GetAllMethods(reader);
+                ReadyToRunMethod caller = Assert.Single(methods,
+                    method => method.SignatureString.Contains(CallerType + ".Run()", StringComparison.Ordinal));
+                ReadyToRunMethod callee = Assert.Single(methods,
+                    method => method.SignatureString.Contains(CanonicalDispose, StringComparison.Ordinal));
+                ReadyToRunSection section = reader.ReadyToRunHeader.Sections[ReadyToRunSectionType.AuxiliaryModuleMetadata];
+                int offset = reader.GetOffset(section.RelativeVirtualAddress);
+                AuxiliaryModuleMetadataSection metadata = new(reader, offset, offset + section.Size);
+                AuxiliaryModuleEntry auxiliary = Assert.Single(metadata.Entries);
+                Assert.InRange(caller.EntryPointRuntimeFunctionId, 0, metadata.PrimaryModuleMethodCount - 1);
+                if (expectDirect)
+                {
+                    Assert.InRange(callee.EntryPointRuntimeFunctionId, 0, metadata.PrimaryModuleMethodCount - 1);
+                }
+                else
+                {
+                    Assert.InRange(callee.EntryPointRuntimeFunctionId, metadata.PrimaryModuleMethodCount,
+                        metadata.PrimaryModuleMethodCount + auxiliary.MethodCount - 1);
+                }
+            }
+
+            SignatureFormattingOptions formattingOptions = new();
+            var disposeImports = reader.ImportSections.SelectMany(section => section.Entries)
+                .Where(entry => entry.Signature?.FixupKind is ReadyToRunFixupKind.MethodEntry_ReadyToRun or ReadyToRunFixupKind.MethodEntry)
+                .Select(entry => (entry.Signature!.FixupKind, Text: entry.Signature.ToString(formattingOptions)))
+                .Where(import => import.Text.Contains(EnumeratorType + "<", StringComparison.Ordinal) &&
+                    import.Text.Contains(".Dispose()", StringComparison.Ordinal));
+
+            var import = Assert.Single(disposeImports);
+            Assert.Contains(CanonicalDispose, import.Text);
+            Assert.Equal(expectDirect ? ReadyToRunFixupKind.MethodEntry_ReadyToRun : ReadyToRunFixupKind.MethodEntry, import.FixupKind);
+            if (expectDirect)
+            {
+                Assert.DoesNotContain(" @ ", import.Text);
+                Assert.DoesNotContain("CanonicalActivation.Marker", import.Text);
+            }
+            else
+            {
+                Assert.Contains(" @ CanonicalActivation.Enumerator`1<CanonicalActivation.Marker>", import.Text);
+            }
+        }
+    }
+
+    [ConditionalTheory(typeof(TestPaths), nameof(TestPaths.IsWasmTarget))]
     [InlineData(false)]
     [InlineData(true)]
     public void StartupEagerMethodsHaveNoPrecodeFixups(bool rootCoreLib)
